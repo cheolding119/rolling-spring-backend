@@ -8,6 +8,6 @@ public class RollingApiApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(RollingApiApplication.class, args);
+
 	}
-//ssss
 }
