@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
 
-    Page<OpenMat> findByRegionOrderByStartDateTimeAsc(String region, Pageable pageable);
+    Page<OpenMat> findByIsHiddenFalse(Pageable pageable);
 }

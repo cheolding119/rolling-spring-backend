@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "open_mats")
@@ -31,54 +33,53 @@ public class OpenMat extends BaseTimeEntity {
     private String description;
 
     @Column(nullable = false)
-    private String region;
-
-    private String locationName;
-
-    private String address;
-
-    @Column(nullable = false)
     private LocalDateTime startDateTime;
 
     @Column(nullable = false)
     private LocalDateTime endDateTime;
 
-    @Column(nullable = false)
-    private Integer currentParticipants = 0;
+    private String locationName;
+
+    private String address;
+
+    @ElementCollection
+    @CollectionTable(name = "open_mat_participants", joinColumns = @JoinColumn(name = "open_mat_id"))
+    @Column(name = "user_id")
+    private List<Long> participantUids = new ArrayList<>();
 
     @Column(nullable = false)
     private Integer maxCapacity = -1;
-
-    private String hostInstagramId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OpenMatStatus status = OpenMatStatus.RECRUITING;
 
+    @Column(nullable = false)
+    private Integer reportCount = 0;
+
+    @Column(nullable = false)
+    private Boolean isHidden = false;
+
+    private String hostInstagramId;
+
     @Builder
     public OpenMat(User host,
                    String title,
                    String description,
-                   String region,
-                   String locationName,
-                   String address,
                    LocalDateTime startDateTime,
                    LocalDateTime endDateTime,
-                   Integer currentParticipants,
+                   String locationName,
+                   String address,
                    Integer maxCapacity,
                    String hostInstagramId,
                    OpenMatStatus status) {
         this.host = host;
         this.title = title;
         this.description = description;
-        this.region = region;
-        this.locationName = locationName;
-        this.address = address;
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
-        if (currentParticipants != null) {
-            this.currentParticipants = currentParticipants;
-        }
+        this.locationName = locationName;
+        this.address = address;
         if (maxCapacity != null) {
             this.maxCapacity = maxCapacity;
         }
@@ -87,6 +88,13 @@ public class OpenMat extends BaseTimeEntity {
         }
         if (status != null) {
             this.status = status;
+        }
+    }
+
+    public void report() {
+        this.reportCount++;
+        if (this.reportCount >= 2) {
+            this.isHidden = true;
         }
     }
 }

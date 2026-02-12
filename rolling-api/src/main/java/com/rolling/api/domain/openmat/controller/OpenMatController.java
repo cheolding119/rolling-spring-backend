@@ -39,10 +39,8 @@ public class OpenMatController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
-            @RequestParam(required = false) String region,
-            Pageable pageable) {
-        Page<OpenMatResponse> response = openMatService.findAll(region, pageable);
+    public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(Pageable pageable) {
+        Page<OpenMatResponse> response = openMatService.findAll(pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

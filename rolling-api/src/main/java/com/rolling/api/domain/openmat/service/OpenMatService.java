@@ -40,13 +40,11 @@ public class OpenMatService {
                 .host(host)
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .region(request.getRegion())
-                .locationName(request.getLocationName())
-                .address(request.getAddress())
                 .startDateTime(request.getStartDateTime())
                 .endDateTime(request.getEndDateTime())
+                .locationName(request.getLocationName())
+                .address(request.getAddress())
                 .maxCapacity(request.getMaxCapacity())
-                .currentParticipants(0)
                 .hostInstagramId(request.getHostInstagramId())
                 .status(OpenMatStatus.RECRUITING)
                 .build();
@@ -56,14 +54,12 @@ public class OpenMatService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OpenMatResponse> findAll(String region, Pageable pageable) {
+    public Page<OpenMatResponse> findAll(Pageable pageable) {
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
-        Page<OpenMat> page = (region == null || region.isBlank())
-                ? openMatRepository.findAll(pageableWithSort)
-                : openMatRepository.findByRegionOrderByStartDateTimeAsc(region, pageableWithSort);
+        Page<OpenMat> page = openMatRepository.findByIsHiddenFalse(pageableWithSort);
 
         return page.map(OpenMatResponse::from);
     }

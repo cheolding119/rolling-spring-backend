@@ -1,23 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="1c392be9-3777-4709-8574-2495837ca819" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/checksums/checksums.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/checksums/md5-checksums.bin" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/checksums/sha1-checksums.bin" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/executionHistory/executionHistory.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/fileChanges/last-build.bin" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/fileHashes/fileHashes.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/gc.properties" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/cache.properties" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/vcs-1/gc.properties" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/compiler.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/gradle.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/jarRepositories.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rolling-api/build/reports/problems/problems-report.html" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/.claude/settings.local.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/build.gradle" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/docs/DOMAIN_MODEL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/docs/PROJECT_OVERVIEW.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/docs/REQUIREMENTS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/docs/TECK_STACK.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/src/main/java/com/rolling/api/RollingApiApplication.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/src/main/resources/application.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rolling-api/src/main/resources/data.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/checksums/checksums.lock" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/checksums/checksums.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/executionHistory/executionHistory.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/9.2.1/fileHashes/fileHashes.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/cache.properties" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/cache.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/outputFiles.bin" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/buildOutputCleanup/outputFiles.bin" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.gradle/file-system.probe" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/.idea/modules/rolling-api.main.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/RollingApiApplication.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/RollingApiApplication.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/controller/AuthController.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/controller/AuthController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/RefreshTokenRequest.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/SocialLoginRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/SocialLoginRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/TokenResponse$TokenResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/TokenResponse.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/dto/TokenResponse.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/service/AuthService.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/auth/service/AuthService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/controller/GymController.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymAmenityResponse$GymAmenityResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymAmenityResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymDetailResponse$GymDetailResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymDetailResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymImageResponse$GymImageResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymImageResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymListResponse$GymListResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymListResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymScheduleResponse$GymScheduleResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/dto/GymScheduleResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/Gym$GymBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/Gym.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymAmenity$GymAmenityBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymAmenity.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymImage$GymImageBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymImage.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymSchedule$GymScheduleBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/entity/GymSchedule.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/repository/GymImageRepository.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/repository/GymRepository.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/repository/GymScheduleRepository.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/gym/service/GymService.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/controller/UserController.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/dto/FcmTokenRequest.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/dto/UserResponse$UserResponseBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/dto/UserResponse.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/dto/UserUpdateRequest.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/entity/SocialProvider.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/entity/SocialProvider.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/entity/User$UserBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/entity/User.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/entity/User.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/repository/UserRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/repository/UserRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/domain/user/service/UserService.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/config/JpaConfig.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/config/RestTemplateConfig.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/config/SecurityConfig.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/entity/BaseTimeEntity.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/exception/AuthException.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/exception/GlobalExceptionHandler.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/exception/GlobalExceptionHandler.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/exception/InvalidTokenException.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/exception/SocialLoginException.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/response/ApiResponse.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/response/ApiResponse.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/CurrentUser.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/CustomUserDetails.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/CustomUserDetailsService.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/JwtAuthenticationFilter.class" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/JwtAuthenticationFilter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/global/security/JwtProvider.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/AppleLoginVerifier.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/GoogleLoginVerifier.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/KakaoLoginVerifier.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/SocialLoginInfo$SocialLoginInfoBuilder.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/SocialLoginInfo.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/SocialLoginVerifier.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/classes/java/main/com/rolling/api/infra/social/SocialLoginVerifierFactory.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/libs/rolling-api-0.0.1-SNAPSHOT-plain.jar" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/libs/rolling-api-0.0.1-SNAPSHOT-plain.jar" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/libs/rolling-api-0.0.1-SNAPSHOT.jar" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/libs/rolling-api-0.0.1-SNAPSHOT.jar" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/reports/problems/problems-report.html" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/reports/problems/problems-report.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/resources/main/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/resources/main/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rolling-api/build/tmp/compileJava/previous-compilation-data.bin" beforeDir="false" afterPath="$PROJECT_DIR$/rolling-api/build/tmp/compileJava/previous-compilation-data.bin" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,6 +101,22 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;cheolding119&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/cheolding119/rolling-spring-backend.git&quot;,
+    &quot;accountId&quot;: &quot;f3a8be23-588b-4f96-91cd-03cb5bdd08a5&quot;
+  }
+}</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -34,20 +124,41 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/rolling/rolling-spring-backend/rolling-api/build.gradle",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature)-gym--backend&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/rolling/rolling-spring-backend&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;프로젝트&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
+  <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="rolling-spring-backend" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="rolling-spring-backend" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9f38398b9061-18abd8497189-intellij.indexing.shared.core-IU-241.14494.240" />
-        <option value="bundled-js-predefined-1d06a55b98c1-74d2a5396914-JavaScript-IU-241.14494.240" />
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
       </set>
     </attachedChunks>
   </component>
@@ -66,5 +177,9 @@
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
