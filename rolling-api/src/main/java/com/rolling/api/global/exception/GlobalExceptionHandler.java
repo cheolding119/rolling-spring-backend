@@ -21,6 +21,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getCode(), e.getMessage()));
     }
 
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
+        log.error("BusinessException: {} - {}", e.getCode(), e.getMessage());
+        return ResponseEntity
+                .status(e.getHttpStatus())
+                .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ApiResponse<Void>> handleRestClientException(RestClientException e) {
         log.error("RestClientException: {}", e.getMessage());

@@ -2,47 +2,164 @@ package com.rolling.api.domain.openmat.controller;
 
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
+import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.global.response.ApiResponse;
+import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "OpenMat", description = "오픈매트 API")
 @RestController
 @RequestMapping("/api/v1/open-mats")
 @RequiredArgsConstructor
 public class OpenMatController {
 
     private final OpenMatService openMatService;
+    private final JwtTokenProvider jwtTokenProvider;
 
+    @Operation(summary = "오픈매트 생성", description = "새로운 오픈매트를 생성합니다. 인증이 필요합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "생성 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @PostMapping
     public ResponseEntity<ApiResponse<OpenMatResponse>> create(
-            @RequestHeader(value = "X-User-Id", required = false) Long xUserId,
-            @RequestHeader(value = "user_id", required = false) Long userId,
+            HttpServletRequest httpRequest,
             @Valid @RequestBody OpenMatCreateRequest request) {
-        Long hostId = userId != null ? userId : xUserId;
-        if (hostId == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "user_id 헤더가 필요합니다");
-        }
+        Long hostId = extractUserId(httpRequest);
         OpenMatResponse response = openMatService.create(hostId, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    private Long extractUserId(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            throw new com.rolling.api.global.exception.AuthException("UNAUTHORIZED", "Authorization 헤더가 필요합니다");
+        }
+        String token = header.substring(7);
+        return jwtTokenProvider.getUserIdFromToken(token);
+    }
+
+    @Operation(summary = "내가 신청한 오픈매트 목록", description = "내가 신청한 오픈매트 목록을 조회합니다. 인증이 필요합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> myOpenMats(
+            HttpServletRequest httpRequest,
+            @PageableDefault(size = 10, sort = "startDateTime") Pageable pageable) {
+        Long userId = extractUserId(httpRequest);
+        Page<OpenMatResponse> response = openMatService.findMyOpenMats(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역 필터링을 지원합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
-            @RequestParam(required = false) String region,
+            @Parameter(description = "지역 필터 (주소에 포함된 키워드)") @RequestParam(required = false) String region,
             Pageable pageable) {
         Page<OpenMatResponse> response = openMatService.findAll(region, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 상세 조회", description = "오픈매트 단건을 상세 조회합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<OpenMatResponse>> findById(
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
+        OpenMatResponse response = openMatService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 수정", description = "오픈매트를 수정합니다. 작성자 본인만 가능합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<OpenMatResponse>> update(
+            HttpServletRequest httpRequest,
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id,
+            @RequestBody OpenMatUpdateRequest request) {
+        Long userId = extractUserId(httpRequest);
+        OpenMatResponse response = openMatService.update(userId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 신청", description = "오픈매트에 참가 신청합니다. 인증이 필요합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "신청 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청 불가 (마감/종료/중복/정원초과)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @PostMapping("/{id}/apply")
+    public ResponseEntity<ApiResponse<Void>> apply(
+            HttpServletRequest httpRequest,
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
+        Long userId = extractUserId(httpRequest);
+        openMatService.apply(userId, id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "오픈매트 신청 취소", description = "오픈매트 참가 신청을 취소합니다. 인증이 필요합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "취소 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청하지 않은 오픈매트"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @DeleteMapping("/{id}/apply")
+    public ResponseEntity<ApiResponse<Void>> cancelApply(
+            HttpServletRequest httpRequest,
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
+        Long userId = extractUserId(httpRequest);
+        openMatService.cancelApply(userId, id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "오픈매트 삭제", description = "오픈매트를 삭제합니다. 작성자 본인만 가능하며, 신청자가 있는 경우 force=true가 필요합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청자가 있어 force 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            HttpServletRequest httpRequest,
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id,
+            @Parameter(description = "신청자가 있을 때 강제 삭제 여부") @RequestParam(defaultValue = "false") boolean force) {
+        Long userId = extractUserId(httpRequest);
+        openMatService.delete(userId, id, force);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

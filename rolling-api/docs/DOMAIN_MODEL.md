@@ -11,14 +11,7 @@ public enum SocialProvider {
 }
 ```
 
-### DayOfWeek
-요일 타입 (Java 기본 제공 사용)
-```java
-import java.time.DayOfWeek;
-// MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
-```
-
-### OpenMatStatus
+ㄴ### OpenMatStatus
 오픈매트 모집 상태
 ```java
 public enum OpenMatStatus {
@@ -83,237 +76,7 @@ public class User extends BaseTimeEntity {
 }
 ```
 
-## 2. 체육관 (Gym)
-
-**Entity**: `Gym`
-
-| **필드명** | **타입** | **설명** | **비고** |
-| --- | --- | --- | --- |
-| `id` | `Long` | 체육관 고유 ID | PK |
-| `owner` | `User` | 관리자(관장) | @ManyToOne |
-| `name` | `String` | 체육관 명칭 | @Column(nullable = false) |
-| `address` | `String` | 도로명/지번 주소 |  |
-| `latitude` | `Double` | 위도 (Latitude) |  |
-| `longitude` | `Double` | 경도 (Longitude) |  |
-| `phone` | `String` | 대표 연락처 |  |
-| `description` | `String` | 상세 소개 문구 | @Column(columnDefinition = "TEXT") |
-| `priceInfo` | `String` | 가격 가이드 정보 |  |
-| `isVisible` | `Boolean` | 앱 노출 여부 | default = true |
-| `createdAt` | `LocalDateTime` | 생성 일시 | @CreatedDate |
-| `updatedAt` | `LocalDateTime` | 수정 일시 | @LastModifiedDate |
-
-```java
-@Entity
-@Table(name = "gyms")
-public class Gym extends BaseTimeEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id", nullable = false)
-    private User owner;
-
-    @Column(nullable = false)
-    private String name;
-
-    private String address;
-    private Double latitude;
-    private Double longitude;
-    private String phone;
-
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    private String priceInfo;
-
-    @Column(nullable = false)
-    private Boolean isVisible = true;
-
-    @OneToMany(mappedBy = "gym", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<GymSchedule> schedules = new ArrayList<>();
-
-    @OneToMany(mappedBy = "gym", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<GymImage> images = new ArrayList<>();
-
-    @OneToMany(mappedBy = "gym", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<GymAmenity> amenities = new ArrayList<>();
-}
-```
-
-**Entity**: `GymSchedule` (시간표)
-
-| **필드명** | **타입** | **설명** | **비고** |
-| --- | --- | --- | --- |
-| `id` | `Long` | 시간표 ID | PK |
-| `gym` | `Gym` | 체육관 | @ManyToOne |
-| `dayOfWeek` | `DayOfWeek` | 요일 | @Enumerated |
-| `startTime` | `LocalTime` | 시작 시간 |  |
-| `endTime` | `LocalTime` | 종료 시간 |  |
-| `className` | `String` | 클래스 명칭 | 예: "기초반", "오픈매트" |
-
-```java
-@Entity
-@Table(name = "gym_schedules")
-public class GymSchedule {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gym_id", nullable = false)
-    private Gym gym;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private DayOfWeek dayOfWeek;
-
-    @Column(nullable = false)
-    private LocalTime startTime;
-
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(nullable = false)
-    private String className;
-}
-```
-
-**Entity**: `GymImage` (체육관 이미지)
-
-```java
-@Entity
-@Table(name = "gym_images")
-public class GymImage {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gym_id", nullable = false)
-    private Gym gym;
-
-    @Column(nullable = false)
-    private String imageUrl;
-
-    private Integer sortOrder;
-}
-```
-
-**Entity**: `GymAmenity` (편의시설)
-
-```java
-@Entity
-@Table(name = "gym_amenities")
-public class GymAmenity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gym_id", nullable = false)
-    private Gym gym;
-
-    @Column(nullable = false)
-    private String amenityType; // parking, shower, locker 등
-
-    @Column(nullable = false)
-    private Boolean available = true;
-}
-```
-
-## 3. 커뮤니티 (Community)
-
-**Entity**: `Post`
-
-| **필드명** | **타입** | **설명** | **비고** |
-| --- | --- | --- | --- |
-| `id` | `Long` | 게시글 고유 ID | PK |
-| `author` | `User` | 작성자 | @ManyToOne |
-| `title` | `String` | 게시글 제목 |  |
-| `content` | `String` | 본문 내용 | @Column(columnDefinition = "TEXT") |
-| `regionTag` | `String` | 지역 필터 태그 |  |
-| `viewCount` | `Integer` | 조회수 | default = 0 |
-| `commentCount` | `Integer` | 댓글 총 개수 | default = 0 |
-| `isReported` | `Boolean` | 신고 접수 여부 | default = false |
-| `reportedCount` | `Integer` | 신고 접수 개수 | default = 0 |
-| `isDeleted` | `Boolean` | 삭제 여부 | Soft Delete |
-| `createdAt` | `LocalDateTime` | 작성 일시 |  |
-| `updatedAt` | `LocalDateTime` | 최종 수정 일시 |  |
-
-```java
-@Entity
-@Table(name = "posts")
-public class Post extends BaseTimeEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", nullable = false)
-    private User author;
-
-    @Column(nullable = false)
-    private String title;
-
-    @Column(columnDefinition = "TEXT", nullable = false)
-    private String content;
-
-    @Column(nullable = false)
-    private String regionTag;
-
-    @Column(nullable = false)
-    private Integer viewCount = 0;
-
-    @Column(nullable = false)
-    private Integer commentCount = 0;
-
-    @Column(nullable = false)
-    private Boolean isReported = false;
-
-    @Column(nullable = false)
-    private Integer reportedCount = 0;
-
-    @Column(nullable = false)
-    private Boolean isDeleted = false;
-
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
-    private List<PostImage> images = new ArrayList<>();
-
-    @OneToMany(mappedBy = "post")
-    private List<PostLike> likes = new ArrayList<>();
-
-    @OneToMany(mappedBy = "post")
-    private List<Comment> comments = new ArrayList<>();
-}
-```
-
-**Entity**: `PostLike` (좋아요/싫어요)
-
-```java
-@Entity
-@Table(name = "post_likes", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"post_id", "user_id"})
-})
-public class PostLike {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    private Post post;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @Column(nullable = false)
-    private Boolean isLike; // true: 좋아요, false: 싫어요
-}
-```
-
-## 4. 오픈매트 (OpenMat)
+## 2. 오픈매트 (OpenMat)
 
 **Entity**: `OpenMat`
 
@@ -385,45 +148,7 @@ public class OpenMat extends BaseTimeEntity {
 }
 ```
 
-## 5. 댓글 (Comment)
-
-**Entity**: `Comment`
-
-| **필드명** | **타입** | **설명** | **비고** |
-| --- | --- | --- | --- |
-| `id` | `Long` | 댓글 고유 ID | PK |
-| `post` | `Post` | 게시글 | @ManyToOne |
-| `author` | `User` | 작성자 | @ManyToOne |
-| `content` | `String` | 댓글 내용 |  |
-| `isDeleted` | `Boolean` | 삭제 여부 | Soft Delete |
-| `createdAt` | `LocalDateTime` | 작성 일시 |  |
-| `updatedAt` | `LocalDateTime` | 최종 수정 일시 |  |
-
-```java
-@Entity
-@Table(name = "comments")
-public class Comment extends BaseTimeEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    private Post post;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", nullable = false)
-    private User author;
-
-    @Column(columnDefinition = "TEXT", nullable = false)
-    private String content;
-
-    @Column(nullable = false)
-    private Boolean isDeleted = false;
-}
-```
-
-## 6. 대회 정보 (Tournament)
+## 3. 대회 정보 (Tournament)
 
 **Entity**: `Tournament`
 
@@ -483,7 +208,7 @@ public class Tournament extends BaseTimeEntity {
 }
 ```
 
-## 7. BaseTimeEntity (공통 시간 엔티티)
+## 4. BaseTimeEntity (공통 시간 엔티티)
 
 ```java
 @MappedSuperclass
@@ -497,3 +222,17 @@ public abstract class BaseTimeEntity {
     private LocalDateTime updatedAt;
 }
 ```
+---
+
+## 변경사항 (2026-02-19)
+
+### OpenMat 조회 모델 보완
+- `my applied open mats`는 목록 반환 대신 **페이지 반환**을 사용한다.
+- 엔티티(`OpenMat`, `User`)의 컬럼/관계는 변경 없다.
+- 응답 모델은 페이지 메타데이터를 포함한다.
+  - `content`
+  - `page`
+  - `size` (기본 10)
+  - `totalElements`
+  - `totalPages`
+  - `last`
