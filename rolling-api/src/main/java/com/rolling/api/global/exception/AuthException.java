@@ -19,4 +19,12 @@ public class AuthException extends RuntimeException {
     public static AuthException kakaoApiError(String message) {
         return new AuthException("KAKAO_API_ERROR", message);
     }
+
+    public static AuthException googleApiError(String message) {
+        return new AuthException("GOOGLE_API_ERROR", message);
+    }
+
+    public static AuthException unsupportedProvider(String provider) {
+        return new AuthException("UNSUPPORTED_PROVIDER", "지원하지 않는 소셜 로그인 provider입니다: " + provider);
+    }
 }

@@ -1,41 +1,32 @@
 package com.rolling.api.domain.openmat.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
 
 @Getter
-@Schema(description = "오픈매트 생성 요청")
-public class OpenMatCreateRequest {
+@Schema(description = "오픈매트 수정 요청")
+public class OpenMatUpdateRequest {
 
-    @NotBlank(message = "제목은 필수입니다")
     @Schema(description = "오픈매트 제목", example = "주말 오픈매트")
     private String title;
 
-    @NotBlank(message = "설명은 필수입니다")
     @Schema(description = "오픈매트 설명", example = "자유롭게 참가 가능한 주말 오픈매트입니다.")
     private String description;
 
-    @NotNull(message = "시작 시간은 필수입니다")
     @Schema(description = "시작 일시", example = "2026-03-01T10:00:00")
     private LocalDateTime startDateTime;
 
-    @NotNull(message = "종료 시간은 필수입니다")
     @Schema(description = "종료 일시", example = "2026-03-01T12:00:00")
     private LocalDateTime endDateTime;
 
-    @NotBlank(message = "장소명은 필수입니다")
     @Schema(description = "장소명", example = "롤링 주짓수 아카데미")
     private String locationName;
 
-    @NotBlank(message = "주소는 필수입니다")
     @Schema(description = "주소", example = "서울시 강남구 역삼동 123-45")
     private String address;
 
-    @NotNull(message = "최대 정원은 필수입니다")
     @Schema(description = "최대 참가 인원", example = "20")
     private Integer maxCapacity;
 

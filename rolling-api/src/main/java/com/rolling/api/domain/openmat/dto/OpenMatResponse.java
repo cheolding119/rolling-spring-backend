@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -21,9 +22,10 @@ public class OpenMatResponse {
     private String address;
     private List<Long> participantUids;
     private Integer maxCapacity;
+    private Integer currentParticipants;
     private OpenMatStatus status;
-    private Integer reportCount;
-    private Boolean isHidden;
+    private Long hostId;
+    private String hostNickname;
     private String hostInstagramId;
     private LocalDateTime createdAt;
 
@@ -36,11 +38,12 @@ public class OpenMatResponse {
                 .endDateTime(openMat.getEndDateTime())
                 .locationName(openMat.getLocationName())
                 .address(openMat.getAddress())
-                .participantUids(openMat.getParticipantUids())
+                .participantUids(new ArrayList<>(openMat.getParticipantUids()))
                 .maxCapacity(openMat.getMaxCapacity())
+                .currentParticipants(openMat.getParticipantUids().size())
                 .status(openMat.getStatus())
-                .reportCount(openMat.getReportCount())
-                .isHidden(openMat.getIsHidden())
+                .hostId(openMat.getHost().getId())
+                .hostNickname(openMat.getHost().getNickname())
                 .hostInstagramId(openMat.getHostInstagramId())
                 .createdAt(openMat.getCreatedAt())
                 .build();

@@ -91,6 +91,44 @@ public class OpenMat extends BaseTimeEntity {
         }
     }
 
+    public void update(String title,
+                       String description,
+                       LocalDateTime startDateTime,
+                       LocalDateTime endDateTime,
+                       String locationName,
+                       String address,
+                       Integer maxCapacity,
+                       String hostInstagramId) {
+        if (title != null) this.title = title;
+        if (description != null) this.description = description;
+        if (startDateTime != null) this.startDateTime = startDateTime;
+        if (endDateTime != null) this.endDateTime = endDateTime;
+        if (locationName != null) this.locationName = locationName;
+        if (address != null) this.address = address;
+        if (maxCapacity != null) this.maxCapacity = maxCapacity;
+        if (hostInstagramId != null) this.hostInstagramId = hostInstagramId;
+    }
+
+    public boolean hasParticipants() {
+        return participantUids != null && !participantUids.isEmpty();
+    }
+
+    public boolean isParticipant(Long userId) {
+        return participantUids.contains(userId);
+    }
+
+    public boolean isCapacityFull() {
+        return maxCapacity != -1 && participantUids.size() >= maxCapacity;
+    }
+
+    public void addParticipant(Long userId) {
+        participantUids.add(userId);
+    }
+
+    public void removeParticipant(Long userId) {
+        participantUids.remove(userId);
+    }
+
     public void report() {
         this.reportCount++;
         if (this.reportCount >= 2) {

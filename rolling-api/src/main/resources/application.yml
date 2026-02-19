@@ -28,7 +28,7 @@ logging:
     root: INFO
     com.rolling.api: DEBUG
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
+    org.hibernate.orm.jdbc.bind: OFF
 
 server:
   port: 8080

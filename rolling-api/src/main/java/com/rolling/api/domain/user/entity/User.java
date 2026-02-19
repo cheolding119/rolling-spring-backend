@@ -11,7 +11,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"socialId", "socialProvider"})
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
@@ -31,7 +33,7 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private SocialProvider socialProvider;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String socialId;
 
     private String fcmToken;

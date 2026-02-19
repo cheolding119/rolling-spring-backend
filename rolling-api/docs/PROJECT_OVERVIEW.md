@@ -2,15 +2,15 @@
 
 **주짓수 라이프스타일 통합 플랫폼 '롤링(Rolling)' - Backend**
 
-파편화된 주짓수 정보(체육관, 오픈매트, 대회, 커뮤니티)를 하나로 모아 제공하는 REST API 서버입니다.
+파편화된 주짓수 정보(오픈매트, 대회)를 하나로 모아 제공하는 REST API 서버입니다.
 Flutter 모바일 앱에 데이터를 제공하며, 정보 탐색과 외부 활동 참여에 집중한 MVP(Minimum Viable Product) 모델입니다.
 
 ---
 
 ## 2. 주요 대상 (Target Audience)
 
-- **수련생**: 자신의 체육관 밖에서 일어나는 오픈매트, 대회, 커뮤니티 등 다양한 '외부 활동'을 즐기는 적극적인 수련자.
-- **관장님**: 마케팅 툴이 부족한 상황에서 최소한의 노력으로 체육관의 시설과 프로그램을 홍보하려는 운영자.
+- **수련생**: 자신의 체육관 밖에서 일어나는 오픈매트, 대회 등 다양한 '외부 활동'을 즐기는 적극적인 수련자.
+- **관장님**: 최소한의 노력으로 오픈매트와 대회 정보를 홍보하려는 운영자.
 
 ---
 
@@ -36,35 +36,11 @@ Flutter 모바일 앱에 데이터를 제공하며, 정보 탐색과 외부 활�
 |--------|----------|------|
 | GET | `/api/v1/users/me` | 내 정보 조회 |
 | PUT | `/api/v1/users/me` | 내 정보 수정 |
-| POST | `/api/v1/users/me/fcm-token` | FCM 토큰 등록 |
-| GET | `/api/v1/users/me/posts` | 내가 쓴 글 목록 |
-| GET | `/api/v1/users/me/comments` | 내가 쓴 댓글 목록 |
+| POST | `/api/v1/users/me/fcm`| FCM 토큰 등록 |
 | POST | `/api/v1/users/{id}/block` | 사용자 차단 |
 | DELETE | `/api/v1/users/{id}/block` | 차단 해제 |
 
-### 3.3 체육관 API (Gym)
-
-| Method | Endpoint | 설명 |
-|--------|----------|------|
-| GET | `/api/v1/gyms` | 체육관 리스트 (위치 기반, 거리순) |
-| GET | `/api/v1/gyms/{id}` | 체육관 상세 조회 |
-| GET | `/api/v1/gyms/search` | 체육관 검색 |
-| POST | `/api/v1/gyms` | 체육관 등록 (관장) |
-| PUT | `/api/v1/gyms/{id}` | 체육관 수정 (관장) |
-| DELETE | `/api/v1/gyms/{id}` | 체육관 삭제 (관장) |
-| POST | `/api/v1/gyms/{id}/schedules` | 시간표 추가 |
-| PUT | `/api/v1/gyms/{id}/schedules/{scheduleId}` | 시간표 수정 |
-| DELETE | `/api/v1/gyms/{id}/schedules/{scheduleId}` | 시간표 삭제 |
-| POST | `/api/v1/gyms/{id}/images` | 이미지 업로드 (S3) |
-| DELETE | `/api/v1/gyms/{id}/images/{imageId}` | 이미지 삭제 |
-
-**구현 요구사항**:
-- 위도/경도 기반 거리 계산 (Haversine 공식)
-- `isVisible = true` 필터링
-- amenities 동적 필터링 (QueryDSL)
-- 시간표 `startTime < endTime` 검증
-
-### 3.4 오픈매트 API (OpenMat)
+### 3.3 오픈매트 API (OpenMat)
 
 | Method | Endpoint | 설명 |
 |--------|----------|------|
@@ -82,31 +58,7 @@ Flutter 모바일 앱에 데이터를 제공하며, 정보 탐색과 외부 활�
 - Scheduler로 endDateTime 지난 오픈매트 FINISHED 전환
 - 수정/삭제 시 신청자에게 FCM 푸시 알림
 
-### 3.5 커뮤니티 API (Post & Comment)
-
-| Method | Endpoint | 설명 |
-|--------|----------|------|
-| GET | `/api/v1/posts` | 게시글 리스트 (지역 필터) |
-| GET | `/api/v1/posts/{id}` | 게시글 상세 조회 |
-| POST | `/api/v1/posts` | 게시글 작성 |
-| PUT | `/api/v1/posts/{id}` | 게시글 수정 |
-| DELETE | `/api/v1/posts/{id}` | 게시글 삭제 (Soft Delete) |
-| POST | `/api/v1/posts/{id}/like` | 좋아요 |
-| POST | `/api/v1/posts/{id}/dislike` | 싫어요 |
-| DELETE | `/api/v1/posts/{id}/like` | 좋아요/싫어요 취소 |
-| POST | `/api/v1/posts/{id}/report` | 게시글 신고 |
-| GET | `/api/v1/posts/{id}/comments` | 댓글 조회 |
-| POST | `/api/v1/posts/{id}/comments` | 댓글 작성 |
-| PUT | `/api/v1/posts/{id}/comments/{commentId}` | 댓글 수정 |
-| DELETE | `/api/v1/posts/{id}/comments/{commentId}` | 댓글 삭제 |
-
-**구현 요구사항**:
-- 익명성 보장 (작성자 ID 미노출, nickname만 반환)
-- 신고 3회 누적 시 자동 숨김 처리
-- Soft Delete (isDeleted = true)
-- 게시글 삭제 시 댓글 연쇄 Soft Delete
-
-### 3.6 대회 API (Tournament)
+### 3.4 대회 API (Tournament)
 
 | Method | Endpoint | 설명 |
 |--------|----------|------|
@@ -160,10 +112,7 @@ com.rolling/
 ├── global/           # 공통 설정, 예외, 유틸
 ├── domain/           # 도메인별 모듈
 │   ├── user/
-│   ├── gym/
 │   ├── openmat/
-│   ├── post/
-│   ├── comment/
 │   └── tournament/
 └── infra/            # 외부 서비스 연동
     ├── firebase/
