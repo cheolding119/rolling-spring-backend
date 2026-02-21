@@ -4,6 +4,7 @@ import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.repository.OpenMatRepository;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -19,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +44,7 @@ public class OpenMatService {
                 .endDateTime(request.getEndDateTime())
                 .locationName(request.getLocationName())
                 .address(request.getAddress())
+                .region(request.getRegion())
                 .maxCapacity(request.getMaxCapacity())
                 .hostInstagramId(request.getHostInstagramId())
                 .status(OpenMatStatus.RECRUITING)
@@ -54,14 +55,14 @@ public class OpenMatService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OpenMatResponse> findAll(String region, Pageable pageable) {
+    public Page<OpenMatResponse> findAll(Region region, Pageable pageable) {
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
         Page<OpenMat> page;
-        if (region != null && !region.isBlank()) {
-            page = openMatRepository.findByIsHiddenFalseAndAddressContaining(region, pageableWithSort);
+        if (region != null) {
+            page = openMatRepository.findByIsHiddenFalseAndRegion(region, pageableWithSort);
         } else {
             page = openMatRepository.findByIsHiddenFalse(pageableWithSort);
         }
@@ -83,6 +84,18 @@ public class OpenMatService {
 
         validateHost(openMat, userId);
 
+        LocalDateTime effectiveStart = request.getStartDateTime() != null ? request.getStartDateTime() : openMat.getStartDateTime();
+        LocalDateTime effectiveEnd = request.getEndDateTime() != null ? request.getEndDateTime() : openMat.getEndDateTime();
+        validateDateRange(effectiveStart, effectiveEnd);
+
+        validateCapacity(request.getMaxCapacity());
+
+        if (request.getMaxCapacity() != null && request.getMaxCapacity() != -1
+                && request.getMaxCapacity() < openMat.getParticipantUids().size()) {
+            throw BusinessException.badRequest(
+                    "정원을 현재 참여자 수(" + openMat.getParticipantUids().size() + "명)보다 작게 줄일 수 없습니다");
+        }
+
         openMat.update(
                 request.getTitle(),
                 request.getDescription(),
@@ -90,6 +103,7 @@ public class OpenMatService {
                 request.getEndDateTime(),
                 request.getLocationName(),
                 request.getAddress(),
+                request.getRegion(),
                 request.getMaxCapacity(),
                 request.getHostInstagramId()
         );
@@ -108,14 +122,17 @@ public class OpenMatService {
             throw BusinessException.badRequest("신청자가 있는 오픈매트는 force=true 파라미터가 필요합니다");
         }
 
-        openMatRepository.delete(openMat);
+        openMat.hide();
     }
 
     @Transactional
     public void apply(Long userId, Long openMatId) {
-        OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
+        OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
 
+        if (openMat.getHost().getId().equals(userId)) {
+            throw new BusinessException("HOST_CANNOT_APPLY", "자신이 주최한 오픈매트에는 신청할 수 없습니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         if (openMat.getStatus() == OpenMatStatus.CLOSED) {
             throw new BusinessException("OPEN_MAT_CLOSED", "모집이 마감된 오픈매트입니다", org.springframework.http.HttpStatus.BAD_REQUEST);
         }
@@ -169,8 +186,8 @@ public class OpenMatService {
     }
 
     private void validateCapacity(Integer maxCapacity) {
-        if (maxCapacity != null && maxCapacity < -1) {
-            throw BusinessException.badRequest("정원은 -1 이상이어야 합니다");
+        if (maxCapacity != null && maxCapacity != -1 && maxCapacity < 1) {
+            throw BusinessException.badRequest("정원은 -1(무제한) 또는 1 이상이어야 합니다");
         }
     }
 }

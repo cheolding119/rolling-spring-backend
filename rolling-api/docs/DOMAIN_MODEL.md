@@ -21,6 +21,30 @@ public enum OpenMatStatus {
 }
 ```
 
+### Region
+오픈매트 지역
+```java
+public enum Region {
+    SEOUL,      // 서울
+    GYEONGGI,   // 경기
+    INCHEON,    // 인천
+    DAEJEON,    // 대전
+    SEJONG,     // 세종
+    CHUNGBUK,   // 충북
+    CHUNGNAM,   // 충남
+    BUSAN,      // 부산
+    DAEGU,      // 대구
+    ULSAN,      // 울산
+    GYEONGBUK,  // 경북
+    GYEONGNAM,  // 경남
+    GWANGJU,    // 광주
+    JEONBUK,    // 전북
+    JEONNAM,    // 전남
+    GANGWON,    // 강원
+    JEJU        // 제주
+}
+```
+
 ---
 
 ## 1. 유저 (User)
@@ -91,6 +115,7 @@ public class User extends BaseTimeEntity {
 | `endDateTime` | `LocalDateTime` | 종료 시간 |  |
 | `locationName` | `String` | 장소 명칭 |  |
 | `address` | `String` | 상세 주소 |  |
+| `region` | `Region` | 지역 | @Enumerated(EnumType.STRING), nullable = false |
 | `maxCapacity` | `Integer` | 정원 제한 수 | -1 = 제한 없음 |
 | `status` | `OpenMatStatus` | 현재 모집 상태 | @Enumerated |
 | `createdAt` | `LocalDateTime` | 생성 일시 |  |
@@ -126,6 +151,10 @@ public class OpenMat extends BaseTimeEntity {
 
     private String locationName;
     private String address;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Region region;
 
     @Column(nullable = false)
     private Integer maxCapacity = -1;

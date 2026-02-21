@@ -3,6 +3,7 @@ package com.rolling.api.domain.openmat.controller;
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -80,7 +81,7 @@ public class OpenMatController {
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
-            @Parameter(description = "지역 필터 (주소에 포함된 키워드)") @RequestParam(required = false) String region,
+            @Parameter(description = "지역 필터 (예: SEOUL, BUSAN)") @RequestParam(required = false) Region region,
             Pageable pageable) {
         Page<OpenMatResponse> response = openMatService.findAll(region, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));

@@ -38,13 +38,6 @@ public class User extends BaseTimeEntity {
 
     private String fcmToken;
 
-    // TODO: OpenMat 엔티티 구현 후 활성화
-    // @ManyToMany
-    // @JoinTable(name = "user_joined_openmats",
-    //     joinColumns = @JoinColumn(name = "user_id"),
-    //     inverseJoinColumns = @JoinColumn(name = "openmat_id"))
-    // private Set<OpenMat> joinedOpenMats = new HashSet<>();
-
     @ManyToMany
     @JoinTable(name = "user_blocked_users",
         joinColumns = @JoinColumn(name = "user_id"),
