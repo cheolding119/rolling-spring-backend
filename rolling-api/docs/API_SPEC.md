@@ -70,6 +70,27 @@
 | `CLOSED` | 정원 마감 |
 | `FINISHED` | 종료됨 (endDateTime 경과) |
 
+**Region**
+| 값 | 설명 |
+|------|------|
+| `SEOUL` | 서울 |
+| `GYEONGGI` | 경기 |
+| `INCHEON` | 인천 |
+| `DAEJEON` | 대전 |
+| `SEJONG` | 세종 |
+| `CHUNGBUK` | 충북 |
+| `CHUNGNAM` | 충남 |
+| `BUSAN` | 부산 |
+| `DAEGU` | 대구 |
+| `ULSAN` | 울산 |
+| `GYEONGBUK` | 경북 |
+| `GYEONGNAM` | 경남 |
+| `GWANGJU` | 광주 |
+| `JEONBUK` | 전북 |
+| `JEONNAM` | 전남 |
+| `GANGWON` | 강원 |
+| `JEJU` | 제주 |
+
 ---
 
 ## 1. 인증 API (Auth)
@@ -356,7 +377,7 @@ GET /api/v1/open-mats
 **Query Parameters**
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|:----:|--------|------|
-| `region` | `String` | - | - | 지역 필터 |
+| `region` | `Region` | - | - | 지역 필터 (예: `SEOUL`, `BUSAN`) |
 | `page` | `Integer` | - | `0` | 페이지 번호 (0부터 시작) |
 | `size` | `Integer` | - | `20` | 페이지 크기 |
 | `sort` | `String` | - | `startDateTime,asc` | 정렬 기준 |
@@ -375,6 +396,7 @@ GET /api/v1/open-mats
         "endDateTime": "2026-03-01T12:00:00",
         "locationName": "롤링 주짓수 아카데미",
         "address": "서울시 강남구 역삼동 123-45",
+        "region": "SEOUL",
         "maxCapacity": 20,
         "currentParticipants": 5,
         "status": "RECRUITING",
@@ -422,6 +444,7 @@ GET /api/v1/open-mats/{id}
     "endDateTime": "2026-03-01T12:00:00",
     "locationName": "롤링 주짓수 아카데미",
     "address": "서울시 강남구 역삼동 123-45",
+    "region": "SEOUL",
     "maxCapacity": 20,
     "currentParticipants": 5,
     "participantUids": [2, 3, 5, 7, 11],
@@ -453,6 +476,7 @@ POST /api/v1/open-mats
 | `endDateTime` | `String` | O | 종료 일시 (ISO 8601) |
 | `locationName` | `String` | O | 장소명 |
 | `address` | `String` | O | 상세 주소 |
+| `region` | `Region` | O | 지역 (예: `SEOUL`) |
 | `maxCapacity` | `Integer` | O | 최대 정원 (`-1` = 제한 없음) |
 | `hostInstagramId` | `String` | - | 호스트 인스타그램 ID |
 
@@ -464,6 +488,7 @@ POST /api/v1/open-mats
   "endDateTime": "2026-03-01T12:00:00",
   "locationName": "롤링 주짓수 아카데미",
   "address": "서울시 강남구 역삼동 123-45",
+  "region": "SEOUL",
   "maxCapacity": 20,
   "hostInstagramId": "rolling_bjj"
 }
@@ -501,6 +526,7 @@ PUT /api/v1/open-mats/{id}
 | `endDateTime` | `String` | - | 종료 일시 (ISO 8601) |
 | `locationName` | `String` | - | 장소명 |
 | `address` | `String` | - | 상세 주소 |
+| `region` | `Region` | - | 지역 (예: `SEOUL`) |
 | `maxCapacity` | `Integer` | - | 최대 정원 |
 | `hostInstagramId` | `String` | - | 호스트 인스타그램 ID |
 

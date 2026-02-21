@@ -42,6 +42,10 @@ public class OpenMat extends BaseTimeEntity {
 
     private String address;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Region region;
+
     @ElementCollection
     @CollectionTable(name = "open_mat_participants", joinColumns = @JoinColumn(name = "open_mat_id"))
     @Column(name = "user_id")
@@ -70,6 +74,7 @@ public class OpenMat extends BaseTimeEntity {
                    LocalDateTime endDateTime,
                    String locationName,
                    String address,
+                   Region region,
                    Integer maxCapacity,
                    String hostInstagramId,
                    OpenMatStatus status) {
@@ -80,6 +85,7 @@ public class OpenMat extends BaseTimeEntity {
         this.endDateTime = endDateTime;
         this.locationName = locationName;
         this.address = address;
+        this.region = region;
         if (maxCapacity != null) {
             this.maxCapacity = maxCapacity;
         }
@@ -97,6 +103,7 @@ public class OpenMat extends BaseTimeEntity {
                        LocalDateTime endDateTime,
                        String locationName,
                        String address,
+                       Region region,
                        Integer maxCapacity,
                        String hostInstagramId) {
         if (title != null) this.title = title;
@@ -105,6 +112,7 @@ public class OpenMat extends BaseTimeEntity {
         if (endDateTime != null) this.endDateTime = endDateTime;
         if (locationName != null) this.locationName = locationName;
         if (address != null) this.address = address;
+        if (region != null) this.region = region;
         if (maxCapacity != null) this.maxCapacity = maxCapacity;
         if (hostInstagramId != null) this.hostInstagramId = hostInstagramId;
     }
@@ -127,6 +135,10 @@ public class OpenMat extends BaseTimeEntity {
 
     public void removeParticipant(Long userId) {
         participantUids.remove(userId);
+    }
+
+    public void hide() {
+        this.isHidden = true;
     }
 
     public void report() {

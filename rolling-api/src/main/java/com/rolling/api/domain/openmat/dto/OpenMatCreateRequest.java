@@ -1,5 +1,6 @@
 package com.rolling.api.domain.openmat.dto;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -34,6 +35,10 @@ public class OpenMatCreateRequest {
     @NotBlank(message = "주소는 필수입니다")
     @Schema(description = "주소", example = "서울시 강남구 역삼동 123-45")
     private String address;
+
+    @NotNull(message = "지역은 필수입니다")
+    @Schema(description = "지역", example = "SEOUL")
+    private Region region;
 
     @NotNull(message = "최대 정원은 필수입니다")
     @Schema(description = "최대 참가 인원", example = "20")

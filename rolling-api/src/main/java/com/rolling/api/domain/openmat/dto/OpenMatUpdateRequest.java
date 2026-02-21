@@ -1,5 +1,6 @@
 package com.rolling.api.domain.openmat.dto;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
@@ -26,6 +27,9 @@ public class OpenMatUpdateRequest {
 
     @Schema(description = "주소", example = "서울시 강남구 역삼동 123-45")
     private String address;
+
+    @Schema(description = "지역", example = "SEOUL")
+    private Region region;
 
     @Schema(description = "최대 참가 인원", example = "20")
     private Integer maxCapacity;

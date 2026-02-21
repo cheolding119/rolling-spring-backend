@@ -2,12 +2,11 @@ package com.rolling.api.domain.openmat.dto;
 
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
+import com.rolling.api.domain.openmat.entity.Region;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @Builder
@@ -20,7 +19,7 @@ public class OpenMatResponse {
     private LocalDateTime endDateTime;
     private String locationName;
     private String address;
-    private List<Long> participantUids;
+    private Region region;
     private Integer maxCapacity;
     private Integer currentParticipants;
     private OpenMatStatus status;
@@ -38,7 +37,7 @@ public class OpenMatResponse {
                 .endDateTime(openMat.getEndDateTime())
                 .locationName(openMat.getLocationName())
                 .address(openMat.getAddress())
-                .participantUids(new ArrayList<>(openMat.getParticipantUids()))
+                .region(openMat.getRegion())
                 .maxCapacity(openMat.getMaxCapacity())
                 .currentParticipants(openMat.getParticipantUids().size())
                 .status(openMat.getStatus())
