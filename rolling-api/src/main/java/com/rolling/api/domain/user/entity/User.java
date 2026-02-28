@@ -36,6 +36,10 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private String socialId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private BeltColor beltColor;
+
     private String fcmToken;
 
     @ManyToMany
@@ -45,12 +49,13 @@ public class User extends BaseTimeEntity {
     private Set<User> blockedUsers = new HashSet<>();
 
     @Builder
-    public User(String socialId, SocialProvider socialProvider, String nickname, String email, String phone, String fcmToken) {
+    public User(String socialId, SocialProvider socialProvider, String nickname, String email, String phone, BeltColor beltColor, String fcmToken) {
         this.socialId = socialId;
         this.socialProvider = socialProvider;
         this.nickname = nickname;
         this.email = email;
         this.phone = phone;
+        this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
         this.fcmToken = fcmToken;
     }
 
@@ -68,6 +73,12 @@ public class User extends BaseTimeEntity {
 
     public void updatePhone(String phone) {
         this.phone = phone;
+    }
+
+    public void updateBeltColor(BeltColor beltColor) {
+        if (beltColor != null) {
+            this.beltColor = beltColor;
+        }
     }
 
     public void updateFcmToken(String fcmToken) {

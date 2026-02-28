@@ -5,20 +5,21 @@ import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatService;
+import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
-import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,42 +37,32 @@ import org.springframework.web.bind.annotation.RestController;
 public class OpenMatController {
 
     private final OpenMatService openMatService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(summary = "오픈매트 생성", description = "새로운 오픈매트를 생성합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "생성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @PostMapping
     public ResponseEntity<ApiResponse<OpenMatResponse>> create(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody OpenMatCreateRequest request) {
-        Long hostId = extractUserId(httpRequest);
-        OpenMatResponse response = openMatService.create(hostId, request);
+        OpenMatResponse response = openMatService.create(requireUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    private Long extractUserId(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new com.rolling.api.global.exception.AuthException("UNAUTHORIZED", "Authorization 헤더가 필요합니다");
-        }
-        String token = header.substring(7);
-        return jwtTokenProvider.getUserIdFromToken(token);
-    }
-
     @Operation(summary = "내가 신청한 오픈매트 목록", description = "내가 신청한 오픈매트 목록을 조회합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> myOpenMats(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PageableDefault(size = 10, sort = "startDateTime") Pageable pageable) {
-        Long userId = extractUserId(httpRequest);
-        Page<OpenMatResponse> response = openMatService.findMyOpenMats(userId, pageable);
+        Page<OpenMatResponse> response = openMatService.findMyOpenMats(requireUserId(principal), pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -100,6 +91,7 @@ public class OpenMatController {
     }
 
     @Operation(summary = "오픈매트 수정", description = "오픈매트를 수정합니다. 작성자 본인만 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아님"),
@@ -107,15 +99,15 @@ public class OpenMatController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<OpenMatResponse>> update(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id,
             @RequestBody OpenMatUpdateRequest request) {
-        Long userId = extractUserId(httpRequest);
-        OpenMatResponse response = openMatService.update(userId, id, request);
+        OpenMatResponse response = openMatService.update(requireUserId(principal), id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(summary = "오픈매트 신청", description = "오픈매트에 참가 신청합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "신청 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청 불가 (마감/종료/중복/정원초과)"),
@@ -124,14 +116,14 @@ public class OpenMatController {
     })
     @PostMapping("/{id}/apply")
     public ResponseEntity<ApiResponse<Void>> apply(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
-        Long userId = extractUserId(httpRequest);
-        openMatService.apply(userId, id);
+        openMatService.apply(requireUserId(principal), id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @Operation(summary = "오픈매트 신청 취소", description = "오픈매트 참가 신청을 취소합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "취소 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청하지 않은 오픈매트"),
@@ -140,14 +132,14 @@ public class OpenMatController {
     })
     @DeleteMapping("/{id}/apply")
     public ResponseEntity<ApiResponse<Void>> cancelApply(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
-        Long userId = extractUserId(httpRequest);
-        openMatService.cancelApply(userId, id);
+        openMatService.cancelApply(requireUserId(principal), id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @Operation(summary = "오픈매트 삭제", description = "오픈매트를 삭제합니다. 작성자 본인만 가능하며, 신청자가 있는 경우 force=true가 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청자가 있어 force 필요"),
@@ -156,11 +148,17 @@ public class OpenMatController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
-            HttpServletRequest httpRequest,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id,
             @Parameter(description = "신청자가 있을 때 강제 삭제 여부") @RequestParam(defaultValue = "false") boolean force) {
-        Long userId = extractUserId(httpRequest);
-        openMatService.delete(userId, id, force);
+        openMatService.delete(requireUserId(principal), id, force);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    private Long requireUserId(UserPrincipal principal) {
+        if (principal == null) {
+            throw new AuthException("UNAUTHORIZED", "인증이 필요합니다");
+        }
+        return principal.getUserId();
     }
 }

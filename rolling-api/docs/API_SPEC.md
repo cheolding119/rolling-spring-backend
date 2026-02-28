@@ -8,6 +8,31 @@
 
 ---
 
+## JWT 인증 흐름
+
+```
+1. 소셜 로그인
+   POST /api/v1/auth/login
+   → accessToken (30분) + refreshToken (14일) 발급
+
+2. API 호출
+   Authorization: Bearer {accessToken}
+   → 서버가 토큰에서 userId 자동 추출 (request에 userId 불필요)
+
+3. accessToken 만료 시
+   POST /api/v1/auth/refresh  { refreshToken: "..." }
+   → 새로운 accessToken + refreshToken 발급 (Refresh Token Rotation)
+
+4. 로그아웃
+   POST /api/v1/auth/logout  (Authorization: Bearer {accessToken})
+   → 서버의 refreshToken 무효화
+```
+
+> **핵심 원칙**: userId는 항상 서버가 JWT에서 추출합니다.
+> request body나 query param으로 userId를 보내지 않습니다.
+
+---
+
 ## 공통 응답 형식
 
 ### 성공 응답
@@ -48,7 +73,10 @@
 
 | 코드 | HTTP Status | 설명 |
 |------|:-----------:|------|
-| `UNAUTHORIZED` | 401 | 인증 토큰 없음 또는 만료 |
+| `UNAUTHORIZED` | 401 | 인증 토큰 없음 |
+| `INVALID_TOKEN` | 401 | 유효하지 않은 Access Token |
+| `INVALID_REFRESH_TOKEN` | 401 | 유효하지 않은 Refresh Token |
+| `EXPIRED_REFRESH_TOKEN` | 401 | 만료된 Refresh Token (재로그인 필요) |
 | `FORBIDDEN` | 403 | 권한 없음 |
 | `NOT_FOUND` | 404 | 리소스를 찾을 수 없음 |
 | `VALIDATION_ERROR` | 400 | 요청 데이터 유효성 검증 실패 |
@@ -237,6 +265,8 @@ GET /api/v1/users/me
 ```
 
 **인증**: 필요
+
+> userId를 별도로 전달하지 않습니다. 서버가 Authorization 헤더의 JWT에서 자동으로 식별합니다.
 
 **Response** `200 OK`
 | 필드 | 타입 | 설명 |
@@ -799,6 +829,18 @@ DELETE /api/v1/tournaments/{id}
 |------|------|------|
 | DateTime | ISO 8601 | `2026-03-01T10:00:00` |
 | Date | ISO 8601 | `2026-03-01` |
+---
+
+## 변경사항 (2026-02-21)
+
+### JWT 인증 시스템 도입
+
+- `POST /api/v1/auth/refresh` 신규 추가 — Refresh Token으로 Access Token 갱신 (Rotation)
+- `POST /api/v1/auth/logout` 신규 추가 — 인증 필요, 서버의 Refresh Token 무효화
+- `GET /api/v1/users/me` 구현 완료 — JWT에서 userId 자동 추출, request에 userId 불필요
+- 인증이 필요한 엔드포인트는 Spring Security 레벨에서 차단 (이전에는 Controller 내부에서 처리)
+- userId를 request body / query param으로 받는 엔드포인트 없음 (모두 JWT에서 추출)
+
 ---
 
 ## 변경사항 (2026-02-19)

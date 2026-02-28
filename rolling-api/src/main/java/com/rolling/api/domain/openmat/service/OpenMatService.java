@@ -58,13 +58,24 @@ public class OpenMatService {
     public Page<OpenMatResponse> findAll(Region region, Pageable pageable) {
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").descending());
+
+        LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
 
         Page<OpenMat> page;
         if (region != null) {
-            page = openMatRepository.findByIsHiddenFalseAndRegion(region, pageableWithSort);
+            page = openMatRepository.findByIsHiddenFalseAndRegionAndStatusAndEndDateTimeGreaterThanEqual(
+                    region,
+                    OpenMatStatus.RECRUITING,
+                    oneDayAgo,
+                    pageableWithSort
+            );
         } else {
-            page = openMatRepository.findByIsHiddenFalse(pageableWithSort);
+            page = openMatRepository.findByIsHiddenFalseAndStatusAndEndDateTimeGreaterThanEqual(
+                    OpenMatStatus.RECRUITING,
+                    oneDayAgo,
+                    pageableWithSort
+            );
         }
 
         return page.map(OpenMatResponse::from);

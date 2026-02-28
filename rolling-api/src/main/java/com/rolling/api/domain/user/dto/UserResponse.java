@@ -1,0 +1,47 @@
+package com.rolling.api.domain.user.dto;
+
+import com.rolling.api.domain.user.entity.User;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Builder
+@Schema(description = "사용자 정보 응답")
+public class UserResponse {
+
+    @Schema(description = "사용자 ID", example = "1")
+    private Long id;
+
+    @Schema(description = "닉네임", example = "rolling_user")
+    private String nickname;
+
+    @Schema(description = "이메일", example = "user@gmail.com")
+    private String email;
+
+    @Schema(description = "전화번호", example = "010-1234-5678")
+    private String phone;
+
+    @Schema(description = "소셜 로그인 제공자", example = "GOOGLE")
+    private String socialProvider;
+
+    @Schema(description = "주짓수 벨트 색상", example = "BLUE")
+    private String beltColor;
+
+    @Schema(description = "생성 시각")
+    private LocalDateTime createdAt;
+
+    public static UserResponse from(User user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .nickname(user.getNickname())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .socialProvider(user.getSocialProvider().name())
+                .beltColor(user.getBeltColor().name())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+}

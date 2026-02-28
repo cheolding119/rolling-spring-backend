@@ -49,8 +49,9 @@ enum ReportTargetType {
 | **필드명** | **타입** | **설명** | **비고** |
 | --- | --- | --- | --- |
 | `id` | `int` | 고유 식별자 | PK |
- | `email`| `String`|이메일|
+| `email`| `String`|이메일|
 | `nickname` | `String` | 프로필 닉네임 |  |
+| `beltColor` | `BeltColor` | 주짓수 벨트 색상 | Enum 타입 |
 | `socialProvider` | `SocialProvider` | 소셜 로그인 제공자 | Enum 타입 |
 | `joinedOpenMats` | `List<int>` | 신청한 오픈매트 ID 리스트 |  |
 | `createdAt` | `DateTime` | 계정 생성 일시 |  |
@@ -130,8 +131,8 @@ enum ReportTargetType {
 ### 3.1 사용자 앱 (B2C)
 
 - **[이벤트: 외부 활동 참여]**
-    - **오픈매트**: 신청 및 명단 등록, 정원 관리(정원 초과 시 자동 마감), 종료 시간 기준 자동 상태 전환(finished).
-    - **대회**: 일정 확인 및 외부 접수처 링크 연동, 접수 마감일 기준 자동 정렬 및 배지 표시.
+  - **오픈매트**: 신청 및 명단 등록, 정원 관리(정원 초과 시 자동 마감), 종료 시간 기준 자동 상태 전환(finished).
+  - **대회**: 일정 확인 및 외부 접수처 링크 연동, 접수 마감일 기준 자동 정렬 및 배지 표시.
 
 ---
 
@@ -250,25 +251,25 @@ enum ReportTargetType {
 
 - **Pattern**: **MVVM (Model-View-ViewModel)**
 - **State Management**: **GetX**
-    - 사용 목적: 반응형 상태 관리(`Rx`), 의존성 주입(`DI`), Context가 필요 없는 라우팅(Navigation).
+  - 사용 목적: 반응형 상태 관리(`Rx`), 의존성 주입(`DI`), Context가 필요 없는 라우팅(Navigation).
 - **Directory Structure**: **Feature-based** (기능 중심 폴더 구조)
-    - 각 기능별로 `view`, `controller`, `repository`, `binding`을 모듈화하여 관리.
+  - 각 기능별로 `view`, `controller`, `repository`, `binding`을 모듈화하여 관리.
 
 ## 3. Network & Data
 
 - **HTTP Client**: **http**
-    - 사용 목적: REST API 통신
-    - Base URL: Spring Boot REST API 서버
+  - 사용 목적: REST API 통신
+  - Base URL: Spring Boot REST API 서버
 - **Local Storage**:
-    - `flutter_secure_storage`: JWT Access Token / Refresh Token 보안 저장.
+  - `flutter_secure_storage`: JWT Access Token / Refresh Token 보안 저장.
 
 ## 4. Authentication (OAuth - Web)
 
 - **Backend 인증**: **Spring Security + JWT**
-    - Access Token / Refresh Token 기반 인증 처리.
+  - Access Token / Refresh Token 기반 인증 처리.
 - **Social Logins**: OAuth 2.0
-    - Kakao, Google, Naver 소셜 로그인
-    - 서버 측 OAuth 처리 후 JWT 발급
+  - Kakao, Google, Naver 소셜 로그인
+  - 서버 측 OAuth 처리 후 JWT 발급
 
 ## 5. UI/UX Components
 
@@ -348,6 +349,15 @@ enum ReportTargetType {
 | `GOOGLE` | 구글 로그인 |
 | `APPLE` | 애플 로그인 (예정) |
 | `NAVER` | 네이버 로그인 (예정) |
+
+**BeltColor**
+| 값 | 설명 |
+|------|------|
+| `WHITE` | 화이트 벨트 |
+| `BLUE` | 블루 벨트 |
+| `PURPLE` | 퍼플 벨트 |
+| `BROWN` | 브라운 벨트 |
+| `BLACK` | 블랙 벨트 |
 
 **OpenMatStatus**
 | 값 | 설명 |
@@ -511,6 +521,7 @@ GET /api/v1/users/me
 | `email` | `String` | 이메일 |
 | `phone` | `String` | 연락처 |
 | `socialProvider` | `String` | 소셜 로그인 제공자 |
+| `beltColor` | `String` | 벨트 색상 (`WHITE`, `BLUE`, `PURPLE`, `BROWN`, `BLACK`) |
 | `createdAt` | `String` | 가입 일시 (ISO 8601) |
 
 ```json
@@ -542,6 +553,7 @@ PUT /api/v1/users/me
 |------|------|:----:|------|
 | `nickname` | `String` | - | 닉네임 |
 | `phone` | `String` | - | 연락처 |
+| `beltColor` | `String` | - | 벨트 색상 (`WHITE`, `BLUE`, `PURPLE`, `BROWN`, `BLACK`) |
 
 ```json
 {
@@ -1075,3 +1087,57 @@ DELETE /api/v1/tournaments/{id}
 ### 백엔드 개발 가이드
 - 엔드포인트 추가/수정 시 Swagger 문서와 API 명세를 동시에 갱신한다.
 - OpenMat "my" 목록 기능은 페이징 응답(`content/page/size/totalElements/totalPages/last`)을 표준으로 사용한다.
+
+---
+
+## 변경사항 (2026-02-28)
+
+### User 벨트 필드 추가
+- `User` 엔티티에 `beltColor` 필드가 추가되었습니다.
+- 타입: `BeltColor` (Enum, `@Enumerated(EnumType.STRING)`)
+- 소셜 로그인 신규 가입 시 기본값: `WHITE`
+
+### BeltColor Enum
+```java
+enum BeltColor {
+  WHITE,
+  BLUE,
+  PURPLE,
+  BROWN,
+  BLACK
+}
+```
+
+### 사용자 모델 반영
+- `GET /api/v1/users/me` 응답에 `beltColor`가 포함됩니다.
+- 예시:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "nickname": "rolling_user",
+    "email": "user@gmail.com",
+    "phone": "010-1234-5678",
+    "socialProvider": "GOOGLE",
+    "beltColor": "PURPLE",
+    "createdAt": "2026-02-28T16:20:00"
+  }
+}
+```
+
+### 내 정보 수정 API 반영
+- `PUT /api/v1/users/me` 요청 필드에 `beltColor`가 추가되었습니다.
+- 허용값: `WHITE`, `BLUE`, `PURPLE`, `BROWN`, `BLACK`
+- 요청 예시:
+```json
+{
+  "nickname": "rolling_user",
+  "phone": "010-1234-5678",
+  "beltColor": "BLUE"
+}
+```
+
+- 요청 유효성:
+  - `nickname`, `phone`, `beltColor` 중 최소 1개는 필수
+  - `phone` 형식: `010-1234-5678`

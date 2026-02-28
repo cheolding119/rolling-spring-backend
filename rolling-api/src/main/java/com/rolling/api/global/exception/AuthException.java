@@ -27,4 +27,16 @@ public class AuthException extends RuntimeException {
     public static AuthException unsupportedProvider(String provider) {
         return new AuthException("UNSUPPORTED_PROVIDER", "지원하지 않는 소셜 로그인 provider입니다: " + provider);
     }
+
+    public static AuthException invalidToken() {
+        return new AuthException("INVALID_TOKEN", "유효하지 않은 토큰입니다");
+    }
+
+    public static AuthException invalidRefreshToken() {
+        return new AuthException("INVALID_REFRESH_TOKEN", "유효하지 않은 Refresh Token입니다");
+    }
+
+    public static AuthException expiredRefreshToken() {
+        return new AuthException("EXPIRED_REFRESH_TOKEN", "만료된 Refresh Token입니다. 다시 로그인해 주세요");
+    }
 }

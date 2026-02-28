@@ -2,6 +2,11 @@ package com.rolling.api.domain.auth.service;
 
 import com.rolling.api.domain.auth.dto.AuthResponse;
 import com.rolling.api.domain.auth.dto.SocialLoginRequest;
+import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
+import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
+import com.rolling.api.domain.auth.entity.RefreshToken;
+import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
+import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -17,6 +22,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,9 +34,13 @@ public class AuthService {
     private final GoogleClient googleClient;
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Value("${jwt.access-token-expiry}")
     private Long accessTokenExpiry;
+
+    @Value("${jwt.refresh-token-expiry}")
+    private Long refreshTokenExpiry;
 
     @Transactional
     public AuthResponse login(SocialLoginRequest request) {
@@ -56,13 +68,20 @@ public class AuthService {
             default -> throw AuthException.unsupportedProvider(provider.name());
         }
 
-        // DB에서 회원 조회 또는 생성
         boolean[] isNewUser = {false};
         User user = findOrCreateUser(socialId, provider, nickname, email, isNewUser);
 
-        // JWT 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+        // 기존 RefreshToken 삭제 후 새로 저장 (한 계정 = 하나의 RefreshToken)
+        refreshTokenRepository.deleteByUserId(user.getId());
+        LocalDateTime expiryDate = LocalDateTime.now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
+        refreshTokenRepository.save(RefreshToken.builder()
+                .token(refreshToken)
+                .userId(user.getId())
+                .expiryDate(expiryDate)
+                .build());
 
         log.info("{} login success - userId: {}, newUser: {}", provider, user.getId(), isNewUser[0]);
 
@@ -76,6 +95,53 @@ public class AuthService {
                 .email(user.getEmail())
                 .name(user.getNickname())
                 .build();
+    }
+
+    @Transactional
+    public TokenRefreshResponse refresh(TokenRefreshRequest request) {
+        String oldToken = request.getRefreshToken();
+
+        RefreshToken savedToken = refreshTokenRepository.findByToken(oldToken)
+                .orElseThrow(AuthException::invalidRefreshToken);
+
+        if (savedToken.isExpired()) {
+            refreshTokenRepository.delete(savedToken);
+            throw AuthException.expiredRefreshToken();
+        }
+
+        if (!jwtTokenProvider.validateToken(oldToken)) {
+            refreshTokenRepository.delete(savedToken);
+            throw AuthException.invalidRefreshToken();
+        }
+
+        Long userId = savedToken.getUserId();
+
+        // Refresh Token Rotation: 새 토큰 발급 후 기존 토큰 교체
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        refreshTokenRepository.delete(savedToken);
+        LocalDateTime expiryDate = LocalDateTime.now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
+        refreshTokenRepository.save(RefreshToken.builder()
+                .token(newRefreshToken)
+                .userId(userId)
+                .expiryDate(expiryDate)
+                .build());
+
+        log.info("Token refresh success - userId: {}", userId);
+
+        return TokenRefreshResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .tokenType("Bearer")
+                .expiresIn(accessTokenExpiry / 1000)
+                .build();
+    }
+
+    @Transactional
+    public void logout(Long userId) {
+        refreshTokenRepository.deleteByUserId(userId);
+        log.info("Logout success - userId: {}", userId);
     }
 
     private SocialProvider parseProvider(String provider) {
@@ -101,6 +167,7 @@ public class AuthService {
                             .socialProvider(provider)
                             .nickname(nickname)
                             .email(email)
+                            .beltColor(BeltColor.WHITE)
                             .build();
                     User savedUser = userRepository.save(newUser);
                     log.info("New user created: {}", savedUser.getId());

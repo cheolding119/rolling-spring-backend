@@ -1,6 +1,7 @@
 package com.rolling.api.domain.openmat.repository;
 
 import com.rolling.api.domain.openmat.entity.OpenMat;
+import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
@@ -17,6 +19,19 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
     Page<OpenMat> findByIsHiddenFalse(Pageable pageable);
 
     Page<OpenMat> findByIsHiddenFalseAndRegion(Region region, Pageable pageable);
+
+    Page<OpenMat> findByIsHiddenFalseAndStatusAndEndDateTimeGreaterThanEqual(
+            OpenMatStatus status,
+            LocalDateTime endDateTime,
+            Pageable pageable
+    );
+
+    Page<OpenMat> findByIsHiddenFalseAndRegionAndStatusAndEndDateTimeGreaterThanEqual(
+            Region region,
+            OpenMatStatus status,
+            LocalDateTime endDateTime,
+            Pageable pageable
+    );
 
     Optional<OpenMat> findByIdAndIsHiddenFalse(Long id);
 
