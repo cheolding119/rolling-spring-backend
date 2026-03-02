@@ -1,5 +1,6 @@
 package com.rolling.api.global.config;
 
+import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,6 +27,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -61,7 +63,7 @@ public class SecurityConfig {
                         })
                 )
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider),
+                        new JwtAuthenticationFilter(jwtTokenProvider, userRepository),
                         UsernamePasswordAuthenticationFilter.class
                 );
 

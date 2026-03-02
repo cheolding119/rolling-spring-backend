@@ -4,6 +4,7 @@ import com.rolling.api.domain.auth.dto.AuthResponse;
 import com.rolling.api.domain.auth.dto.SocialLoginRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
+import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.entity.RefreshToken;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
@@ -11,6 +12,7 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
+import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
@@ -19,16 +21,25 @@ import com.rolling.api.infra.kakao.dto.KakaoUserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final ZoneId WITHDRAW_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalTime WITHDRAW_EXECUTION_TIME = LocalTime.of(21, 0);
 
     private final KakaoClient kakaoClient;
     private final GoogleClient googleClient;
@@ -67,6 +78,8 @@ public class AuthService {
             }
             default -> throw AuthException.unsupportedProvider(provider.name());
         }
+
+        socialId = validateSocialId(provider, socialId);
 
         boolean[] isNewUser = {false};
         User user = findOrCreateUser(socialId, provider, nickname, email, isNewUser);
@@ -144,6 +157,67 @@ public class AuthService {
         log.info("Logout success - userId: {}", userId);
     }
 
+    @Transactional
+    public WithdrawStatusResponse withdraw(Long userId) {
+        User user = userRepository.findByIdAndIsWithdrawnFalse(userId)
+                .orElseThrow(() -> BusinessException.notFound("User not found"));
+
+        if (Boolean.TRUE.equals(user.getWithdrawalPending()) && user.getWithdrawalScheduledAt() != null) {
+            return WithdrawStatusResponse.builder()
+                    .withdrawalPending(true)
+                    .scheduledAt(user.getWithdrawalScheduledAt())
+                    .build();
+        }
+
+        LocalDateTime requestedAt = nowInWithdrawZone();
+        LocalDateTime scheduledAt = requestedAt.toLocalDate()
+                .plusDays(1)
+                .atTime(WITHDRAW_EXECUTION_TIME);
+        user.requestWithdrawal(requestedAt, scheduledAt);
+
+        log.info("Withdraw requested - userId: {}, scheduledAt: {}", userId, scheduledAt);
+        return WithdrawStatusResponse.builder()
+                .withdrawalPending(true)
+                .scheduledAt(scheduledAt)
+                .build();
+    }
+
+    @Transactional
+    public WithdrawStatusResponse cancelWithdraw(Long userId) {
+        User user = userRepository.findByIdAndIsWithdrawnFalse(userId)
+                .orElseThrow(() -> BusinessException.notFound("User not found"));
+
+        if (!Boolean.TRUE.equals(user.getWithdrawalPending())) {
+            throw new BusinessException("WITHDRAWAL_NOT_PENDING", "예약된 회원 탈퇴가 없습니다", HttpStatus.BAD_REQUEST);
+        }
+
+        user.cancelWithdrawal();
+        log.info("Withdraw canceled - userId: {}", userId);
+
+        return WithdrawStatusResponse.builder()
+                .withdrawalPending(false)
+                .scheduledAt(null)
+                .build();
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 * * * * *")
+    public void processScheduledWithdrawals() {
+        LocalDateTime now = nowInWithdrawZone();
+        List<User> targets = userRepository
+                .findAllByIsWithdrawnFalseAndWithdrawalPendingTrueAndWithdrawalScheduledAtLessThanEqual(now);
+
+        if (targets.isEmpty()) {
+            return;
+        }
+
+        for (User user : targets) {
+            refreshTokenRepository.deleteByUserId(user.getId());
+            user.withdraw();
+            log.info("Withdraw executed - userId: {}", user.getId());
+        }
+    }
+
     private SocialProvider parseProvider(String provider) {
         try {
             return SocialProvider.valueOf(provider.toUpperCase());
@@ -152,8 +226,33 @@ public class AuthService {
         }
     }
 
+    private String validateSocialId(SocialProvider provider, String socialId) {
+        if (socialId == null) {
+            throw providerUserInfoError(provider, "소셜 사용자 식별자(socialId)가 없습니다");
+        }
+
+        String normalized = socialId.trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            throw providerUserInfoError(provider, "소셜 사용자 식별자(socialId)가 유효하지 않습니다");
+        }
+
+        return normalized;
+    }
+
+    private AuthException providerUserInfoError(SocialProvider provider, String message) {
+        return switch (provider) {
+            case KAKAO -> AuthException.kakaoApiError(message);
+            case GOOGLE -> AuthException.googleApiError(message);
+        };
+    }
+
+    private LocalDateTime nowInWithdrawZone() {
+        return ZonedDateTime.now(WITHDRAW_ZONE).toLocalDateTime();
+    }
+
     private User findOrCreateUser(String socialId, SocialProvider provider, String nickname, String email, boolean[] isNewUser) {
-        return userRepository.findBySocialIdAndSocialProvider(socialId, provider)
+        // 정책: 탈퇴한 계정은 로그인 조회 대상에서 제외하고, 동일 소셜 계정은 신규 가입으로 처리한다.
+        return userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse(socialId, provider)
                 .map(existingUser -> {
                     existingUser.updateNickname(nickname);
                     existingUser.updateEmail(email);

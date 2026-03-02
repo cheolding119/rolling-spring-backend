@@ -8,7 +8,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.HashSet;
+import java.time.LocalDateTime;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
@@ -41,6 +43,16 @@ public class User extends BaseTimeEntity {
     private BeltColor beltColor;
 
     private String fcmToken;
+
+    @Column(nullable = false)
+    private Boolean isWithdrawn = false;
+
+    @Column(nullable = false)
+    private Boolean withdrawalPending = false;
+
+    private LocalDateTime withdrawalRequestedAt;
+
+    private LocalDateTime withdrawalScheduledAt;
 
     @ManyToMany
     @JoinTable(name = "user_blocked_users",
@@ -91,5 +103,30 @@ public class User extends BaseTimeEntity {
 
     public void unblockUser(User user) {
         this.blockedUsers.remove(user);
+    }
+
+    public void requestWithdrawal(LocalDateTime requestedAt, LocalDateTime scheduledAt) {
+        this.withdrawalPending = true;
+        this.withdrawalRequestedAt = requestedAt;
+        this.withdrawalScheduledAt = scheduledAt;
+    }
+
+    public void cancelWithdrawal() {
+        this.withdrawalPending = false;
+        this.withdrawalRequestedAt = null;
+        this.withdrawalScheduledAt = null;
+    }
+
+    public void withdraw() {
+        this.nickname = "withdrawn_user_" + this.id;
+        this.email = null;
+        this.phone = null;
+        this.fcmToken = null;
+        this.socialId = "withdrawn-" + this.id + "-" + UUID.randomUUID();
+        this.withdrawalPending = false;
+        this.withdrawalRequestedAt = null;
+        this.withdrawalScheduledAt = null;
+        this.isWithdrawn = true;
+        this.blockedUsers.clear();
     }
 }

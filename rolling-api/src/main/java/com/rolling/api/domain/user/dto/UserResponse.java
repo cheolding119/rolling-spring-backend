@@ -33,6 +33,12 @@ public class UserResponse {
     @Schema(description = "생성 시각")
     private LocalDateTime createdAt;
 
+    @Schema(description = "회원 탈퇴 예약 상태", example = "false")
+    private Boolean withdrawalPending;
+
+    @Schema(description = "회원 탈퇴 예정 시각 (예약된 경우)", example = "2026-03-02T21:00:00")
+    private LocalDateTime withdrawalScheduledAt;
+
     public static UserResponse from(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -42,6 +48,8 @@ public class UserResponse {
                 .socialProvider(user.getSocialProvider().name())
                 .beltColor(user.getBeltColor().name())
                 .createdAt(user.getCreatedAt())
+                .withdrawalPending(user.getWithdrawalPending())
+                .withdrawalScheduledAt(user.getWithdrawalScheduledAt())
                 .build();
     }
 }

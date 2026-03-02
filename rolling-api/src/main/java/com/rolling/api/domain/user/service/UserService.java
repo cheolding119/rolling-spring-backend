@@ -27,14 +27,6 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> BusinessException.notFound("User not found"));
 
-        if (request.getNickname() == null && request.getBeltColor() == null) {
-            throw BusinessException.badRequest("At least one field (nickname or beltColor) is required");
-        }
-
-        if (request.getNickname() != null && request.getNickname().isBlank()) {
-            throw BusinessException.badRequest("Nickname cannot be blank");
-        }
-
         user.updateNickname(request.getNickname());
         user.updateBeltColor(request.getBeltColor());
 

@@ -4,6 +4,7 @@ import com.rolling.api.domain.auth.dto.AuthResponse;
 import com.rolling.api.domain.auth.dto.SocialLoginRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
+import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.service.AuthService;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -70,5 +72,33 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal UserPrincipal principal) {
         authService.logout(principal.getUserId());
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "회원 탈퇴 요청", description = "회원 탈퇴를 예약합니다. 탈퇴는 다음날 21:00(Asia/Seoul)에 실행되며, 그 전까지 취소할 수 있습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
+    })
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<ApiResponse<WithdrawStatusResponse>> withdraw(@AuthenticationPrincipal UserPrincipal principal) {
+        WithdrawStatusResponse response = authService.withdraw(principal.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "회원 탈퇴 취소", description = "예약된 회원 탈퇴를 취소합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "회원 탈퇴 취소 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "예약된 탈퇴가 없음",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
+    })
+    @PostMapping("/withdraw/cancel")
+    public ResponseEntity<ApiResponse<WithdrawStatusResponse>> cancelWithdraw(@AuthenticationPrincipal UserPrincipal principal) {
+        WithdrawStatusResponse response = authService.cancelWithdraw(principal.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

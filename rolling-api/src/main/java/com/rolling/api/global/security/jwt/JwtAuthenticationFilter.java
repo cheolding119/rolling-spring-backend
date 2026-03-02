@@ -1,5 +1,6 @@
 package com.rolling.api.global.security.jwt;
 
+import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.UserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,6 +20,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -28,11 +30,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
-            UserPrincipal principal = new UserPrincipal(userId);
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(auth);
-            log.debug("JWT 인증 성공 - userId: {}", userId);
+            if (userRepository.existsByIdAndIsWithdrawnFalse(userId)) {
+                UserPrincipal principal = new UserPrincipal(userId);
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                log.debug("JWT 인증 성공 - userId: {}", userId);
+            } else {
+                log.debug("JWT 인증 실패(탈퇴/미존재 사용자) - userId: {}", userId);
+            }
         }
 
         filterChain.doFilter(request, response);
