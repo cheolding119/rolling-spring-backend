@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,18 +43,17 @@ public class UserController {
 
     @Operation(
             summary = "내 정보 수정",
-            description = "닉네임 또는 벨트 색상을 수정합니다"
+            description = "닉네임 또는 벨트 색상을 수정합니다. 요청 검증은 수행하지 않습니다."
     )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> updateMe(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @RequestBody UserUpdateRequest request) {
+            @RequestBody UserUpdateRequest request) {
         UserResponse response = userService.updateMe(principal.getUserId(), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
