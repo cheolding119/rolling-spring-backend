@@ -654,6 +654,7 @@ GET /api/v1/open-mats
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|:----:|--------|------|
 | `region` | `String` | - | - | 지역 필터 |
+| `status` | `String` | - | - | 상태 필터 (`RECRUITING`, `CLOSED`, `FINISHED`) |
 | `page` | `Integer` | - | `0` | 페이지 번호 (0부터 시작) |
 | `size` | `Integer` | - | `20` | 페이지 크기 |
 | `sort` | `String` | - | `startDateTime,asc` | 정렬 기준 |
@@ -691,6 +692,7 @@ GET /api/v1/open-mats
 ```
 
 > 숨김 처리된 오픈매트(`isHidden = true`)는 리스트에 노출되지 않습니다.
+> `status`를 지정하지 않으면 전체 상태를 조회하며, 기본 정렬은 `startDateTime ASC` 입니다.
 
 ---
 
@@ -863,6 +865,7 @@ POST /api/v1/open-mats/{id}/apply
 |------|------|
 | `OPEN_MAT_CLOSED` | 모집이 마감된 오픈매트 |
 | `OPEN_MAT_FINISHED` | 이미 종료된 오픈매트 |
+| `OPEN_MAT_REPORTED` | 신고 누적으로 신청이 차단된 오픈매트 |
 | `ALREADY_APPLIED` | 이미 신청한 오픈매트 |
 | `CAPACITY_FULL` | 정원 초과 |
 
@@ -1151,3 +1154,15 @@ enum BeltColor {
 - 전체 수동 크롤링 API는 `POST /api/v1/tournaments/crawl` 입니다.
 - 스트릿 주짓수만 실행하는 API는 `POST /api/v1/tournaments/crawl/street` 입니다.
 - 코주챔만 실행하는 API는 `POST /api/v1/tournaments/crawl/koreajiu` 입니다.
+
+---
+
+## 변경사항 (2026-03-10)
+
+### OpenMat 상태 자동화/정합성 보강
+- 오픈매트 상태는 `endDateTime`과 정원 상태를 기준으로 자동 보정됩니다.
+- 정원이 가득 차면 `RECRUITING -> CLOSED`로 자동 전환됩니다.
+- 신청 취소로 여유가 생기고 종료 전이라면 `CLOSED -> RECRUITING`으로 자동 복귀합니다.
+- `endDateTime`이 지난 오픈매트는 스케줄러와 조회 시점 보정으로 `FINISHED` 처리됩니다.
+- 오픈매트 리스트 조회 API는 `status` 필터를 지원하며 기본 정렬은 `startDateTime ASC` 입니다.
+- 신고 누적 3건 이상 오픈매트는 신규 신청이 차단됩니다.

@@ -38,6 +38,12 @@ jwt:
   access-token-expiry: 1800000
   refresh-token-expiry: 1209600000
 
+openmat:
+  status:
+    schedule:
+      enabled: true
+      cron: "0 * * * * *"
+      zone: "Asia/Seoul"
 
 tournament:
   crawler:

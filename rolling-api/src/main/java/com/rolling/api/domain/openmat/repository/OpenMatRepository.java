@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
@@ -20,20 +21,16 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
 
     Page<OpenMat> findByIsHiddenFalseAndRegion(Region region, Pageable pageable);
 
-    Page<OpenMat> findByIsHiddenFalseAndStatusAndEndDateTimeGreaterThanEqual(
-            OpenMatStatus status,
-            LocalDateTime endDateTime,
-            Pageable pageable
-    );
+    Page<OpenMat> findByIsHiddenFalseAndStatus(OpenMatStatus status, Pageable pageable);
 
-    Page<OpenMat> findByIsHiddenFalseAndRegionAndStatusAndEndDateTimeGreaterThanEqual(
-            Region region,
-            OpenMatStatus status,
-            LocalDateTime endDateTime,
-            Pageable pageable
-    );
+    Page<OpenMat> findByIsHiddenFalseAndRegionAndStatus(Region region, OpenMatStatus status, Pageable pageable);
 
     Optional<OpenMat> findByIdAndIsHiddenFalse(Long id);
+
+    List<OpenMat> findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
+            OpenMatStatus status,
+            LocalDateTime endDateTime
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM OpenMat o WHERE o.id = :id AND o.isHidden = false")

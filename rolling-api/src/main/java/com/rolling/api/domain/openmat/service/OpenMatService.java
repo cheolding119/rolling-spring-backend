@@ -2,6 +2,7 @@ package com.rolling.api.domain.openmat.service;
 
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
+import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
@@ -10,23 +11,27 @@ import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
-
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OpenMatService {
 
     private final OpenMatRepository openMatRepository;
     private final UserRepository userRepository;
+    private final Clock clock;
 
     @Transactional
     public OpenMatResponse create(Long hostId, OpenMatCreateRequest request) {
@@ -50,41 +55,31 @@ public class OpenMatService {
                 .status(OpenMatStatus.RECRUITING)
                 .build();
 
+        openMat.synchronizeStatus(now());
         OpenMat saved = openMatRepository.save(openMat);
         return OpenMatResponse.from(saved);
     }
 
-    @Transactional(readOnly = true)
-    public Page<OpenMatResponse> findAll(Region region, Pageable pageable) {
+    @Transactional
+    public Page<OpenMatResponse> findAll(Region region, OpenMatStatus status, Pageable pageable) {
+        syncExpiredOpenMats();
+
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").descending());
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
-        LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
-
-        Page<OpenMat> page;
-        if (region != null) {
-            page = openMatRepository.findByIsHiddenFalseAndRegionAndStatusAndEndDateTimeGreaterThanEqual(
-                    region,
-                    OpenMatStatus.RECRUITING,
-                    oneDayAgo,
-                    pageableWithSort
-            );
-        } else {
-            page = openMatRepository.findByIsHiddenFalseAndStatusAndEndDateTimeGreaterThanEqual(
-                    OpenMatStatus.RECRUITING,
-                    oneDayAgo,
-                    pageableWithSort
-            );
-        }
+        Page<OpenMat> page = findOpenMats(region, status, pageableWithSort);
+        LocalDateTime now = now();
+        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
 
         return page.map(OpenMatResponse::from);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OpenMatResponse findById(Long id) {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(id)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+        openMat.synchronizeStatus(now());
         return OpenMatResponse.from(openMat);
     }
 
@@ -118,6 +113,7 @@ public class OpenMatService {
                 request.getMaxCapacity(),
                 request.getHostInstagramId()
         );
+        openMat.synchronizeStatus(now());
 
         return OpenMatResponse.from(openMat);
     }
@@ -140,45 +136,73 @@ public class OpenMatService {
     public void apply(Long userId, Long openMatId) {
         OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+        LocalDateTime now = now();
+        openMat.synchronizeStatus(now);
 
         if (openMat.getHost().getId().equals(userId)) {
-            throw new BusinessException("HOST_CANNOT_APPLY", "자신이 주최한 오픈매트에는 신청할 수 없습니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new BusinessException("HOST_CANNOT_APPLY", "자신이 주최한 오픈매트에는 신청할 수 없습니다", HttpStatus.BAD_REQUEST);
+        }
+        if (openMat.isReported()) {
+            throw new BusinessException("OPEN_MAT_REPORTED", "신고 누적으로 신청이 차단된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.getStatus() == OpenMatStatus.CLOSED) {
-            throw new BusinessException("OPEN_MAT_CLOSED", "모집이 마감된 오픈매트입니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new BusinessException("OPEN_MAT_CLOSED", "모집이 마감된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.getStatus() == OpenMatStatus.FINISHED) {
-            throw new BusinessException("OPEN_MAT_FINISHED", "이미 종료된 오픈매트입니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new BusinessException("OPEN_MAT_FINISHED", "이미 종료된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.isParticipant(userId)) {
-            throw new BusinessException("ALREADY_APPLIED", "이미 신청한 오픈매트입니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new BusinessException("ALREADY_APPLIED", "이미 신청한 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.isCapacityFull()) {
-            throw new BusinessException("CAPACITY_FULL", "정원이 초과되었습니다", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new BusinessException("CAPACITY_FULL", "정원이 초과되었습니다", HttpStatus.BAD_REQUEST);
         }
 
         openMat.addParticipant(userId);
+        openMat.synchronizeStatus(now);
     }
 
     @Transactional
     public void cancelApply(Long userId, Long openMatId) {
-        OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
+        OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+        LocalDateTime now = now();
+        openMat.synchronizeStatus(now);
 
         if (!openMat.isParticipant(userId)) {
             throw BusinessException.badRequest("신청하지 않은 오픈매트입니다");
         }
 
         openMat.removeParticipant(userId);
+        openMat.synchronizeStatus(now);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<OpenMatResponse> findMyOpenMats(Long userId, Pageable pageable) {
+        syncExpiredOpenMats();
+
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
-        return openMatRepository.findByParticipantUidsContaining(userId, pageableWithSort)
-                .map(OpenMatResponse::from);
+
+        Page<OpenMat> page = openMatRepository.findByParticipantUidsContaining(userId, pageableWithSort);
+        LocalDateTime now = now();
+        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
+        return page.map(OpenMatResponse::from);
+    }
+
+    @Transactional
+    public int syncExpiredOpenMats() {
+        LocalDateTime now = now();
+        List<OpenMat> expiredOpenMats = openMatRepository
+                .findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(OpenMatStatus.FINISHED, now);
+
+        expiredOpenMats.forEach(openMat -> openMat.synchronizeStatus(now));
+
+        if (!expiredOpenMats.isEmpty()) {
+            log.debug("Synchronized {} expired open mats to FINISHED", expiredOpenMats.size());
+        }
+        return expiredOpenMats.size();
     }
 
     private void validateHost(OpenMat openMat, Long userId) {
@@ -200,5 +224,22 @@ public class OpenMatService {
         if (maxCapacity != null && maxCapacity != -1 && maxCapacity < 1) {
             throw BusinessException.badRequest("정원은 -1(무제한) 또는 1 이상이어야 합니다");
         }
+    }
+
+    private Page<OpenMat> findOpenMats(Region region, OpenMatStatus status, Pageable pageable) {
+        if (region != null && status != null) {
+            return openMatRepository.findByIsHiddenFalseAndRegionAndStatus(region, status, pageable);
+        }
+        if (region != null) {
+            return openMatRepository.findByIsHiddenFalseAndRegion(region, pageable);
+        }
+        if (status != null) {
+            return openMatRepository.findByIsHiddenFalseAndStatus(status, pageable);
+        }
+        return openMatRepository.findByIsHiddenFalse(pageable);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 }
