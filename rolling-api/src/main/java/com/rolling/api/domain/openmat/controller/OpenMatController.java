@@ -3,6 +3,7 @@ package com.rolling.api.domain.openmat.controller;
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
+import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.global.exception.AuthException;
@@ -17,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -66,15 +68,16 @@ public class OpenMatController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역 필터링을 지원합니다.")
+    @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역 및 상태 필터링을 지원합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
             @Parameter(description = "지역 필터 (예: SEOUL, BUSAN)") @RequestParam(required = false) Region region,
-            Pageable pageable) {
-        Page<OpenMatResponse> response = openMatService.findAll(region, pageable);
+            @Parameter(description = "상태 필터 (RECRUITING, CLOSED, FINISHED)") @RequestParam(required = false) OpenMatStatus status,
+            @PageableDefault(size = 20, sort = "startDateTime", direction = Sort.Direction.ASC) Pageable pageable) {
+        Page<OpenMatResponse> response = openMatService.findAll(region, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

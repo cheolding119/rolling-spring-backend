@@ -18,6 +18,8 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OpenMat extends BaseTimeEntity {
 
+    private static final int REPORT_BLOCK_THRESHOLD = 3;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -129,6 +131,10 @@ public class OpenMat extends BaseTimeEntity {
         return maxCapacity != -1 && participantUids.size() >= maxCapacity;
     }
 
+    public boolean isReported() {
+        return reportCount != null && reportCount >= REPORT_BLOCK_THRESHOLD;
+    }
+
     public void addParticipant(Long userId) {
         participantUids.add(userId);
     }
@@ -141,10 +147,25 @@ public class OpenMat extends BaseTimeEntity {
         this.isHidden = true;
     }
 
+    public void synchronizeStatus(LocalDateTime now) {
+        if (now == null) {
+            return;
+        }
+
+        if (!endDateTime.isAfter(now)) {
+            this.status = OpenMatStatus.FINISHED;
+            return;
+        }
+
+        if (isCapacityFull()) {
+            this.status = OpenMatStatus.CLOSED;
+            return;
+        }
+
+        this.status = OpenMatStatus.RECRUITING;
+    }
+
     public void report() {
         this.reportCount++;
-        if (this.reportCount >= 2) {
-            this.isHidden = true;
-        }
     }
 }
