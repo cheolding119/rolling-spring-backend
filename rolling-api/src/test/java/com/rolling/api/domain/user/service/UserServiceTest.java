@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +45,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(request, "nickname", "new-nickname");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndIsWithdrawnFalse(1L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.updateMe(1L, request);
 
@@ -66,7 +67,7 @@ class UserServiceTest {
 
         UserUpdateRequest request = new UserUpdateRequest();
 
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndIsWithdrawnFalse(2L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.updateMe(2L, request);
 
@@ -89,11 +90,68 @@ class UserServiceTest {
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "");
 
-        when(userRepository.findById(3L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndIsWithdrawnFalse(3L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.updateMe(3L, request);
 
         assertThat(response.getNickname()).isEqualTo("");
         assertThat(response.getBeltColor()).isEqualTo("BROWN");
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 등록 시 사용자 토큰을 갱신한다")
+    void registerFcmToken_updatesUserToken() {
+        User user = User.builder()
+                .socialId("social-4")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("push-user")
+                .email("user4@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 4L);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(4L)).thenReturn(Optional.of(user));
+
+        userService.registerFcmToken(4L, "fcm-token-123");
+
+        assertThat(user.getFcmToken()).isEqualTo("fcm-token-123");
+    }
+
+    @Test
+    @DisplayName("사용자 차단과 차단 해제가 blockedUsers에 반영된다")
+    void blockAndUnblockUser_updatesBlockedUsers() {
+        User user = User.builder()
+                .socialId("social-5")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("owner")
+                .email("owner@test.com")
+                .beltColor(BeltColor.BLUE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 5L);
+
+        User blockedUser = User.builder()
+                .socialId("social-6")
+                .socialProvider(SocialProvider.KAKAO)
+                .nickname("blocked")
+                .email("blocked@test.com")
+                .beltColor(BeltColor.PURPLE)
+                .build();
+        ReflectionTestUtils.setField(blockedUser, "id", 6L);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(5L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndIsWithdrawnFalse(6L)).thenReturn(Optional.of(blockedUser));
+
+        userService.blockUser(5L, 6L);
+        assertThat(user.getBlockedUsers()).contains(blockedUser);
+
+        userService.unblockUser(5L, 6L);
+        assertThat(user.getBlockedUsers()).doesNotContain(blockedUser);
+    }
+
+    @Test
+    @DisplayName("자기 자신은 차단할 수 없다")
+    void blockUser_rejectsSelfBlock() {
+        assertThatThrownBy(() -> userService.blockUser(7L, 7L))
+                .hasMessage("자기 자신은 차단할 수 없습니다");
     }
 }

@@ -90,13 +90,12 @@ enum ReportTargetType {
 | `hostUserId` | `int` | 작성자 유저 ID | FK |
 | `title` | `String` | 대회 명칭 |  |
 | `organizer` | `String` | 주최사 정보 |  |
-| `posterUrl` | `String` | 대회 포스터 이미지 URL |  |
 | `competitionDate` | `DateTime` | 대회 개최일 |  |
-| `registrationDeadline` | `DateTime` | 접수 마감 기한 |  |
+| `registrationDeadline` | `DateTime` | 접수 마감일 | 접수 마감/배지 표시 기준 |
 | `location` | `String` | 개최 장소 |  |
+| `posterUrl` | `String` | 대회 포스터 이미지 URL |  |
 | `applyLink` | `String` | 외부 접수처 링크 | URL 연동 |
-| `categoryTags` | `List<String>` | 종목 태그 | 예: Gi, No-Gi 등 |
-| `reportCount` | `int` | 신고 누적 건수 | 3건 이상 시 외부 링크 차단 |
+| `status` | `Enum` | 검수 노출 | PENDING, APPROVED 등 | |
 | `createdAt` | `DateTime` | 작성 일시 |  |
 
 ---
@@ -199,7 +198,7 @@ enum ReportTargetType {
 - 접수 마감된 대회는 '접수 종료' 배지를 표시하고 리스트 하단으로 정렬한다.
 
 ### 3.2 대회 상세
-- 대회의 상세 정보(제목, 주최사, 일시, 장소, 종목 태그)를 확인할 수 있다.
+- 대회의 상세 정보(제목, 주최사, 일시, 접수 마감일, 장소, 종목 태그)를 확인할 수 있다.
 - 대회 포스터 이미지를 확인할 수 있다.
 
 ### 3.3 대회 등록/수정/삭제
@@ -958,7 +957,6 @@ GET /api/v1/tournaments
         "registrationDeadline": "2026-04-01",
         "location": "서울 올림픽공원 체조경기장",
         "applyLink": "https://forms.google.com/...",
-        "categoryTags": ["Gi", "No-Gi"],
         "registrationClosed": false,
         "createdAt": "2026-02-01T12:00:00"
       }
@@ -997,7 +995,7 @@ GET /api/v1/tournaments/{id}
 POST /api/v1/tournaments
 ```
 
-**인증**: 필요 (주최자/관리자)
+**인증**: 필요 (작성자 본인)
 
 **Request Body**
 | 필드 | 타입 | 필수 | 설명 |
@@ -1009,7 +1007,6 @@ POST /api/v1/tournaments
 | `registrationDeadline` | `String` | O | 접수 마감일 (`YYYY-MM-DD`) |
 | `location` | `String` | - | 개최 장소 |
 | `applyLink` | `String` | O | 외부 접수 링크 |
-| `categoryTags` | `String[]` | - | 카테고리 태그 (`Gi`, `No-Gi` 등) |
 
 ```json
 {
@@ -1019,8 +1016,7 @@ POST /api/v1/tournaments
   "competitionDate": "2026-04-15",
   "registrationDeadline": "2026-04-01",
   "location": "서울 올림픽공원 체조경기장",
-  "applyLink": "https://forms.google.com/...",
-  "categoryTags": ["Gi", "No-Gi"]
+  "applyLink": "https://forms.google.com/..."
 }
 ```
 
@@ -1034,7 +1030,7 @@ POST /api/v1/tournaments
 PUT /api/v1/tournaments/{id}
 ```
 
-**인증**: 필요 (주최자/관리자)
+**인증**: 필요 (작성자 본인)
 
 **Request Body** — 4.3과 동일 (변경할 필드만 전송)
 
@@ -1048,7 +1044,7 @@ PUT /api/v1/tournaments/{id}
 DELETE /api/v1/tournaments/{id}
 ```
 
-**인증**: 필요 (주최자/관리자)
+**인증**: 필요 (작성자 본인)
 
 **Path Parameter**
 | 파라미터 | 타입 | 설명 |
@@ -1141,3 +1137,17 @@ enum BeltColor {
 - 요청 유효성:
   - `nickname`, `phone`, `beltColor` 중 최소 1개는 필수
   - `phone` 형식: `010-1234-5678`
+
+---
+
+## 변경사항 (2026-03-08)
+
+### Tournament 접수 마감일 필드 명시
+- `Tournament` 도메인 정의에 `registrationDeadline`(접수 마감일) 필드를 명시했습니다.
+- 대회 상세 기능 설명에 접수 마감일 확인 항목을 추가했습니다.
+- 스트릿 주짓수 크롤링 데이터는 상세 페이지의 `접수 마감 : YYYY년 M월 D일` 문구에서 날짜를 추출해 `registrationDeadline`에 저장합니다.
+
+### Tournament 수동 크롤링 API 분리
+- 전체 수동 크롤링 API는 `POST /api/v1/tournaments/crawl` 입니다.
+- 스트릿 주짓수만 실행하는 API는 `POST /api/v1/tournaments/crawl/street` 입니다.
+- 코주챔만 실행하는 API는 `POST /api/v1/tournaments/crawl/koreajiu` 입니다.

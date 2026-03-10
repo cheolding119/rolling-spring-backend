@@ -83,11 +83,11 @@
 - 중복 신고/자기 신고가 차단되고 3건 누적 정책이 적용됨
 
 ## Unit B-08. Tournament Core API
-- [ ] Tournament 엔티티/리포지토리/서비스/컨트롤러 구현
-- [ ] `GET /api/v1/tournaments` 페이징/정렬 정책 구현
-- [ ] `GET /api/v1/tournaments/{id}` 구현
-- [ ] `POST/PUT/DELETE /api/v1/tournaments` 구현
-- [ ] Swagger/명세 동기화
+- [x] Tournament 엔티티/리포지토리/서비스/컨트롤러 구현
+- [x] `GET /api/v1/tournaments` 페이징/정렬 정책 구현
+- [x] `GET /api/v1/tournaments/{id}` 구현
+- [x] `POST/PUT/DELETE /api/v1/tournaments` 구현
+- [x] Swagger/명세 동기화
 
 완료 기준:
 - 대회 CRUD + 조회 정책이 프론트 연동 가능한 수준으로 완료
