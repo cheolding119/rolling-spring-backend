@@ -1,18 +1,24 @@
 package com.rolling.api.domain.user.controller;
 
+import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.service.UserService;
+import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,7 +43,7 @@ public class UserController {
     })
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getMe(@AuthenticationPrincipal UserPrincipal principal) {
-        UserResponse response = userService.getMe(principal.getUserId());
+        UserResponse response = userService.getMe(requireUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -54,7 +60,70 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> updateMe(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody UserUpdateRequest request) {
-        UserResponse response = userService.updateMe(principal.getUserId(), request);
+        UserResponse response = userService.updateMe(requireUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "FCM 토큰 등록",
+            description = "현재 로그인한 사용자 FCM 토큰을 등록/갱신합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PostMapping("/me/fcm")
+    public ResponseEntity<ApiResponse<Void>> registerFcmToken(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody UserFcmTokenRequest request) {
+        userService.registerFcmToken(requireUserId(principal), request.getFcmToken());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
+            summary = "사용자 차단",
+            description = "현재 로그인한 사용자가 특정 사용자를 차단합니다. 이미 차단된 경우에도 성공 응답을 반환합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "차단 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "자기 자신 차단 시도"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대상 사용자 없음")
+    })
+    @PostMapping("/{id}/block")
+    public ResponseEntity<ApiResponse<Void>> blockUser(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        userService.blockUser(requireUserId(principal), id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
+            summary = "사용자 차단 해제",
+            description = "현재 로그인한 사용자가 특정 사용자 차단을 해제합니다. 차단 상태가 아니어도 성공 응답을 반환합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "해제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "자기 자신 차단 해제 시도"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대상 사용자 없음")
+    })
+    @DeleteMapping("/{id}/block")
+    public ResponseEntity<ApiResponse<Void>> unblockUser(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        userService.unblockUser(requireUserId(principal), id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    private Long requireUserId(UserPrincipal principal) {
+        if (principal == null) {
+            throw new AuthException("UNAUTHORIZED", "인증이 필요합니다");
+        }
+        return principal.getUserId();
     }
 }
