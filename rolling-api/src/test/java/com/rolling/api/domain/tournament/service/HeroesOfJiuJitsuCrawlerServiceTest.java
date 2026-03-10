@@ -117,4 +117,40 @@ HeroesOfJiuJitsuCrawlerServiceTest {
         assertThat(tournamentModel.getOrganizer()).isEqualTo("히어로즈 오브 스포츠, 굿네이버스");
         assertThat(tournamentModel.getApplyLink()).isEqualTo("https://www.heroesofsports.kr/events/application/240");
     }
+
+    @Test
+    @DisplayName("server action 응답 앞에 HTML 조각이 있어도 listData payload를 추출한다")
+    void parseServerActionResponse_extractsPayloadWhenHtmlPrefixExists() {
+        String listPageUrl = "https://www.heroesofsports.kr/events/application";
+        String responseBody = """
+                0:["$@1",["build-id",null]]
+                2:T25e7,<p>preface html fragment</p><p>another line</p>1:{"listData":[{"id":"$n240","title":"2026 히어로즈 오브 주짓수 리그 시즌16(대구)","meta":{"coHost":"히어로즈 오브 스포츠, 굿네이버스","venue":"대구 시민체육관","thumbnail":"https://sportseventsolution.s3.ap-northeast-2.amazonaws.com/attachment/poster.jpg","eventDate":"2099-04-04T15:00:00.000Z","applicaitonEndDate":"2099-03-27T14:59:59.999Z","isPublished":true},"isApproved":true,"isPrivate":false}],"totalCount":1}
+                """;
+
+        assertThat(crawlerService.parseServerActionResponse(responseBody, listPageUrl))
+                .singleElement()
+                .satisfies(tournamentModel -> {
+                    assertThat(tournamentModel.getTitle()).isEqualTo("2026 히어로즈 오브 주짓수 리그 시즌16(대구)");
+                    assertThat(tournamentModel.getCompetitionDate()).isEqualTo("2099-04-05");
+                    assertThat(tournamentModel.getRegistrationDeadline()).isEqualTo("2099-03-27");
+                    assertThat(tournamentModel.getLocation()).isEqualTo("대구 시민체육관");
+                    assertThat(tournamentModel.getApplyLink()).isEqualTo("https://www.heroesofsports.kr/events/application/240");
+                });
+    }
+
+    @Test
+    @DisplayName("application 전용 필드가 없어도 startDate와 endDate로 신청 가능 여부를 판단한다")
+    void parseServerActionResponse_usesStartDateAndEndDateFallback() {
+        String listPageUrl = "https://www.heroesofsports.kr/events/application";
+        String responseBody = """
+                1:{"listData":[
+                {"id":"$n240","title":"신청 가능한 대회","meta":{"coHost":"히어로즈 오브 스포츠","venue":"대구 시민체육관","thumbnail":"https://example.com/poster.jpg","eventDate":"2099-04-04T15:00:00.000Z","startDate":"2000-03-01T15:00:00.000Z","endDate":"2099-03-27T14:59:59.999Z","isPublished":true},"isApproved":true,"isPrivate":false},
+                {"id":"$n241","title":"오픈 예정 대회","meta":{"coHost":"히어로즈 오브 스포츠","venue":"서울 체육관","thumbnail":"https://example.com/upcoming.jpg","eventDate":"2999-04-04T15:00:00.000Z","startDate":"2999-03-01T15:00:00.000Z","endDate":"2999-03-27T14:59:59.999Z","isPublished":true},"isApproved":true,"isPrivate":false}
+                ],"totalCount":2}
+                """;
+
+        assertThat(crawlerService.parseServerActionResponse(responseBody, listPageUrl))
+                .extracting(TournamentModel::getTitle)
+                .containsExactly("신청 가능한 대회");
+    }
 }

@@ -35,7 +35,7 @@ public class HeroesOfJiuJitsuCrawlerService {
     private static final Pattern DOTTED_DATE_PATTERN =
             Pattern.compile("((\\d{2})\\.(\\d{2})\\.(\\d{2}))");
     private static final Pattern MAP_QUERY_PATTERN = Pattern.compile("[?&]q=([^&]+)");
-    private static final Pattern JSON_PAYLOAD_LINE_PATTERN = Pattern.compile("^\\d+:(\\{.*)$");
+    private static final Pattern JSON_PAYLOAD_OBJECT_START_PATTERN = Pattern.compile("\\d+:\\{");
     private static final Pattern NUMERIC_ID_PATTERN = Pattern.compile("(\\d+)");
 
     public TournamentModel parseListCardHtml(String html, String detailUrl) {
@@ -179,8 +179,8 @@ public class HeroesOfJiuJitsuCrawlerService {
 
     private boolean isActive(JsonNode meta) {
         Instant now = Instant.now();
-        Instant start = parseInstant(text(meta, "applicaitonStartDate"));
-        Instant end = parseInstant(text(meta, "applicaitonEndDate"));
+        Instant start = parseInstant(firstNonBlank(text(meta, "applicaitonStartDate"), text(meta, "startDate")));
+        Instant end = parseInstant(firstNonBlank(text(meta, "applicaitonEndDate"), text(meta, "endDate")));
 
         if (end != null && now.isAfter(end)) {
             return false;
@@ -371,14 +371,22 @@ public class HeroesOfJiuJitsuCrawlerService {
     }
 
     private String extractJsonPayload(String responseBody) {
-        for (String line : responseBody.split("\\R")) {
-            Matcher matcher = JSON_PAYLOAD_LINE_PATTERN.matcher(line);
-            if (matcher.find() && matcher.group(1).contains("\"listData\"")) {
-                return matcher.group(1);
-            }
+        int listDataIndex = responseBody.indexOf("\"listData\"");
+        if (listDataIndex < 0) {
+            return null;
         }
 
-        return null;
+        int objectStart = findPayloadObjectStart(responseBody, listDataIndex);
+        if (objectStart < 0) {
+            return null;
+        }
+
+        int objectEnd = findJsonObjectEnd(responseBody, objectStart);
+        if (objectEnd < 0) {
+            return null;
+        }
+
+        return responseBody.substring(objectStart, objectEnd + 1);
     }
 
     private Long extractPostId(String rawId) {
@@ -491,5 +499,66 @@ public class HeroesOfJiuJitsuCrawlerService {
                 .replaceAll("[\\u200B-\\u200D\\uFEFF]", "")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private int findPayloadObjectStart(String responseBody, int listDataIndex) {
+        Matcher matcher = JSON_PAYLOAD_OBJECT_START_PATTERN.matcher(responseBody);
+        int objectStart = -1;
+
+        while (matcher.find()) {
+            int jsonStart = matcher.end() - 1;
+            if (jsonStart > listDataIndex) {
+                break;
+            }
+            objectStart = jsonStart;
+        }
+
+        return objectStart;
+    }
+
+    private int findJsonObjectEnd(String responseBody, int objectStart) {
+        boolean inString = false;
+        boolean escaped = false;
+        int depth = 0;
+
+        for (int i = objectStart; i < responseBody.length(); i++) {
+            char current = responseBody.charAt(i);
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+
+                if (current == '\\') {
+                    escaped = true;
+                    continue;
+                }
+
+                if (current == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (current == '"') {
+                inString = true;
+                continue;
+            }
+
+            if (current == '{') {
+                depth++;
+                continue;
+            }
+
+            if (current == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     }
 }

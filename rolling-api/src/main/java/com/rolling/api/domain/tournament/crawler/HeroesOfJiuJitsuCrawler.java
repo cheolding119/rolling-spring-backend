@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -123,12 +124,12 @@ public class HeroesOfJiuJitsuCrawler implements TournamentCrawler {
 
     private String fetchRawText(String url) {
         try {
-            return Jsoup.connect(url)
+            Connection.Response response = Jsoup.connect(url)
                     .userAgent(USER_AGENT)
                     .timeout(REQUEST_TIMEOUT_MILLIS)
                     .ignoreContentType(true)
-                    .execute()
-                    .body();
+                    .execute();
+            return decodeUtf8Body(response);
         } catch (IOException | IllegalArgumentException e) {
             log.warn("HeroesOfJiuJitsu request failed. url={}", url, e);
             return null;
@@ -137,7 +138,7 @@ public class HeroesOfJiuJitsuCrawler implements TournamentCrawler {
 
     private String executeListServerAction(String listPageUrl, String actionId) {
         try {
-            return Jsoup.connect(listPageUrl)
+            Connection.Response response = Jsoup.connect(listPageUrl)
                     .userAgent(USER_AGENT)
                     .timeout(REQUEST_TIMEOUT_MILLIS)
                     .ignoreContentType(true)
@@ -145,12 +146,20 @@ public class HeroesOfJiuJitsuCrawler implements TournamentCrawler {
                     .header("Content-Type", "text/plain;charset=UTF-8")
                     .method(Connection.Method.POST)
                     .requestBody(SERVER_ACTION_REQUEST_BODY)
-                    .execute()
-                    .body();
+                    .execute();
+            return decodeUtf8Body(response);
         } catch (IOException | IllegalArgumentException e) {
             log.warn("HeroesOfJiuJitsu server action failed. listPageUrl={}, actionId={}", listPageUrl, actionId, e);
             return null;
         }
+    }
+
+    private String decodeUtf8Body(Connection.Response response) {
+        if (response == null) {
+            return null;
+        }
+
+        return new String(response.bodyAsBytes(), StandardCharsets.UTF_8);
     }
 
     private Map<String, Element> extractDetailAnchors(Document document) {
