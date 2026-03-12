@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.crawler;
 
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.service.HeroesOfJiuJitsuCrawlerService;
 import org.jsoup.Connection;
@@ -46,6 +47,11 @@ public class HeroesOfJiuJitsuCrawler implements TournamentCrawler {
     private List<String> listPageUrls;
 
     private final HeroesOfJiuJitsuCrawlerService crawlerService;
+
+    @Override
+    public TournamentSource getSource() {
+        return TournamentSource.HEROES_OF_JIU_JITSU;
+    }
 
     @Override
     public List<TournamentModel> crawlAll() {

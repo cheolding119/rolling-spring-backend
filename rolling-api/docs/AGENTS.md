@@ -20,6 +20,19 @@ enum OpenMatStatus {
 }
 ```
 
+### TournamentSource
+대회 등록 출처
+```dart
+enum TournamentSource {
+  streetJiuJitsu,    // 스트릿 주짓수 크롤링
+  koreaJiu,          // 코리아 주짓수 크롤링
+  heroesOfJiuJitsu,  // 히어로즈 오브 주짓수 크롤링
+  manual             // 수동 등록
+}
+```
+- API raw value: `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `MANUAL`
+- 수동 크롤링 API의 `source`는 `MANUAL`을 지원하지 않는다.
+
 ### ReportReason
 신고 사유 타입
 ```dart
@@ -87,15 +100,16 @@ enum ReportTargetType {
 | **필드명** | **타입** | **설명** | **비고** |
 | --- | --- | --- | --- |
 | `id` | `int` | 대회 고유 ID | PK |
-| `hostUserId` | `int` | 작성자 유저 ID | FK |
+| `hostUserId` | `int` | 작성자 유저 ID | 수동 등록 대회만 값 존재, 크롤링 데이터는 null 가능 |
+| `source` | `TournamentSource` | 등록 출처 | `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `MANUAL` |
 | `title` | `String` | 대회 명칭 |  |
 | `organizer` | `String` | 주최사 정보 |  |
-| `competitionDate` | `DateTime` | 대회 개최일 |  |
-| `registrationDeadline` | `DateTime` | 접수 마감일 | 접수 마감/배지 표시 기준 |
+| `competitionDate` | `Date` | 대회 개최일 | `YYYY-MM-DD` |
+| `registrationDeadline` | `Date` | 접수 마감일 | `YYYY-MM-DD`, 접수 마감/배지 표시 기준 |
 | `location` | `String` | 개최 장소 |  |
 | `posterUrl` | `String` | 대회 포스터 이미지 URL |  |
 | `applyLink` | `String` | 외부 접수처 링크 | URL 연동 |
-| `status` | `Enum` | 검수 노출 | PENDING, APPROVED 등 | |
+| `registrationClosed` | `bool` | 접수 마감 여부 | 서버 계산 필드 |
 | `createdAt` | `DateTime` | 작성 일시 |  |
 
 ---
@@ -198,11 +212,13 @@ enum ReportTargetType {
 - 접수 마감된 대회는 '접수 종료' 배지를 표시하고 리스트 하단으로 정렬한다.
 
 ### 3.2 대회 상세
-- 대회의 상세 정보(제목, 주최사, 일시, 접수 마감일, 장소, 종목 태그)를 확인할 수 있다.
+- 대회의 상세 정보(제목, 주최사, 대회일, 접수 마감일, 장소, 외부 접수 링크)를 확인할 수 있다.
 - 대회 포스터 이미지를 확인할 수 있다.
+- 서버는 접수 마감 여부를 `registrationClosed` 필드로 함께 내려준다.
 
 ### 3.3 대회 등록/수정/삭제
 - 로그인한 유저는 대회 정보를 등록할 수 있다.
+- 수동 등록 대회는 `source = MANUAL`로 저장된다.
 - 작성자 본인만 수정/삭제가 가능하다.
 
 ### 3.4 대회 관리 (작성자 전용)
@@ -210,16 +226,15 @@ enum ReportTargetType {
 - **대회 정보 수정**: 제목, 주최사, 일시, 장소, 포스터 이미지 등의 정보를 수정할 수 있다.
 - **대회 삭제**: 대회 정보를 삭제할 수 있다.
 
-### 3.5 대회 신고
-- 로그인한 유저는 대회를 신고할 수 있다.
-- 신고 사유를 선택하거나 직접 입력할 수 있다. (허위 정보, 부적절한 내용, 스팸/광고, 기타)
-- 동일 유저가 같은 대회를 중복 신고할 수 없다.
-- 신고가 3건 이상 누적된 대회는 '신고됨' 상태로 표시되며, 외부 링크 연결이 차단된다.
-- 작성자는 자신이 등록한 대회를 신고할 수 없다.
+### 3.5 대회 크롤링 수동 실행
+- 운영/개발자는 대회 크롤링 수동 실행 API를 호출할 수 있다.
+- `source`를 생략하면 전체 크롤러를 실행한다.
+- `source`를 지정하면 해당 출처 크롤러만 실행한다. 지원값: `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`
+- 크롤링 결과는 DB에 upsert 저장되며 `crawledCount`, `createdCount`, `updatedCount`, `skippedCount`를 반환한다.
 
 ### 3.6 외부 연동
 - 대회 정보 클릭 시 `applyLink`를 통해 외부 브라우저로 연결한다.
-- 신고가 3건 이상인 대회는 외부 연동이 비활성화된다.
+- 수동 등록과 크롤링 수집 데이터 모두 동일한 `applyLink` 필드를 사용한다.
 
 
 
@@ -364,6 +379,14 @@ enum ReportTargetType {
 | `RECRUITING` | 모집중 |
 | `CLOSED` | 정원 마감 |
 | `FINISHED` | 종료됨 (endDateTime 경과) |
+
+**TournamentSource**
+| 값 | 설명 |
+|------|------|
+| `STREET_JIU_JITSU` | 스트릿 주짓수 크롤링 수집 |
+| `KOREA_JIU` | 코리아 주짓수 크롤링 수집 |
+| `HEROES_OF_JIU_JITSU` | 히어로즈 오브 주짓수 크롤링 수집 |
+| `MANUAL` | 사용자 수동 등록 |
 
 ---
 
@@ -939,12 +962,14 @@ GET /api/v1/tournaments
 **Query Parameters**
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|:----:|--------|------|
+| `source` | `String` | - | - | 출처 필터 (`STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `MANUAL`) |
 | `page` | `Integer` | - | `0` | 페이지 번호 |
 | `size` | `Integer` | - | `20` | 페이지 크기 |
 
 **Response** `200 OK` — 페이징 응답
 
 > 접수 가능한 대회가 상단, 마감된 대회가 하단으로 정렬됩니다.
+> `source`를 지정하면 해당 출처의 대회만 조회합니다.
 
 ```json
 {
@@ -953,6 +978,7 @@ GET /api/v1/tournaments
     "content": [
       {
         "id": 1,
+        "source": "MANUAL",
         "title": "제5회 롤링컵",
         "organizer": "롤링 주짓수",
         "posterUrl": "https://cdn.rolling.com/posters/1.jpg",
@@ -1025,6 +1051,14 @@ POST /api/v1/tournaments
 
 **Response** `200 OK` — 4.2 상세 조회와 동일한 형식
 
+> 수동 등록 대회는 `source = MANUAL`로 저장됩니다.
+
+**에러**
+| 코드 | 상황 |
+|------|------|
+| `VALIDATION_ERROR` | 필수 필드 누락 |
+| `VALIDATION_ERROR` | 접수 마감일이 대회일보다 늦음 |
+
 ---
 
 ### 4.4 대회 수정
@@ -1038,6 +1072,8 @@ PUT /api/v1/tournaments/{id}
 **Request Body** — 4.3과 동일 (변경할 필드만 전송)
 
 **Response** `200 OK` — 4.2 상세 조회와 동일한 형식
+
+> 최소 1개 필드는 전달해야 하며, 적용 후 `registrationDeadline`은 `competitionDate`보다 늦을 수 없습니다.
 
 ---
 
@@ -1061,6 +1097,49 @@ DELETE /api/v1/tournaments/{id}
   "data": null
 }
 ```
+
+---
+
+### 4.6 대회 크롤링 수동 실행
+
+```
+POST /api/v1/tournaments/crawl
+```
+
+**인증**: 환경 설정에 따라 다름
+
+> `tournament.crawler.manual.endpoint-public=true`이면 인증 없이 호출할 수 있습니다.
+> 현재 기본 `application.yml`은 `true`로 설정되어 있습니다.
+
+**Query Parameters**
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|:----:|--------|------|
+| `source` | `String` | - | - | 실행할 출처 (`STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`) |
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "crawledCount": 12,
+    "createdCount": 3,
+    "updatedCount": 8,
+    "skippedCount": 1
+  }
+}
+```
+
+> `source`를 생략하면 전체 크롤러를 실행합니다.
+> 지원 `source`: `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`
+> `MANUAL`은 조회/수동 등록용 source이며 크롤링 대상이 아닙니다.
+> 실행 전 접수 마감일이 지난 대회를 삭제하고, 수집 결과는 DB에 upsert 저장합니다.
+
+**에러**
+| 코드 | 상황 |
+|------|------|
+| `VALIDATION_ERROR` | 지원하지 않는 source |
+| `VALIDATION_ERROR` | `MANUAL` 등 크롤러가 없는 출처 지정 |
+| `UNAUTHORIZED` | 엔드포인트 비공개 설정에서 인증 없이 호출 |
 
 ---
 
@@ -1150,10 +1229,18 @@ enum BeltColor {
 - 대회 상세 기능 설명에 접수 마감일 확인 항목을 추가했습니다.
 - 스트릿 주짓수 크롤링 데이터는 상세 페이지의 `접수 마감 : YYYY년 M월 D일` 문구에서 날짜를 추출해 `registrationDeadline`에 저장합니다.
 
-### Tournament 수동 크롤링 API 분리
-- 전체 수동 크롤링 API는 `POST /api/v1/tournaments/crawl` 입니다.
-- 스트릿 주짓수만 실행하는 API는 `POST /api/v1/tournaments/crawl/street` 입니다.
-- 코주챔만 실행하는 API는 `POST /api/v1/tournaments/crawl/koreajiu` 입니다.
+---
+
+## 변경사항 (2026-03-11)
+
+### TournamentSource 필드 및 API 정합성 반영
+- `Tournament` 엔티티와 대회 응답 모델에 `source` 필드가 추가되었습니다.
+- 수동 등록 대회는 서버에서 `MANUAL`로 저장됩니다.
+- `GET /api/v1/tournaments`는 `source` 필터를 지원합니다.
+- 대회 크롤링 수동 실행 API는 `POST /api/v1/tournaments/crawl?source=...` 형식으로 통합되었습니다.
+- 대회 조회/필터 지원 출처 값은 `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `MANUAL` 입니다.
+- 대회 크롤링 수동 실행 지원 출처 값은 `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU` 입니다.
+- `MANUAL`은 수동 등록/조회용 source이며 크롤링 대상은 아닙니다.
 
 ---
 
@@ -1166,3 +1253,13 @@ enum BeltColor {
 - `endDateTime`이 지난 오픈매트는 스케줄러와 조회 시점 보정으로 `FINISHED` 처리됩니다.
 - 오픈매트 리스트 조회 API는 `status` 필터를 지원하며 기본 정렬은 `startDateTime ASC` 입니다.
 - 신고 누적 3건 이상 오픈매트는 신규 신청이 차단됩니다.
+
+---
+
+## 변경사항 (2026-03-12)
+
+### Tournament 문서 정합성 보정
+- `Tournament` 도메인 정의에서 `competitionDate`, `registrationDeadline` 타입을 `Date`로 명시했습니다.
+- 대회 응답 모델의 계산 필드 `registrationClosed`를 문서에 반영했습니다.
+- 대회 크롤링 수동 실행 API의 인증 조건을 설정값 기반으로 정리했습니다.
+- `MANUAL`은 대회 조회/수동 등록용 source이며 크롤링 source가 아님을 명시했습니다.

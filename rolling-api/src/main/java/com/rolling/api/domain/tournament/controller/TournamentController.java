@@ -3,11 +3,13 @@ package com.rolling.api.domain.tournament.controller;
 import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.dto.TournamentUpdateRequest;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.service.TournamentService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Tournament", description = "대회 API")
@@ -35,14 +38,16 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
 
-    @Operation(summary = "대회 리스트 조회", description = "대회 목록을 페이징 조회합니다. 접수 가능한 대회가 상단에 정렬됩니다.")
+    @Operation(summary = "대회 리스트 조회", description = "대회 목록을 페이징 조회합니다. 접수 가능한 대회가 상단에 정렬되며 source 필터를 지원합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<TournamentResponse>>> list(
+            @Parameter(description = "출처 필터 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, MANUAL)")
+            @RequestParam(required = false) TournamentSource source,
             @PageableDefault(size = 20) Pageable pageable) {
-        Page<TournamentResponse> response = tournamentService.findAll(pageable);
+        Page<TournamentResponse> response = tournamentService.findAll(pageable, source);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -57,7 +62,7 @@ public class TournamentController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "대회 등록", description = "대회 정보를 등록합니다.")
+    @Operation(summary = "대회 등록", description = "대회 정보를 등록합니다. 수동 등록 대회는 source가 MANUAL로 저장됩니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
