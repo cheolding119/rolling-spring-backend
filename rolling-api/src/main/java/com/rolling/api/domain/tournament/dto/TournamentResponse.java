@@ -1,6 +1,7 @@
 package com.rolling.api.domain.tournament.dto;
 
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +17,7 @@ public class TournamentResponse {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private Long id;
+    private TournamentSource source;
     private String title;
     private String organizer;
     private String posterUrl;
@@ -33,6 +35,7 @@ public class TournamentResponse {
 
         return TournamentResponse.builder()
                 .id(tournament.getId())
+                .source(resolveSource(tournament.getSource()))
                 .title(tournament.getTitle())
                 .organizer(tournament.getOrganizer())
                 .posterUrl(tournament.getPosterUrl())
@@ -43,5 +46,9 @@ public class TournamentResponse {
                 .registrationClosed(registrationClosed)
                 .createdAt(tournament.getCreatedAt())
                 .build();
+    }
+
+    private static TournamentSource resolveSource(TournamentSource source) {
+        return source == null ? TournamentSource.MANUAL : source;
     }
 }

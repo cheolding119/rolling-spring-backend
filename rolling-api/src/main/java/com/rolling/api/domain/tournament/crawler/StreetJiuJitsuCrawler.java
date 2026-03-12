@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.crawler;
 
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.service.StreetJiuJitsuCrawlerService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,11 @@ public class StreetJiuJitsuCrawler implements TournamentCrawler {
     private List<String> listPageUrls;
 
     private final StreetJiuJitsuCrawlerService detailCrawlerService;
+
+    @Override
+    public TournamentSource getSource() {
+        return TournamentSource.STREET_JIU_JITSU;
+    }
 
     @Override
     public List<TournamentModel> crawlAll() {

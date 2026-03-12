@@ -6,6 +6,7 @@ import com.rolling.api.domain.tournament.crawler.StreetJiuJitsuCrawler;
 import com.rolling.api.domain.tournament.crawler.TournamentCrawler;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.global.exception.BusinessException;
@@ -19,6 +20,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +50,7 @@ class TournamentManagerServiceTest {
         model.setTitle("sample");
 
         when(failingCrawler.crawlAll()).thenThrow(new RuntimeException("crawler failed"));
+        when(successCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
         when(successCrawler.crawlAll()).thenReturn(List.of(model));
 
         TournamentManagerService managerService =
@@ -57,6 +60,7 @@ class TournamentManagerServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTitle()).isEqualTo("sample");
+        assertThat(result.get(0).getSource()).isEqualTo(TournamentSource.STREET_JIU_JITSU);
         verify(failingCrawler).crawlAll();
         verify(successCrawler).crawlAll();
     }
@@ -95,6 +99,7 @@ class TournamentManagerServiceTest {
         assertThat(result.getCreatedCount()).isEqualTo(0);
         assertThat(result.getUpdatedCount()).isEqualTo(1);
         assertThat(result.getSkippedCount()).isEqualTo(0);
+        assertThat(existing.getSource()).isEqualTo(TournamentSource.STREET_JIU_JITSU);
         assertThat(existing.getTitle()).isEqualTo(model.getTitle());
         assertThat(existing.getPosterUrl()).isEqualTo(model.getPosterUrl());
         assertThat(existing.getCompetitionDate()).isEqualTo(model.getCompetitionDate());
@@ -137,6 +142,7 @@ class TournamentManagerServiceTest {
 
         assertThat(result.getCreatedCount()).isEqualTo(0);
         assertThat(result.getUpdatedCount()).isEqualTo(1);
+        assertThat(existing.getSource()).isEqualTo(TournamentSource.STREET_JIU_JITSU);
         assertThat(existing.getApplyLink()).isEqualTo(model.getApplyLink());
         verify(tournamentRepository).findByApplyLink(model.getApplyLink());
         verify(tournamentRepository).findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate());
@@ -146,10 +152,10 @@ class TournamentManagerServiceTest {
     @DisplayName("필수값이 누락된 크롤링 데이터는 저장하지 않고 스킵한다")
     void crawlAndSaveAll_skipsInvalidTournamentModel() {
         TournamentModel invalid = new TournamentModel();
+        invalid.setSource(TournamentSource.STREET_JIU_JITSU);
         invalid.setApplyLink("https://www.street-jiujitsu.com/invalid");
         invalid.setCompetitionDate("2099-03-07");
         invalid.setLocation("전주대학교 체육관");
-        // title 누락
 
         when(successCrawler.crawlAll()).thenReturn(List.of(invalid));
 
@@ -195,12 +201,17 @@ class TournamentManagerServiceTest {
                 "부산 벡스코",
                 "https://www.street-jiujitsu.com/tournament-170"
         );
+        AtomicReference<Tournament> savedTournament = new AtomicReference<>();
 
         when(successCrawler.crawlAll()).thenReturn(List.of(model));
         when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
         when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
                 .thenReturn(Optional.empty());
-        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> {
+            Tournament tournament = invocation.getArgument(0);
+            savedTournament.set(tournament);
+            return tournament;
+        });
 
         TournamentManagerService managerService =
                 new TournamentManagerService(List.of(successCrawler), tournamentRepository);
@@ -209,6 +220,8 @@ class TournamentManagerServiceTest {
 
         assertThat(result.getCreatedCount()).isEqualTo(1);
         assertThat(result.getUpdatedCount()).isEqualTo(0);
+        assertThat(savedTournament.get()).isNotNull();
+        assertThat(savedTournament.get().getSource()).isEqualTo(TournamentSource.STREET_JIU_JITSU);
         verify(tournamentRepository).findByApplyLink(model.getApplyLink());
         verify(tournamentRepository).findByTitleAndCompetitionDate(eq(model.getTitle()), eq(model.getCompetitionDate()));
         verify(tournamentRepository).save(any(Tournament.class));
@@ -242,6 +255,7 @@ class TournamentManagerServiceTest {
     @DisplayName("크롤링 시작 전에 접수 마감일이 지난 대회는 DB에서 삭제한다")
     void crawlAndSaveAll_deletesExpiredByRegistrationDeadline() {
         Tournament expired = Tournament.builder()
+                .source(TournamentSource.STREET_JIU_JITSU)
                 .title("expired")
                 .organizer("org")
                 .competitionDate(LocalDate.now().plusDays(2).toString())
@@ -252,6 +266,7 @@ class TournamentManagerServiceTest {
         ReflectionTestUtils.setField(expired, "id", 10L);
 
         Tournament active = Tournament.builder()
+                .source(TournamentSource.KOREA_JIU)
                 .title("active")
                 .organizer("org")
                 .competitionDate(LocalDate.now().plusDays(3).toString())
@@ -274,7 +289,7 @@ class TournamentManagerServiceTest {
     }
 
     @Test
-    @DisplayName("source가 street면 스트릿 주짓수 크롤러만 실행한다")
+    @DisplayName("source가 STREET_JIU_JITSU면 스트릿 주짓수 크롤러만 실행한다")
     void crawlAndSaveBySource_runsOnlyStreetCrawler() {
         StreetJiuJitsuCrawler streetCrawler = mock(StreetJiuJitsuCrawler.class);
         KoreaJiuCrawler koreaJiuCrawler = mock(KoreaJiuCrawler.class);
@@ -285,6 +300,7 @@ class TournamentManagerServiceTest {
                 "https://www.street-jiujitsu.com/tournament-172"
         );
 
+        when(streetCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
         when(streetCrawler.crawlAll()).thenReturn(List.of(model));
         when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
         when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
@@ -294,7 +310,7 @@ class TournamentManagerServiceTest {
         TournamentManagerService managerService =
                 new TournamentManagerService(List.of(streetCrawler, koreaJiuCrawler), tournamentRepository);
 
-        TournamentCrawlResult result = managerService.crawlAndSaveBySource("street");
+        TournamentCrawlResult result = managerService.crawlAndSaveBySource(TournamentSource.STREET_JIU_JITSU);
 
         assertThat(result.getCrawledCount()).isEqualTo(1);
         verify(streetCrawler).crawlAll();
@@ -302,7 +318,7 @@ class TournamentManagerServiceTest {
     }
 
     @Test
-    @DisplayName("source가 heroes면 히어로즈 오브 주짓수 크롤러만 실행한다")
+    @DisplayName("source가 HEROES_OF_JIU_JITSU면 히어로즈 오브 주짓수 크롤러만 실행한다")
     void crawlAndSaveBySource_runsOnlyHeroesCrawler() {
         HeroesOfJiuJitsuCrawler heroesCrawler = mock(HeroesOfJiuJitsuCrawler.class);
         StreetJiuJitsuCrawler streetCrawler = mock(StreetJiuJitsuCrawler.class);
@@ -315,6 +331,8 @@ class TournamentManagerServiceTest {
         model.setOrganizer(null);
         model.setPosterUrl(null);
 
+        when(heroesCrawler.getSource()).thenReturn(TournamentSource.HEROES_OF_JIU_JITSU);
+        when(streetCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
         when(heroesCrawler.crawlAll()).thenReturn(List.of(model));
         when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
         when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
@@ -324,7 +342,7 @@ class TournamentManagerServiceTest {
         TournamentManagerService managerService =
                 new TournamentManagerService(List.of(streetCrawler, heroesCrawler), tournamentRepository);
 
-        TournamentCrawlResult result = managerService.crawlAndSaveBySource("heroes");
+        TournamentCrawlResult result = managerService.crawlAndSaveBySource(TournamentSource.HEROES_OF_JIU_JITSU);
 
         assertThat(result.getCrawledCount()).isEqualTo(1);
         verify(heroesCrawler).crawlAll();
@@ -332,18 +350,20 @@ class TournamentManagerServiceTest {
     }
 
     @Test
-    @DisplayName("지원하지 않는 source면 예외를 던진다")
-    void crawlAndSaveBySource_throwsWhenUnsupported() {
+    @DisplayName("해당 source의 크롤러가 없으면 예외를 던진다")
+    void crawlAndSaveBySource_throwsWhenCrawlerMissing() {
+        when(successCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
         TournamentManagerService managerService =
                 new TournamentManagerService(List.of(successCrawler), tournamentRepository);
 
-        assertThatThrownBy(() -> managerService.crawlAndSaveBySource("unknown"))
+        assertThatThrownBy(() -> managerService.crawlAndSaveBySource(TournamentSource.KOREA_JIU))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("지원하지 않는 대회 크롤러입니다: unknown");
+                .hasMessage("지원하지 않는 대회 크롤러입니다: KOREA_JIU");
     }
 
     private TournamentModel validModel(String title, String competitionDate, String location, String applyLink) {
         TournamentModel model = new TournamentModel();
+        model.setSource(TournamentSource.STREET_JIU_JITSU);
         model.setTitle(title);
         model.setOrganizer("스트릿 주짓수");
         model.setPosterUrl("https://static.example.com/poster.jpg");

@@ -4,6 +4,7 @@ import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.dto.TournamentUpdateRequest;
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -28,7 +29,13 @@ public class TournamentService {
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable) {
+        return findAll(pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
         List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
+                .filter(tournament -> matchesSource(tournament, source))
                 .map(TournamentResponse::from)
                 .sorted(
                         Comparator.comparing(TournamentResponse::isRegistrationClosed)
@@ -64,6 +71,7 @@ public class TournamentService {
 
         Tournament tournament = Tournament.builder()
                 .hostUserId(userId)
+                .source(TournamentSource.MANUAL)
                 .title(requireText(request.getTitle(), "대회 제목은 필수입니다"))
                 .organizer(optionalText(request.getOrganizer()))
                 .posterUrl(requireText(request.getPosterUrl(), "포스터 URL은 필수입니다"))
@@ -83,6 +91,7 @@ public class TournamentService {
                 .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
         validateOwner(tournament, userId);
         validateAtLeastOneField(request);
+        tournament.assignSourceIfAbsent(TournamentSource.MANUAL);
 
         LocalDate effectiveCompetitionDate = request.getCompetitionDate() != null
                 ? request.getCompetitionDate()
@@ -160,6 +169,14 @@ public class TournamentService {
         if (registrationDeadline.isAfter(competitionDate)) {
             throw BusinessException.badRequest("접수 마감일은 대회일보다 이후일 수 없습니다");
         }
+    }
+
+    private boolean matchesSource(Tournament tournament, TournamentSource source) {
+        return source == null || resolveSource(tournament) == source;
+    }
+
+    private TournamentSource resolveSource(Tournament tournament) {
+        return tournament.getSource() == null ? TournamentSource.MANUAL : tournament.getSource();
     }
 
     private String requireText(String value, String message) {

@@ -1,11 +1,9 @@
 package com.rolling.api.domain.tournament.service;
 
-import com.rolling.api.domain.tournament.crawler.HeroesOfJiuJitsuCrawler;
-import com.rolling.api.domain.tournament.crawler.KoreaJiuCrawler;
-import com.rolling.api.domain.tournament.crawler.StreetJiuJitsuCrawler;
 import com.rolling.api.domain.tournament.crawler.TournamentCrawler;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
@@ -37,8 +35,8 @@ public class TournamentManagerService {
 
         for (TournamentCrawler crawler : crawlers) {
             try {
-                List<TournamentModel> crawled = crawler.crawlAll();
-                if (crawled != null && !crawled.isEmpty()) {
+                List<TournamentModel> crawled = applySource(crawler.crawlAll(), crawler.getSource());
+                if (!crawled.isEmpty()) {
                     merged.addAll(crawled);
                 }
             } catch (Exception e) {
@@ -57,7 +55,11 @@ public class TournamentManagerService {
     }
 
     @Transactional
-    public TournamentCrawlResult crawlAndSaveBySource(String source) {
+    public TournamentCrawlResult crawlAndSaveBySource(TournamentSource source) {
+        if (source == null) {
+            throw BusinessException.badRequest("대회 출처는 필수입니다");
+        }
+
         TournamentCrawler crawler = findCrawlerBySource(source);
         int deletedCount = deleteExpiredTournamentsByRegistrationDeadline();
         List<TournamentModel> crawled = crawlSingle(crawler);
@@ -105,32 +107,32 @@ public class TournamentManagerService {
 
     private List<TournamentModel> crawlSingle(TournamentCrawler crawler) {
         try {
-            List<TournamentModel> crawled = crawler.crawlAll();
-            return crawled == null ? List.of() : crawled;
+            return applySource(crawler.crawlAll(), crawler.getSource());
         } catch (Exception e) {
             log.error("Tournament crawler failed: {}", crawler.getClass().getSimpleName(), e);
             return List.of();
         }
     }
 
-    private TournamentCrawler findCrawlerBySource(String source) {
+    private TournamentCrawler findCrawlerBySource(TournamentSource source) {
         return crawlers.stream()
-                .filter(crawler -> matchesSource(crawler, source))
+                .filter(crawler -> crawler.getSource() == source)
                 .findFirst()
                 .orElseThrow(() -> BusinessException.badRequest("지원하지 않는 대회 크롤러입니다: " + source));
     }
 
-    private boolean matchesSource(TournamentCrawler crawler, String source) {
+    private List<TournamentModel> applySource(List<TournamentModel> crawled, TournamentSource source) {
+        List<TournamentModel> safeCrawled = crawled == null ? List.of() : crawled;
         if (source == null) {
-            return false;
+            return safeCrawled;
         }
 
-        return switch (source.trim().toLowerCase()) {
-            case "street" -> crawler instanceof StreetJiuJitsuCrawler;
-            case "koreajiu" -> crawler instanceof KoreaJiuCrawler;
-            case "heroes" -> crawler instanceof HeroesOfJiuJitsuCrawler;
-            default -> false;
-        };
+        for (TournamentModel model : safeCrawled) {
+            if (model != null) {
+                model.setSource(source);
+            }
+        }
+        return safeCrawled;
     }
 
     private int deleteExpiredTournamentsByRegistrationDeadline() {
@@ -160,6 +162,7 @@ public class TournamentManagerService {
         }
 
         NormalizedTournament normalizedTournament = new NormalizedTournament(
+                crawledModel.getSource(),
                 normalize(crawledModel.getTitle()),
                 normalize(crawledModel.getOrganizer()),
                 normalize(crawledModel.getPosterUrl()),
@@ -169,11 +172,13 @@ public class TournamentManagerService {
                 normalize(crawledModel.getApplyLink())
         );
 
-        if (normalizedTournament.applyLink() == null
+        if (normalizedTournament.source() == null
+                || normalizedTournament.applyLink() == null
                 || normalizedTournament.title() == null
                 || normalizedTournament.competitionDate() == null
                 || normalizedTournament.location() == null) {
-            log.warn("Skip tournament save due to missing required fields. title={}, competitionDate={}, location={}, applyLink={}",
+            log.warn("Skip tournament save due to missing required fields. source={}, title={}, competitionDate={}, location={}, applyLink={}",
+                    normalizedTournament.source(),
                     normalizedTournament.title(),
                     normalizedTournament.competitionDate(),
                     normalizedTournament.location(),
@@ -220,6 +225,7 @@ public class TournamentManagerService {
                         .findByTitleAndCompetitionDate(normalizedTournament.title(), normalizedTournament.competitionDate())
                         .orElseGet(() -> Tournament.builder()
                                 .hostUserId(null)
+                                .source(normalizedTournament.source())
                                 .title(normalizedTournament.title())
                                 .organizer(normalizedTournament.organizer())
                                 .posterUrl(normalizedTournament.posterUrl())
@@ -230,6 +236,7 @@ public class TournamentManagerService {
                                 .build()));
 
         boolean isNew = tournament.getId() == null;
+        tournament.assignSourceIfAbsent(normalizedTournament.source());
         tournament.updateFromCrawler(
                 normalizedTournament.title(),
                 normalizedTournament.organizer(),
@@ -275,6 +282,7 @@ public class TournamentManagerService {
     }
 
     private record NormalizedTournament(
+            TournamentSource source,
             String title,
             String organizer,
             String posterUrl,

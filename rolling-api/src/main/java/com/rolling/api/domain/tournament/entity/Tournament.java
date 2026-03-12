@@ -3,6 +3,8 @@ package com.rolling.api.domain.tournament.entity;
 import com.rolling.api.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,6 +40,10 @@ public class Tournament extends BaseTimeEntity {
     @Column(name = "host_user_id")
     private Long hostUserId;
 
+    // 대회 등록 출처
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private TournamentSource source;
 
     // 대회 제목
     @Column(nullable = false)
@@ -67,7 +73,9 @@ public class Tournament extends BaseTimeEntity {
     private String applyLink;
 
     @Builder
-    public Tournament(Long hostUserId, String title,
+    public Tournament(Long hostUserId,
+                      TournamentSource source,
+                      String title,
                       String organizer,
                       String posterUrl,
                       String competitionDate,
@@ -75,6 +83,7 @@ public class Tournament extends BaseTimeEntity {
                       String location,
                       String applyLink) {
         this.hostUserId = hostUserId;
+        this.source = source;
         this.title = title;
         this.organizer = organizer;
         this.posterUrl = posterUrl;
@@ -82,6 +91,12 @@ public class Tournament extends BaseTimeEntity {
         this.registrationDeadline = registrationDeadline;
         this.location = location;
         this.applyLink = applyLink;
+    }
+
+    public void assignSourceIfAbsent(TournamentSource source) {
+        if (this.source == null) {
+            this.source = source;
+        }
     }
 
     public void updateFromCrawler(String title,
