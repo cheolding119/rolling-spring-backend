@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -32,9 +32,11 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.orm.jdbc.bind: OFF
 
+# port 번호
 server:
   port: 8080
 
+# JWT 관련
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiry: 1800000
@@ -47,6 +49,7 @@ openmat:
       cron: "0 * * * * *"
       zone: "Asia/Seoul"
 
+# 대회 크롤링 스케줄링 주기
 tournament:
   crawler:
     manual:
@@ -58,3 +61,17 @@ tournament:
     street-jiujitsu:
       list-page-urls:
         - "https://www.street-jiujitsu.com/"
+
+# S3 관련
+cloud:
+  aws:
+    s3:
+      bucket: ${AWS_S3_BUCKET_NAME}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}
+    region:
+      static: ap-northeast-2
+      auto: false
+    stack:
+      auto: false

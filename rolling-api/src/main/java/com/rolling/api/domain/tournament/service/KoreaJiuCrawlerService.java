@@ -6,11 +6,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -44,7 +46,7 @@ public class KoreaJiuCrawlerService {
 
     TournamentModel parseDetailHtml(String html, String detailUrl, TournamentModel seedModel) {
         Objects.requireNonNull(html, "html must not be null");
-        return parseDetailDocument(Jsoup.parse(html), detailUrl, seedModel);
+        return parseDetailDocument(Jsoup.parse(html, detailUrl), detailUrl, seedModel);
     }
 
     private TournamentModel parseDetailDocument(Document document, String detailUrl, TournamentModel seedModel) {
@@ -63,6 +65,11 @@ public class KoreaJiuCrawlerService {
             }
         }
 
+        String extractedPosterUrl = extractPosterUrl(document);
+        if (extractedPosterUrl != null) {
+            tournamentModel.setPosterUrl(extractedPosterUrl);
+        }
+
         List<String> detailLines = extractDetailLines(document);
         if (detailLines.isEmpty()) {
             return tournamentModel;
@@ -73,6 +80,126 @@ public class KoreaJiuCrawlerService {
         tournamentModel.setRegistrationDeadline(extractRegistrationDeadline(detailLines, competitionDate));
         tournamentModel.setLocation(extractLocation(detailLines));
         return tournamentModel;
+    }
+
+    private String extractPosterUrl(Document document) {
+        String posterNearApplyAction = extractPosterNearApplyAction(document);
+        if (posterNearApplyAction != null) {
+            return posterNearApplyAction;
+        }
+
+        List<Element> candidates = document.select("img[src]").stream()
+                .filter(this::hasPosterSource)
+                .filter(this::isPortraitImage)
+                .sorted(Comparator.comparingInt(this::posterCandidateScore).reversed())
+                .toList();
+
+        if (candidates.isEmpty()) {
+            log.warn("KoreaJiu poster not found");
+            return null;
+        }
+
+        return resolveImageUrl(candidates.get(0));
+    }
+
+    private String extractPosterNearApplyAction(Document document) {
+        for (Element applyAction : document.select("div[data-semantic-classname=button], a[href], button")) {
+            if (!isApplyAction(applyAction)) {
+                continue;
+            }
+
+            Element section = applyAction.closest("section");
+            if (section == null) {
+                continue;
+            }
+
+            List<Element> candidates = new ArrayList<>();
+            Elements orderedElements = section.select("img[src], div[data-semantic-classname=button], a[href], button");
+
+            for (Element element : orderedElements) {
+                if (element == applyAction || isApplyAction(element)) {
+                    String posterUrl = selectPosterCandidate(candidates);
+                    if (posterUrl != null) {
+                        return posterUrl;
+                    }
+                    break;
+                }
+
+                if ("img".equalsIgnoreCase(element.tagName()) && hasPosterSource(element)) {
+                    candidates.add(element);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String selectPosterCandidate(List<Element> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+
+        return candidates.stream()
+                .filter(this::isPortraitImage)
+                .reduce((first, second) -> second)
+                .map(this::resolveImageUrl)
+                .orElseGet(() -> resolveImageUrl(candidates.get(candidates.size() - 1)));
+    }
+
+    private boolean isApplyAction(Element element) {
+        if (element == null) {
+            return false;
+        }
+
+        String normalizedText = normalize(element.text() + " " + element.attr("aria-label"));
+        return normalizedText.contains("참가신청")
+                || normalizedText.contains("참가 신청");
+    }
+
+    private boolean hasPosterSource(Element element) {
+        String imageUrl = resolveImageUrl(element);
+        return imageUrl != null && imageUrl.contains("static.wixstatic.com/media/");
+    }
+
+    private boolean isPortraitImage(Element element) {
+        try {
+            int width = Integer.parseInt(element.attr("width"));
+            int height = Integer.parseInt(element.attr("height"));
+            return height >= width;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private int posterCandidateScore(Element element) {
+        int score = 0;
+        if ("high".equalsIgnoreCase(element.attr("fetchpriority"))) {
+            score += 2;
+        }
+        if (isPortraitImage(element)) {
+            score += 2;
+        }
+        if (element.classNames().contains("BI8PVQ") && element.classNames().contains("Tj01hh")) {
+            score += 1;
+        }
+        return score;
+    }
+
+    private String resolveImageUrl(Element element) {
+        String absoluteUrl = normalizeImageUrl(element.attr("abs:src"));
+        if (absoluteUrl != null) {
+            return absoluteUrl;
+        }
+        return normalizeImageUrl(element.attr("src"));
+    }
+
+    private String normalizeImageUrl(String imageUrl) {
+        if (imageUrl == null) {
+            return null;
+        }
+
+        String trimmed = imageUrl.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String extractTitle(Document document) {

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -175,6 +176,42 @@ class OpenMatServiceTest {
         Pageable pageable = pageableCaptor.getValue();
         assertThat(pageable.getSort().getOrderFor("startDateTime")).isNotNull();
         assertThat(pageable.getSort().getOrderFor("startDateTime").isAscending()).isTrue();
+    }
+
+    @Test
+    @DisplayName("오픈매트 목록 검색 시 제목, 장소명, 주소 대상으로 DB 검색을 사용한다")
+    void findAll_withKeyword_usesSearchQuery() {
+        User host = createUser(1L, "host-search", "host");
+        OpenMat openMat = createOpenMat(
+                16L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
+                eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(openMatRepository.searchVisible(
+                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(openMat)));
+
+        Page<OpenMatResponse> page = openMatService.findAll(
+                Region.SEOUL,
+                OpenMatStatus.RECRUITING,
+                "  강남   오픈매트  ",
+                PageRequest.of(0, 20)
+        );
+
+        assertThat(page.getContent()).hasSize(1);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(openMatRepository).searchVisible(
+                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
     }
 
     @Test

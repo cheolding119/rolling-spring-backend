@@ -11,24 +11,30 @@ import com.rolling.api.global.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TournamentServiceTest {
+
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     @Mock
     private TournamentRepository tournamentRepository;
@@ -37,38 +43,48 @@ class TournamentServiceTest {
     private UserRepository userRepository;
 
     @Test
-    @DisplayName("대회 목록 조회 시 접수 가능 항목이 우선 정렬되고 접수 마감 항목은 하단으로 정렬된다")
-    void findAll_sortsOpenFirst() {
+    @DisplayName("대회 목록 조회는 레포지토리 정렬 결과를 그대로 응답으로 매핑한다")
+    void findAll_mapsRepositoryPage() {
         Tournament closed = tournament(1L, 10L, TournamentSource.MANUAL, "closed", "2026-03-01", "2026-02-20", "https://apply/closed");
         Tournament openLater = tournament(2L, 10L, TournamentSource.STREET_JIU_JITSU, "open-later", "2026-05-20", "2999-05-10", "https://apply/open-later");
         Tournament openEarly = tournament(3L, 10L, TournamentSource.KOREA_JIU, "open-early", "2026-04-10", "2999-04-01", "https://apply/open-early");
-        when(tournamentRepository.findAll()).thenReturn(List.of(closed, openLater, openEarly));
+        PageRequest pageable = PageRequest.of(0, 10);
+
+        when(tournamentRepository.searchVisible(eq(null), eq(false), eq(null), any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(openEarly, openLater, closed), pageable, 3));
 
         TournamentService tournamentService = new TournamentService(tournamentRepository, userRepository);
 
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10));
+        Page<TournamentResponse> page = tournamentService.findAll(pageable);
 
         assertThat(page.getContent()).hasSize(3);
         assertThat(page.getContent().get(0).getId()).isEqualTo(3L);
         assertThat(page.getContent().get(1).getId()).isEqualTo(2L);
         assertThat(page.getContent().get(2).getId()).isEqualTo(1L);
         assertThat(page.getContent().get(2).isRegistrationClosed()).isTrue();
+
+        ArgumentCaptor<String> todayCaptor = ArgumentCaptor.forClass(String.class);
+        verify(tournamentRepository).searchVisible(eq(null), eq(false), eq(null), todayCaptor.capture(), eq(pageable));
+        assertThat(todayCaptor.getValue()).isEqualTo(LocalDate.now(SEOUL_ZONE).toString());
     }
 
     @Test
-    @DisplayName("대회 목록 조회 시 source 필터를 적용한다")
-    void findAll_filtersBySource() {
+    @DisplayName("대회 목록 조회 시 source 필터와 검색어를 레포지토리에 전달하고 legacy MANUAL도 포함한다")
+    void findAll_filtersBySourceAndKeyword() {
         Tournament manual = tournament(1L, 10L, TournamentSource.MANUAL, "manual", "2026-04-10", "2999-04-01", "https://apply/manual");
-        Tournament street = tournament(2L, 10L, TournamentSource.STREET_JIU_JITSU, "street", "2026-05-10", "2999-05-01", "https://apply/street");
         Tournament legacyManual = tournament(3L, 10L, null, "legacy-manual", "2026-06-10", "2999-06-01", "https://apply/legacy-manual");
-        when(tournamentRepository.findAll()).thenReturn(List.of(street, legacyManual, manual));
+        PageRequest pageable = PageRequest.of(0, 10);
+
+        when(tournamentRepository.searchVisible(eq(TournamentSource.MANUAL), eq(true), eq("안산 오픈"), any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(manual, legacyManual), pageable, 2));
 
         TournamentService tournamentService = new TournamentService(tournamentRepository, userRepository);
 
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10), TournamentSource.MANUAL);
+        Page<TournamentResponse> page = tournamentService.findAll(pageable, TournamentSource.MANUAL, "  안산   오픈 ");
 
         assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(1L, 3L);
         assertThat(page.getContent()).extracting(TournamentResponse::getSource).containsOnly(TournamentSource.MANUAL);
+        verify(tournamentRepository).searchVisible(eq(TournamentSource.MANUAL), eq(true), eq("안산 오픈"), any(), eq(pageable));
     }
 
     @Test

@@ -11,47 +11,40 @@ import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
 public class TournamentService {
+
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final TournamentRepository tournamentRepository;
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable) {
-        return findAll(pageable, null);
+        return findAll(pageable, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
-        List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
-                .filter(tournament -> matchesSource(tournament, source))
-                .map(TournamentResponse::from)
-                .sorted(
-                        Comparator.comparing(TournamentResponse::isRegistrationClosed)
-                                .thenComparing(TournamentResponse::getRegistrationDeadline, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(TournamentResponse::getCompetitionDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(TournamentResponse::getId, Comparator.nullsLast(Comparator.naturalOrder()))
-                )
-                .toList();
+        return findAll(pageable, source, null);
+    }
 
-        int total = sorted.size();
-        int start = (int) pageable.getOffset();
-        if (start >= total) {
-            return new PageImpl<>(List.of(), pageable, total);
-        }
-        int end = Math.min(start + pageable.getPageSize(), total);
-        return new PageImpl<>(sorted.subList(start, end), pageable, total);
+    @Transactional(readOnly = true)
+    public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, String keyword) {
+        boolean includeLegacyManual = source == TournamentSource.MANUAL;
+        String normalizedKeyword = normalizeKeyword(keyword);
+        String todayIso = LocalDate.now(SEOUL_ZONE).toString();
+
+        return tournamentRepository.searchVisible(source, includeLegacyManual, normalizedKeyword, todayIso, pageable)
+                .map(TournamentResponse::from);
     }
 
     @Transactional(readOnly = true)
@@ -171,20 +164,20 @@ public class TournamentService {
         }
     }
 
-    private boolean matchesSource(Tournament tournament, TournamentSource source) {
-        return source == null || resolveSource(tournament) == source;
-    }
-
-    private TournamentSource resolveSource(Tournament tournament) {
-        return tournament.getSource() == null ? TournamentSource.MANUAL : tournament.getSource();
-    }
-
     private String requireText(String value, String message) {
         String normalized = optionalText(value);
         if (normalized == null) {
             throw BusinessException.badRequest(message);
         }
         return normalized;
+    }
+
+    private String normalizeKeyword(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim().replaceAll("\\s+", " ");
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String optionalText(String value) {

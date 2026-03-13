@@ -25,6 +25,39 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
 
     Page<OpenMat> findByIsHiddenFalseAndRegionAndStatus(Region region, OpenMatStatus status, Pageable pageable);
 
+    @Query(
+            value = """
+                    SELECT o FROM OpenMat o
+                    WHERE o.isHidden = false
+                      AND (:region IS NULL OR o.region = :region)
+                      AND (:status IS NULL OR o.status = :status)
+                      AND (
+                            :keyword IS NULL
+                            OR LOWER(o.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.locationName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.address, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      )
+                    """,
+            countQuery = """
+                    SELECT COUNT(o) FROM OpenMat o
+                    WHERE o.isHidden = false
+                      AND (:region IS NULL OR o.region = :region)
+                      AND (:status IS NULL OR o.status = :status)
+                      AND (
+                            :keyword IS NULL
+                            OR LOWER(o.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.locationName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.address, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      )
+                    """
+    )
+    Page<OpenMat> searchVisible(
+            @Param("region") Region region,
+            @Param("status") OpenMatStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     Optional<OpenMat> findByIdAndIsHiddenFalse(Long id);
 
     List<OpenMat> findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(

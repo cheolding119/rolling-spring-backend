@@ -59,7 +59,7 @@ public class StreetJiuJitsuCrawlerService {
 
     TournamentModel parseDetailHtml(String html, String detailUrl) {
         Objects.requireNonNull(html, "html must not be null");
-        return parseDetailDocument(Jsoup.parse(html), detailUrl);
+        return parseDetailDocument(Jsoup.parse(html, detailUrl), detailUrl);
     }
 
     private TournamentModel parseDetailDocument(Document document, String detailUrl) {
@@ -68,6 +68,7 @@ public class StreetJiuJitsuCrawlerService {
         String parseSource = infoText != null ? infoText : pageText;
 
         String title = extractTitle(document);
+        String posterUrl = extractPosterUrl(document);
         String competitionDateRaw = extractByPattern(parseSource, COMPETITION_DATE_SECTION_PATTERN, "competitionDate");
         String location = extractByPattern(parseSource, LOCATION_PATTERN, "location");
         String organizer = extractByPattern(parseSource, ORGANIZER_PATTERN, "organizer");
@@ -76,6 +77,7 @@ public class StreetJiuJitsuCrawlerService {
 
         TournamentModel tournamentModel = new TournamentModel();
         tournamentModel.setTitle(title);
+        tournamentModel.setPosterUrl(posterUrl);
         tournamentModel.setCompetitionDate(competitionDate);
         tournamentModel.setLocation(location);
         tournamentModel.setOrganizer(organizer);
@@ -91,6 +93,133 @@ public class StreetJiuJitsuCrawlerService {
             return null;
         }
         return normalize(titleElement.text());
+    }
+
+    private String extractPosterUrl(Document document) {
+        Element titleElement = document.select("h1:contains(스트릿 주짓수)").first();
+        Element section = titleElement != null ? titleElement.closest("section") : null;
+
+        if (section != null) {
+            String posterNearActionArea = extractPosterNearActionArea(section, titleElement);
+            if (posterNearActionArea != null) {
+                return posterNearActionArea;
+            }
+        }
+
+        List<Element> candidates = document.select("img[src]").stream()
+                .filter(this::isPosterScope)
+                .filter(this::hasPosterSource)
+                .sorted(Comparator.comparingInt(this::posterCandidateScore).reversed())
+                .toList();
+
+        if (candidates.isEmpty()) {
+            log.warn("poster not found: no matching poster image candidate");
+            return null;
+        }
+
+        return resolveImageUrl(candidates.get(0));
+    }
+
+    private String extractPosterNearActionArea(Element section, Element titleElement) {
+        List<Element> candidates = new java.util.ArrayList<>();
+        Elements orderedElements = section.select("img[src], div[data-semantic-classname=button], h1");
+
+        for (Element element : orderedElements) {
+            if (element == titleElement || isActionButton(element)) {
+                return selectPosterCandidate(candidates);
+            }
+
+            if (isPosterScope(element) && hasPosterSource(element)) {
+                candidates.add(element);
+            }
+        }
+
+        return selectPosterCandidate(candidates);
+    }
+
+    private String selectPosterCandidate(List<Element> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+
+        return candidates.stream()
+                .filter(this::isPortraitImage)
+                .reduce((first, second) -> second)
+                .map(this::resolveImageUrl)
+                .orElseGet(() -> resolveImageUrl(candidates.get(candidates.size() - 1)));
+    }
+
+    private boolean isActionButton(Element element) {
+        return "div".equalsIgnoreCase(element.tagName())
+                && "button".equalsIgnoreCase(element.attr("data-semantic-classname"));
+    }
+
+    private boolean isPosterScope(Element element) {
+        for (Element parent = element.parent(); parent != null; parent = parent.parent()) {
+            String id = parent.id();
+            if ("SITE_HEADER".equals(id) || "SITE_FOOTER".equals(id)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasPosterSource(Element element) {
+        String imageUrl = resolveImageUrl(element);
+        return imageUrl != null && imageUrl.contains("static.wixstatic.com/media/");
+    }
+
+    private int posterCandidateScore(Element element) {
+        int score = 0;
+        if ("high".equalsIgnoreCase(element.attr("fetchpriority"))) {
+            score += 4;
+        }
+        if (isPortraitImage(element)) {
+            score += 3;
+        }
+        if (element.classNames().contains("BI8PVQ") && element.classNames().contains("Tj01hh")) {
+            score += 2;
+        }
+        if (isMainContentImage(element)) {
+            score += 1;
+        }
+        return score;
+    }
+
+    private boolean isPortraitImage(Element element) {
+        try {
+            int width = Integer.parseInt(element.attr("width"));
+            int height = Integer.parseInt(element.attr("height"));
+            return height >= width;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private boolean isMainContentImage(Element element) {
+        for (Element parent = element.parent(); parent != null; parent = parent.parent()) {
+            if ("PAGES_CONTAINER".equals(parent.id()) || "true".equals(parent.attr("data-main-content"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String resolveImageUrl(Element element) {
+        String absoluteUrl = normalizeImageUrl(element.attr("abs:src"));
+        if (absoluteUrl != null) {
+            return absoluteUrl;
+        }
+        return normalizeImageUrl(element.attr("src"));
+    }
+
+    private String normalizeImageUrl(String imageUrl) {
+        if (imageUrl == null) {
+            return null;
+        }
+
+        String trimmed = imageUrl.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String extractInfoText(Document document) {

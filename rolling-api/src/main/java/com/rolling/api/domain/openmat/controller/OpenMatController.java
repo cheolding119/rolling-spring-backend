@@ -68,7 +68,7 @@ public class OpenMatController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역 및 상태 필터링을 지원합니다.")
+    @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역, 상태, 검색어 필터링을 지원합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     })
@@ -76,8 +76,9 @@ public class OpenMatController {
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
             @Parameter(description = "지역 필터 (예: SEOUL, BUSAN)") @RequestParam(required = false) Region region,
             @Parameter(description = "상태 필터 (RECRUITING, CLOSED, FINISHED)") @RequestParam(required = false) OpenMatStatus status,
+            @Parameter(description = "검색어 (제목, 장소명, 주소)") @RequestParam(required = false, name = "q") String keyword,
             @PageableDefault(size = 20, sort = "startDateTime", direction = Sort.Direction.ASC) Pageable pageable) {
-        Page<OpenMatResponse> response = openMatService.findAll(region, status, pageable);
+        Page<OpenMatResponse> response = openMatService.findAll(region, status, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
