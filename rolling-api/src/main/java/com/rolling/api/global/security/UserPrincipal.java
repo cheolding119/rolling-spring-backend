@@ -12,13 +12,29 @@ import java.util.List;
 public class UserPrincipal implements UserDetails {
 
     private final Long userId;
+    private final boolean admin;
+
+    public static UserPrincipal systemAdmin() {
+        return new UserPrincipal(-1L, true);
+    }
 
     public UserPrincipal(Long userId) {
+        this(userId, false);
+    }
+
+    public UserPrincipal(Long userId, boolean admin) {
         this.userId = userId;
+        this.admin = admin;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (admin) {
+            return List.of(
+                    new SimpleGrantedAuthority("ROLE_USER"),
+                    new SimpleGrantedAuthority("ROLE_ADMIN")
+            );
+        }
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 

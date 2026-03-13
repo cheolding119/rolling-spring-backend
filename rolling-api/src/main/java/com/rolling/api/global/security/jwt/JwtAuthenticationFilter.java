@@ -1,6 +1,7 @@
 package com.rolling.api.global.security.jwt;
 
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.UserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
@@ -19,19 +21,27 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final String CRAWLER_ADMIN_KEY_HEADER = "X-Crawler-Admin-Key";
+
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final AdminAccessConfig adminAccessConfig;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        if (authenticateByCrawlerAdminKey(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
             if (userRepository.existsByIdAndIsWithdrawnFalse(userId)) {
-                UserPrincipal principal = new UserPrincipal(userId);
+                UserPrincipal principal = new UserPrincipal(userId, adminAccessConfig.isAdmin(userId));
                 UsernamePasswordAuthenticationToken auth =
                         new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);
@@ -42,6 +52,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean authenticateByCrawlerAdminKey(HttpServletRequest request) {
+        if (!isTournamentCrawlerRequest(request)) {
+            return false;
+        }
+
+        String crawlerAdminKey = request.getHeader(CRAWLER_ADMIN_KEY_HEADER);
+        if (!adminAccessConfig.matchesCrawlerAdminKey(crawlerAdminKey)) {
+            return false;
+        }
+
+        UserPrincipal principal = UserPrincipal.systemAdmin();
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        log.debug("Crawler admin key 인증 성공");
+        return true;
+    }
+
+    private boolean isTournamentCrawlerRequest(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && request.getRequestURI() != null
+                && request.getRequestURI().startsWith("/api/v1/tournaments/crawl");
     }
 
     private String resolveToken(HttpServletRequest request) {
