@@ -42,6 +42,9 @@ jwt:
   access-token-expiry: 1800000
   refresh-token-expiry: 1209600000
 
+admin:
+  user-ids: ${ADMIN_USER_IDS:}
+
 openmat:
   status:
     schedule:
@@ -52,8 +55,7 @@ openmat:
 # 대회 크롤링 스케줄링 주기
 tournament:
   crawler:
-    manual:
-      endpoint-public: true
+    admin-key: ${TOURNAMENT_CRAWLER_ADMIN_KEY:}
     schedule:
       enabled: true
       cron: "0 0 2 * * *"

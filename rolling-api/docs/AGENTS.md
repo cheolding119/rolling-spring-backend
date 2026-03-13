@@ -1109,10 +1109,11 @@ DELETE /api/v1/tournaments/{id}
 POST /api/v1/tournaments/crawl
 ```
 
-**인증**: 환경 설정에 따라 다름
+**인증**: 필요
 
-> `tournament.crawler.manual.endpoint-public=true`이면 인증 없이 호출할 수 있습니다.
-> 현재 기본 `application.yml`은 `true`로 설정되어 있습니다.
+> 관리자만 호출할 수 있습니다.
+> 관리자 계정은 서버 설정 `ADMIN_USER_IDS`(쉼표 구분 userId 목록)로 지정합니다.
+> 또는 운영용 헤더 `X-Crawler-Admin-Key`와 서버 설정 `TOURNAMENT_CRAWLER_ADMIN_KEY`가 일치하면 호출할 수 있습니다.
 
 **Query Parameters**
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
@@ -1142,7 +1143,8 @@ POST /api/v1/tournaments/crawl
 |------|------|
 | `VALIDATION_ERROR` | 지원하지 않는 source |
 | `VALIDATION_ERROR` | `MANUAL` 등 크롤러가 없는 출처 지정 |
-| `UNAUTHORIZED` | 엔드포인트 비공개 설정에서 인증 없이 호출 |
+| `UNAUTHORIZED` | 인증 없이 호출 |
+| `FORBIDDEN` | 일반 사용자 권한으로 호출 |
 
 ---
 
@@ -1264,7 +1266,7 @@ enum BeltColor {
 ### Tournament 문서 정합성 보정
 - `Tournament` 도메인 정의에서 `competitionDate`, `registrationDeadline` 타입을 `Date`로 명시했습니다.
 - 대회 응답 모델의 계산 필드 `registrationClosed`를 문서에 반영했습니다.
-- 대회 크롤링 수동 실행 API의 인증 조건을 설정값 기반으로 정리했습니다.
+- 대회 크롤링 수동 실행 API의 인증 조건을 문서에 반영했습니다.
 - `MANUAL`은 대회 조회/수동 등록용 source이며 크롤링 source가 아님을 명시했습니다.
 
 ---
@@ -1274,3 +1276,12 @@ enum BeltColor {
 ### OpenMat 목록 검색 기능 추가
 - `GET /api/v1/open-mats`는 검색어 파라미터 `q`를 지원합니다.
 - 오픈매트 검색 대상 필드: `title`, `locationName`, `address`
+
+### Tournament 수동 크롤링 인증 필수화
+- `POST /api/v1/tournaments/crawl`는 항상 JWT 인증이 필요합니다.
+- `tournament.crawler.manual.endpoint-public` 설정은 제거되었습니다.
+
+### Tournament 수동 크롤링 관리자 제한
+- `POST /api/v1/tournaments/crawl`는 관리자만 호출할 수 있습니다.
+- 관리자 계정은 `ADMIN_USER_IDS` 환경변수로 지정합니다.
+- Apidog 등 운영 도구에서는 `X-Crawler-Admin-Key` 헤더와 `TOURNAMENT_CRAWLER_ADMIN_KEY` 환경변수로 로그인 없이 호출할 수 있습니다.

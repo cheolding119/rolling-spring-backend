@@ -1,11 +1,11 @@
 package com.rolling.api.global.config;
 
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,9 +29,7 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-
-    @Value("${tournament.crawler.manual.endpoint-public:false}")
-    private boolean tournamentCrawlEndpointPublic;
+    private final AdminAccessConfig adminAccessConfig;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -51,10 +49,8 @@ public class SecurityConfig {
                             "/error"
                     ).permitAll();
 
-                    // 개발/테스트 편의: 수동 대회 크롤링 엔드포인트 공개 여부
-                    if (tournamentCrawlEndpointPublic) {
-                        auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").permitAll();
-                    }
+                    // 수동 대회 크롤링은 관리자만 실행 가능
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
 
                     // 내 신청 목록은 인증 필요 (/{id} 공개 조회 규칙과 충돌 방지)
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my").authenticated();
@@ -75,7 +71,7 @@ public class SecurityConfig {
                         })
                 )
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider, userRepository),
+                        new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig),
                         UsernamePasswordAuthenticationFilter.class
                 );
 
