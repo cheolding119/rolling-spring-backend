@@ -9,7 +9,9 @@ import com.rolling.api.domain.tournament.entity.Tournament;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
+import com.rolling.api.infra.s3.S3Uploader;
 import com.rolling.api.global.exception.BusinessException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,11 +27,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class TournamentManagerServiceTest {
@@ -43,6 +47,14 @@ class TournamentManagerServiceTest {
     @Mock
     private TournamentRepository tournamentRepository;
 
+    @Mock
+    private S3Uploader s3Uploader;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(s3Uploader.uploadImageFromUrl(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
     @Test
     @DisplayName("특정 크롤러가 실패해도 다음 크롤러를 계속 실행한다")
     void crawlAll_continueWhenOneCrawlerFails() {
@@ -54,7 +66,7 @@ class TournamentManagerServiceTest {
         when(successCrawler.crawlAll()).thenReturn(List.of(model));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(failingCrawler, successCrawler), tournamentRepository);
+                managerService(failingCrawler, successCrawler);
 
         List<TournamentModel> result = managerService.crawlAll();
 
@@ -91,7 +103,7 @@ class TournamentManagerServiceTest {
         when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -136,7 +148,7 @@ class TournamentManagerServiceTest {
         when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -160,7 +172,7 @@ class TournamentManagerServiceTest {
         when(successCrawler.crawlAll()).thenReturn(List.of(invalid));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -184,7 +196,7 @@ class TournamentManagerServiceTest {
         when(successCrawler.crawlAll()).thenReturn(List.of(invalid));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -214,7 +226,7 @@ class TournamentManagerServiceTest {
         });
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -228,6 +240,38 @@ class TournamentManagerServiceTest {
     }
 
     @Test
+    @DisplayName("포스터 업로드가 성공하면 S3 URL을 저장한다")
+    void crawlAndSaveAll_usesUploadedPosterUrl() {
+        TournamentModel model = validModel(
+                "스트릿 주짓수 173 인천 오픈",
+                "2099-08-08",
+                "인천 남동체육관",
+                "https://www.street-jiujitsu.com/tournament-173"
+        );
+        AtomicReference<Tournament> savedTournament = new AtomicReference<>();
+        String uploadedPosterUrl = "https://rolling-jiujitsu-bucket.s3.ap-northeast-2.amazonaws.com/posters/uploaded.webp";
+
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(s3Uploader.uploadImageFromUrl(model.getPosterUrl())).thenReturn(uploadedPosterUrl);
+        when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
+        when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
+                .thenReturn(Optional.empty());
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> {
+            Tournament tournament = invocation.getArgument(0);
+            savedTournament.set(tournament);
+            return tournament;
+        });
+
+        TournamentManagerService managerService = managerService(successCrawler);
+
+        TournamentCrawlResult result = managerService.crawlAndSaveAll();
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        assertThat(savedTournament.get()).isNotNull();
+        assertThat(savedTournament.get().getPosterUrl()).isEqualTo(uploadedPosterUrl);
+        verify(s3Uploader).uploadImageFromUrl("https://static.example.com/poster.jpg");
+    }
+    @Test
     @DisplayName("대회일이 오늘보다 과거면 저장하지 않고 스킵한다")
     void crawlAndSaveAll_skipsPastCompetitionDate() {
         TournamentModel past = validModel(
@@ -240,7 +284,7 @@ class TournamentManagerServiceTest {
         when(successCrawler.crawlAll()).thenReturn(List.of(past));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -280,7 +324,7 @@ class TournamentManagerServiceTest {
         when(successCrawler.crawlAll()).thenReturn(List.of());
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
@@ -308,7 +352,7 @@ class TournamentManagerServiceTest {
         when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(streetCrawler, koreaJiuCrawler), tournamentRepository);
+                managerService(streetCrawler, koreaJiuCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveBySource(TournamentSource.STREET_JIU_JITSU);
 
@@ -340,7 +384,7 @@ class TournamentManagerServiceTest {
         when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(streetCrawler, heroesCrawler), tournamentRepository);
+                managerService(streetCrawler, heroesCrawler);
 
         TournamentCrawlResult result = managerService.crawlAndSaveBySource(TournamentSource.HEROES_OF_JIU_JITSU);
 
@@ -354,13 +398,16 @@ class TournamentManagerServiceTest {
     void crawlAndSaveBySource_throwsWhenCrawlerMissing() {
         when(successCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
         TournamentManagerService managerService =
-                new TournamentManagerService(List.of(successCrawler), tournamentRepository);
+                managerService(successCrawler);
 
         assertThatThrownBy(() -> managerService.crawlAndSaveBySource(TournamentSource.KOREA_JIU))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("지원하지 않는 대회 크롤러입니다: KOREA_JIU");
     }
 
+    private TournamentManagerService managerService(TournamentCrawler... crawlers) {
+        return new TournamentManagerService(List.of(crawlers), tournamentRepository, s3Uploader);
+    }
     private TournamentModel validModel(String title, String competitionDate, String location, String applyLink) {
         TournamentModel model = new TournamentModel();
         model.setSource(TournamentSource.STREET_JIU_JITSU);

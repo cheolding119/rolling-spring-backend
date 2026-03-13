@@ -38,7 +38,7 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
 
-    @Operation(summary = "대회 리스트 조회", description = "대회 목록을 페이징 조회합니다. 접수 가능한 대회가 상단에 정렬되며 source 필터를 지원합니다.")
+    @Operation(summary = "대회 리스트 조회", description = "대회 목록을 페이징 조회합니다. 접수 가능한 대회가 상단에 정렬되며 source, 검색어 필터를 지원합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     })
@@ -46,8 +46,10 @@ public class TournamentController {
     public ResponseEntity<ApiResponse<Page<TournamentResponse>>> list(
             @Parameter(description = "출처 필터 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, MANUAL)")
             @RequestParam(required = false) TournamentSource source,
+            @Parameter(description = "검색어 (대회명, 주최사, 장소)")
+            @RequestParam(required = false, name = "q") String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
-        Page<TournamentResponse> response = tournamentService.findAll(pageable, source);
+        Page<TournamentResponse> response = tournamentService.findAll(pageable, source, keyword);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

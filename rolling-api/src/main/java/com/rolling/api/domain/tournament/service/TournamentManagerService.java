@@ -8,6 +8,7 @@ import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.infra.s3.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class TournamentManagerService {
 
     private final List<TournamentCrawler> crawlers;
     private final TournamentRepository tournamentRepository;
+    private final S3Uploader s3Uploader;
 
     @Transactional(readOnly = true)
     public List<TournamentModel> crawlAll() {
@@ -74,6 +76,7 @@ public class TournamentManagerService {
         int skippedCount = 0;
 
         for (TournamentModel crawledModel : safeCrawled) {
+            enrichPosterUrl(crawledModel);
             Optional<NormalizedTournament> normalizedOptional = normalizeAndValidate(crawledModel);
             if (normalizedOptional.isEmpty()) {
                 skippedCount++;
@@ -153,6 +156,14 @@ public class TournamentManagerService {
         tournamentRepository.deleteAllByIdInBatch(deleteIds);
         log.info("Deleted expired tournaments by registration deadline. today={}, deletedCount={}", today, deleteIds.size());
         return deleteIds.size();
+    }
+
+    private void enrichPosterUrl(TournamentModel crawledModel) {
+        if (crawledModel == null || crawledModel.getPosterUrl() == null || crawledModel.getPosterUrl().isBlank()) {
+            return;
+        }
+
+        crawledModel.setPosterUrl(s3Uploader.uploadImageFromUrl(crawledModel.getPosterUrl()));
     }
 
     private Optional<NormalizedTournament> normalizeAndValidate(TournamentModel crawledModel) {

@@ -168,6 +168,7 @@ enum ReportTargetType {
 ### 2.1 오픈매트 조회
 - 오픈매트 리스트를 조회할 수 있다.
 - 모집중/모집마감/종료 상태에 따라 필터링할 수 있다.
+- 지역, 검색어(`q`) 기준으로 필터링할 수 있다.
 - 시작 시간 기준으로 정렬하여 표시한다.
 
 ### 2.2 오픈매트 상세
@@ -208,6 +209,7 @@ enum ReportTargetType {
 
 ### 3.1 대회 조회
 - 대회 리스트를 조회할 수 있다.
+- `source`, 검색어(`q`) 기준으로 필터링할 수 있다.
 - 접수 마감일 기준으로 자동 정렬하여 표시한다.
 - 접수 마감된 대회는 '접수 종료' 배지를 표시하고 리스트 하단으로 정렬한다.
 
@@ -678,6 +680,7 @@ GET /api/v1/open-mats
 |----------|------|:----:|--------|------|
 | `region` | `String` | - | - | 지역 필터 |
 | `status` | `String` | - | - | 상태 필터 (`RECRUITING`, `CLOSED`, `FINISHED`) |
+| `q` | `String` | - | - | 검색어 (`title`, `locationName`, `address` 대상 부분 일치) |
 | `page` | `Integer` | - | `0` | 페이지 번호 (0부터 시작) |
 | `size` | `Integer` | - | `20` | 페이지 크기 |
 | `sort` | `String` | - | `startDateTime,asc` | 정렬 기준 |
@@ -716,6 +719,7 @@ GET /api/v1/open-mats
 
 > 숨김 처리된 오픈매트(`isHidden = true`)는 리스트에 노출되지 않습니다.
 > `status`를 지정하지 않으면 전체 상태를 조회하며, 기본 정렬은 `startDateTime ASC` 입니다.
+> `q`를 지정하면 제목, 장소명, 주소에서 부분 일치 검색을 수행합니다.
 
 ---
 
@@ -963,6 +967,7 @@ GET /api/v1/tournaments
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|:----:|--------|------|
 | `source` | `String` | - | - | 출처 필터 (`STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `MANUAL`) |
+| `q` | `String` | - | - | 검색어 (`title`, `organizer`, `location` 대상 부분 일치) |
 | `page` | `Integer` | - | `0` | 페이지 번호 |
 | `size` | `Integer` | - | `20` | 페이지 크기 |
 
@@ -970,6 +975,7 @@ GET /api/v1/tournaments
 
 > 접수 가능한 대회가 상단, 마감된 대회가 하단으로 정렬됩니다.
 > `source`를 지정하면 해당 출처의 대회만 조회합니다.
+> `q`를 지정하면 대회명, 주최사, 장소에서 부분 일치 검색을 수행합니다.
 
 ```json
 {
@@ -1263,3 +1269,15 @@ enum BeltColor {
 - 대회 응답 모델의 계산 필드 `registrationClosed`를 문서에 반영했습니다.
 - 대회 크롤링 수동 실행 API의 인증 조건을 설정값 기반으로 정리했습니다.
 - `MANUAL`은 대회 조회/수동 등록용 source이며 크롤링 source가 아님을 명시했습니다.
+
+---
+
+## 변경사항 (2026-03-13)
+
+### OpenMat / Tournament 목록 검색 기능 추가
+- `GET /api/v1/open-mats`는 검색어 파라미터 `q`를 지원합니다.
+- 오픈매트 검색 대상 필드: `title`, `locationName`, `address`
+- `GET /api/v1/tournaments`는 검색어 파라미터 `q`를 지원합니다.
+- 대회 검색 대상 필드: `title`, `organizer`, `location`
+- 대회 목록 조회는 메모리 정렬/페이징 대신 DB 기반 페이징 조회로 변경되었습니다.
+- 대회 목록 정렬 정책은 기존과 동일하게 `접수 가능 우선 -> registrationDeadline -> competitionDate -> id` 순서를 유지합니다.

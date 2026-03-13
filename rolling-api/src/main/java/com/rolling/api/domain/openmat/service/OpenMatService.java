@@ -62,13 +62,18 @@ public class OpenMatService {
 
     @Transactional
     public Page<OpenMatResponse> findAll(Region region, OpenMatStatus status, Pageable pageable) {
+        return findAll(region, status, null, pageable);
+    }
+
+    @Transactional
+    public Page<OpenMatResponse> findAll(Region region, OpenMatStatus status, String keyword, Pageable pageable) {
         syncExpiredOpenMats();
 
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
-        Page<OpenMat> page = findOpenMats(region, status, pageableWithSort);
+        Page<OpenMat> page = findOpenMats(region, status, normalizeKeyword(keyword), pageableWithSort);
         LocalDateTime now = now();
         page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
 
@@ -226,7 +231,10 @@ public class OpenMatService {
         }
     }
 
-    private Page<OpenMat> findOpenMats(Region region, OpenMatStatus status, Pageable pageable) {
+    private Page<OpenMat> findOpenMats(Region region, OpenMatStatus status, String keyword, Pageable pageable) {
+        if (keyword != null) {
+            return openMatRepository.searchVisible(region, status, keyword, pageable);
+        }
         if (region != null && status != null) {
             return openMatRepository.findByIsHiddenFalseAndRegionAndStatus(region, status, pageable);
         }
@@ -241,5 +249,14 @@ public class OpenMatService {
 
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+
+        String normalized = keyword.trim().replaceAll("\\s+", " ");
+        return normalized.isEmpty() ? null : normalized;
     }
 }
