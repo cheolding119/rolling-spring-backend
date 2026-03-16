@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -44,6 +44,11 @@ jwt:
 
 admin:
   user-ids: ${ADMIN_USER_IDS:}
+
+firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  project-id: ${FIREBASE_PROJECT_ID:}
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
 
 openmat:
   status:

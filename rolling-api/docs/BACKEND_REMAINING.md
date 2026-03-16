@@ -1,4 +1,4 @@
-# Rolling 백엔드 Remaining Plan (Unit) - 2026-03-01
+# Rolling 백엔드 Remaining Plan (Unit) - 2026-03-16
 
 기준:
 - 요구사항/명세 기준: `docs/AGENTS.md`
@@ -33,21 +33,24 @@
 - `nickname`, `beltColor` 수정이 정상 동작
 
 ## Unit B-03. User FCM + 차단
-- [ ] `POST /api/v1/users/me/fcm` 구현
-- [ ] `POST /api/v1/users/{id}/block` 구현
-- [ ] `DELETE /api/v1/users/{id}/block` 구현
-- [ ] 자기 자신 차단 방지/존재하지 않는 사용자 예외 처리
-- [ ] Swagger 및 테스트 작성
+- [x] `POST /api/v1/users/me/fcm` 구현
+- [x] `POST /api/v1/users/{id}/block` 구현
+- [x] `DELETE /api/v1/users/{id}/block` 구현
+- [x] 자기 자신 차단 방지/존재하지 않는 사용자 예외 처리
+- [x] Swagger 및 테스트 작성
+- [x] FCM 토큰 저장 구조를 `UserDevice` 1:N으로 확장
+- [x] 동일 FCM 토큰 재등록 시 기존 디바이스 레코드 재사용 및 현재 사용자에게 재연결
 
 완료 기준:
 - FCM 토큰 저장, 차단/해제 API가 idempotent하게 동작
+- 사용자 1명이 여러 디바이스 FCM 토큰을 저장할 수 있음
 
 ## Unit B-04. Report 공통 도메인
-- [ ] `Report` 엔티티/리포지토리/서비스/컨트롤러 기본 골격 구현
-- [ ] Enum: `ReportTargetType`, `ReportReason` 반영
-- [ ] 동일 유저 동일 대상 중복 신고 방지 제약
-- [ ] 자기 게시글 신고 방지 공통 검증
-- [ ] 공통 에러 코드/메시지 정리
+- [x] `Report` 엔티티/리포지토리/서비스/컨트롤러 기본 골격 구현
+- [x] Enum: `ReportTargetType`, `ReportReason` 반영
+- [x] 동일 유저 동일 대상 중복 신고 방지 제약
+- [x] 자기 게시글 신고 방지 공통 검증
+- [x] 공통 에러 코드/메시지 정리
 
 완료 기준:
 - OpenMat/Tournament 신고 로직에서 재사용 가능한 공통 모듈 완성
@@ -58,9 +61,6 @@
 - [x] `endDateTime` 경과 시 `FINISHED` 자동 전환 (스케줄러 + 조회시 보정)
 - [x] 리스트 정렬/필터 정책을 명세와 일치화
 - [x] 신고 임계치 정책 3건 기준으로 정합성 확정
-
-완료 기준:
-- 상태 전환이 수동 개입 없이 정책대로 유지됨
 
 ## Unit B-06. OpenMat 작성자 관리 API
 - [ ] 참가자 목록 조회 API
@@ -73,11 +73,11 @@
 - 작성자 관리 기능 전체가 API로 노출되고 권한이 보장됨
 
 ## Unit B-07. OpenMat 신고 API
-- [ ] OpenMat 신고 엔드포인트 구현
-- [ ] `Report` 공통 모듈과 연동
-- [ ] 신고 3건 이상 시 신규 신청 차단
-- [ ] 상세/리스트에서 신고 상태 표기용 필드 정책 확정
-- [ ] 테스트 작성
+- [x] OpenMat 신고 엔드포인트 구현
+- [x] `Report` 공통 모듈과 연동
+- [x] 신고 3건 이상 시 신규 신청 차단
+- [x] 상세/리스트에서 신고 상태 표기용 필드 정책 확정
+- [x] 테스트 작성
 
 완료 기준:
 - 중복 신고/자기 신고가 차단되고 3건 누적 정책이 적용됨
@@ -110,8 +110,26 @@
 완료 기준:
 - 코드/Swagger/문서에 동일 provider 정책이 반영됨
 
+## Unit B-13. FCM MVP 푸시 연동
+- [x] Firebase Admin SDK 의존성 추가
+- [x] Firebase 설정 프로퍼티 및 `FirebaseApp` 초기화 구성 추가
+- [x] `PushNotificationService` 인터페이스 및 FCM 구현체 추가
+- [x] Firebase 비활성화 시 `NoOpPushNotificationService` fallback 추가
+- [x] `UserDevice` 기준 다중 토큰 조회 및 멀티캐스트 발송 구현
+- [x] `OPEN_MAT_UPDATED`, `OPEN_MAT_DELETED` payload 규칙 정의
+- [x] 오픈매트 일정/장소 변경 시 참가자 대상 푸시 이벤트 연결
+- [x] 오픈매트 삭제 시 참가자 대상 푸시 이벤트 연결
+- [x] 무효 토큰(`UNREGISTERED`, `INVALID_ARGUMENT`) 자동 정리 구현
+- [x] OpenMat/FCM 푸시 관련 테스트 작성
+- [ ] 실제 디바이스 대상 수정/삭제 푸시 수신 검증
+
+완료 기준:
+- 서버가 `UserDevice` 기준으로 특정 사용자의 모든 디바이스에 FCM을 발송할 수 있음
+- 오픈매트 수정/삭제 시 참여자 대상 푸시가 트랜잭션 커밋 이후 발송됨
+- 실제 디바이스 수신 검증까지 끝나면 MVP 범위 완료
+
 ## Unit B-11. 테스트 보강
-- [ ] 서비스 단위 테스트 (Auth/User/OpenMat/Report/Tournament)
+- [~] 서비스 단위 테스트 (Auth/User/OpenMat/Report 일부 보강, FCM/UserDevice/OpenMat 푸시 테스트 추가)
 - [ ] 보안/권한 통합 테스트
 - [ ] 오픈매트 신청 동시성 테스트(정원 경계)
 - [ ] 회귀 테스트 케이스 문서화
@@ -120,10 +138,11 @@
 - 핵심 시나리오가 자동 테스트로 커버됨
 
 ## Unit B-12. 문서/운영 정리
-- [ ] 엔드포인트 추가/수정 시 Swagger + `docs/AGENTS.md` 동시 갱신
+- [~] 엔드포인트 추가/수정 시 Swagger + `docs/AGENTS.md` 동시 갱신
 - [ ] DB 전략 점검 (`ddl-auto=create` 대체)
-- [ ] 배포 프로파일별 설정 분리
-- [ ] 최종 API 변경 로그 정리
+- [~] 배포 프로파일별 설정 분리 (`firebase` 환경변수 구조 반영)
+- [~] 최종 API 변경 로그 정리
+- [x] `docs/FCM_INTEGRATION_CHECKLIST.md` 작성 및 현재 구현 상태 반영
 
 완료 기준:
 - 개발/운영 환경에서 문서와 실행 코드가 일치
@@ -139,5 +158,6 @@
 8. B-08
 9. B-09
 10. B-10
-11. B-11
-12. B-12
+11. B-13
+12. B-11
+13. B-12

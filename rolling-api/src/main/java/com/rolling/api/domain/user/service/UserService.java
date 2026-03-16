@@ -3,6 +3,8 @@ package com.rolling.api.domain.user.service;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.entity.UserDevice;
+import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserDeviceRepository userDeviceRepository;
 
     @Transactional(readOnly = true)
     public UserResponse getMe(Long userId) {
@@ -34,7 +37,15 @@ public class UserService {
     @Transactional
     public void registerFcmToken(Long userId, String fcmToken) {
         User user = getActiveUser(userId);
-        user.updateFcmToken(fcmToken);
+        String normalizedToken = normalizeFcmToken(fcmToken);
+
+        UserDevice userDevice = userDeviceRepository.findByFcmToken(normalizedToken)
+                .orElseGet(() -> UserDevice.builder()
+                        .fcmToken(normalizedToken)
+                        .build());
+
+        userDevice.assignUser(user);
+        userDeviceRepository.save(userDevice);
     }
 
     @Transactional
@@ -62,5 +73,12 @@ public class UserService {
     private User getActiveUser(Long userId) {
         return userRepository.findByIdAndIsWithdrawnFalse(userId)
                 .orElseThrow(() -> BusinessException.notFound("User not found"));
+    }
+
+    private String normalizeFcmToken(String fcmToken) {
+        if (fcmToken == null || fcmToken.isBlank()) {
+            throw BusinessException.badRequest("fcmToken은 비어 있을 수 없습니다");
+        }
+        return fcmToken.trim();
     }
 }

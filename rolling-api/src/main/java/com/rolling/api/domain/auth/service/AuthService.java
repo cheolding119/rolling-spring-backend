@@ -10,6 +10,7 @@ import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.exception.BusinessException;
@@ -44,6 +45,7 @@ public class AuthService {
     private final KakaoClient kakaoClient;
     private final GoogleClient googleClient;
     private final UserRepository userRepository;
+    private final UserDeviceRepository userDeviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
 
@@ -213,6 +215,7 @@ public class AuthService {
 
         for (User user : targets) {
             refreshTokenRepository.deleteByUserId(user.getId());
+            userDeviceRepository.deleteAllByUser_Id(user.getId());
             user.withdraw();
             log.info("Withdraw executed - userId: {}", user.getId());
         }

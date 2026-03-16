@@ -6,6 +6,7 @@ import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatService;
+import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
@@ -139,6 +140,26 @@ public class OpenMatController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
         openMatService.cancelApply(requireUserId(principal), id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
+            summary = "오픈매트 신고",
+            description = "오픈매트를 신고합니다. 동일 사용자는 같은 오픈매트를 한 번만 신고할 수 있으며 작성자는 자신의 오픈매트를 신고할 수 없습니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "신고 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "중복 신고/자기 신고/요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @PostMapping("/{id}/report")
+    public ResponseEntity<ApiResponse<Void>> report(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id,
+            @Valid @RequestBody ReportCreateRequest request) {
+        openMatService.report(requireUserId(principal), id, request.getReason(), request.getCustomReason());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

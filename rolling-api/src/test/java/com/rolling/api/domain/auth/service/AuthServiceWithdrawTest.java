@@ -5,6 +5,7 @@ import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -24,8 +25,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +40,9 @@ class AuthServiceWithdrawTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserDeviceRepository userDeviceRepository;
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
@@ -74,6 +78,7 @@ class AuthServiceWithdrawTest {
         assertThat(user.getWithdrawalScheduledAt()).isNotNull();
         assertThat(user.getIsWithdrawn()).isFalse();
         verify(refreshTokenRepository, never()).deleteByUserId(10L);
+        verify(userDeviceRepository, never()).deleteAllByUser_Id(10L);
     }
 
     @Test
@@ -134,10 +139,12 @@ class AuthServiceWithdrawTest {
         authService.processScheduledWithdrawals();
 
         verify(refreshTokenRepository).deleteByUserId(30L);
+        verify(userDeviceRepository).deleteAllByUser_Id(30L);
         assertThat(user.getIsWithdrawn()).isTrue();
         assertThat(user.getWithdrawalPending()).isFalse();
         assertThat(user.getEmail()).isNull();
         assertThat(user.getPhone()).isNull();
+        assertThat(user.getDevices()).isEmpty();
         assertThat(user.getFcmToken()).isNull();
     }
 }

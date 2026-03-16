@@ -1,10 +1,16 @@
 package com.rolling.api.domain.openmat.service;
 
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
+import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.openmat.event.OpenMatDeletedEvent;
+import com.rolling.api.domain.openmat.event.OpenMatUpdatedEvent;
 import com.rolling.api.domain.openmat.repository.OpenMatRepository;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportTargetType;
+import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
@@ -17,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,12 +55,18 @@ class OpenMatServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ReportService reportService;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
     private OpenMatService openMatService;
 
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), SEOUL_ZONE);
-        openMatService = new OpenMatService(openMatRepository, userRepository, fixedClock);
+        openMatService = new OpenMatService(openMatRepository, userRepository, reportService, fixedClock, applicationEventPublisher);
     }
 
     @Test
@@ -236,6 +250,131 @@ class OpenMatServiceTest {
 
         assertThat(synchronizedCount).isEqualTo(1);
         assertThat(openMat.getStatus()).isEqualTo(OpenMatStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("오픈매트 신고 시 공통 신고 저장 후 신고 횟수를 증가시킨다")
+    void report_increasesReportCount() {
+        User host = createUser(1L, "host-report", "host");
+        OpenMat openMat = createOpenMat(
+                17L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+
+        when(openMatRepository.findByIdForUpdate(17L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.report(9L, 17L, ReportReason.SPAM, null);
+
+        verify(reportService).createReport(9L, ReportTargetType.OPEN_MAT, 17L, 1L, ReportReason.SPAM, null);
+        assertThat(openMat.getReportCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("참가자가 있는 오픈매트의 일정이나 장소가 바뀌면 수정 알림 이벤트를 발행한다")
+    void update_whenScheduleOrLocationChanged_publishesUpdatedEvent() {
+        User host = createUser(1L, "host-update-notify", "host");
+        OpenMat openMat = createOpenMat(
+                19L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L,
+                3L
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "startDateTime", LocalDateTime.of(2026, 3, 12, 20, 0));
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(19L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.update(1L, 19L, request);
+
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue()).isInstanceOf(OpenMatUpdatedEvent.class);
+
+        OpenMatUpdatedEvent event = (OpenMatUpdatedEvent) eventCaptor.getValue();
+        assertThat(event.openMatId()).isEqualTo(19L);
+        assertThat(event.participantUserIds()).containsExactly(2L, 3L);
+    }
+
+    @Test
+    @DisplayName("참가자가 있어도 제목만 바뀌면 수정 알림 이벤트를 발행하지 않는다")
+    void update_whenOnlyTitleChanged_doesNotPublishUpdatedEvent() {
+        User host = createUser(1L, "host-update-title", "host");
+        OpenMat openMat = createOpenMat(
+                20L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "title", "changed title");
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(20L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.update(1L, 20L, request);
+
+        verify(applicationEventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("참가자가 있는 오픈매트를 강제 삭제하면 삭제 알림 이벤트를 발행한다")
+    void delete_whenParticipantsExist_publishesDeletedEvent() {
+        User host = createUser(1L, "host-delete-notify", "host");
+        OpenMat openMat = createOpenMat(
+                21L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L,
+                3L
+        );
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(21L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.delete(1L, 21L, true);
+
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue()).isInstanceOf(OpenMatDeletedEvent.class);
+
+        OpenMatDeletedEvent event = (OpenMatDeletedEvent) eventCaptor.getValue();
+        assertThat(event.openMatId()).isEqualTo(21L);
+        assertThat(event.participantUserIds()).containsExactly(2L, 3L);
+    }
+
+    @Test
+    @DisplayName("오픈매트 상세 응답은 신고 누적 3건 이상이면 reported=true를 반환한다")
+    void findById_whenReported_returnsReportedTrue() {
+        User host = createUser(1L, "host-reported", "host");
+        OpenMat openMat = createOpenMat(
+                18L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        openMat.report();
+        openMat.report();
+        openMat.report();
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(18L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.findById(18L);
+
+        assertThat(response.getReported()).isTrue();
     }
 
     private User createUser(Long id, String socialId, String nickname) {
