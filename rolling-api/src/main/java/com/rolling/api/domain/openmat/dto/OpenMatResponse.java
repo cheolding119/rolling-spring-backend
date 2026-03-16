@@ -23,6 +23,7 @@ public class OpenMatResponse {
     private Integer maxCapacity;
     private Integer currentParticipants;
     private OpenMatStatus status;
+    private Boolean reported;
     private Long hostId;
     private String hostNickname;
     private String hostInstagramId;
@@ -41,6 +42,7 @@ public class OpenMatResponse {
                 .maxCapacity(openMat.getMaxCapacity())
                 .currentParticipants(openMat.getParticipantUids().size())
                 .status(openMat.getStatus())
+                .reported(openMat.isReported())
                 .hostId(openMat.getHost().getId())
                 .hostNickname(openMat.getHost().getNickname())
                 .hostInstagramId(openMat.getHostInstagramId())

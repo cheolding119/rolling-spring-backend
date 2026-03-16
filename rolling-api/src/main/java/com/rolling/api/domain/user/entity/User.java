@@ -7,8 +7,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -42,7 +44,8 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private BeltColor beltColor;
 
-    private String fcmToken;
+    @OneToMany(mappedBy = "user")
+    private List<UserDevice> devices = new ArrayList<>();
 
     @Column(nullable = false)
     private Boolean isWithdrawn = false;
@@ -68,7 +71,9 @@ public class User extends BaseTimeEntity {
         this.email = email;
         this.phone = phone;
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
-        this.fcmToken = fcmToken;
+        if (fcmToken != null && !fcmToken.isBlank()) {
+            new UserDevice(this, fcmToken.trim());
+        }
     }
 
     public void updateNickname(String nickname) {
@@ -93,8 +98,21 @@ public class User extends BaseTimeEntity {
         }
     }
 
-    public void updateFcmToken(String fcmToken) {
-        this.fcmToken = fcmToken;
+    void linkDevice(UserDevice device) {
+        if (!this.devices.contains(device)) {
+            this.devices.add(device);
+        }
+    }
+
+    void unlinkDevice(UserDevice device) {
+        this.devices.remove(device);
+    }
+
+    public String getFcmToken() {
+        if (devices.isEmpty()) {
+            return null;
+        }
+        return devices.get(0).getFcmToken();
     }
 
     public void blockUser(User user) {
@@ -121,7 +139,7 @@ public class User extends BaseTimeEntity {
         this.nickname = "withdrawn_user_" + this.id;
         this.email = null;
         this.phone = null;
-        this.fcmToken = null;
+        this.devices.clear();
         this.socialId = "withdrawn-" + this.id + "-" + UUID.randomUUID();
         this.withdrawalPending = false;
         this.withdrawalRequestedAt = null;

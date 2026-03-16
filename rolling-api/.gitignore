@@ -1,5 +1,6 @@
 # Environment
 .env
+firebase-service-key.json
 
 # Gradle
 .gradle/
@@ -15,3 +16,5 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+

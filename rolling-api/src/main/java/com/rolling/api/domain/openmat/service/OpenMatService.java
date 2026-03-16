@@ -3,10 +3,15 @@ package com.rolling.api.domain.openmat.service;
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
+import com.rolling.api.domain.openmat.event.OpenMatDeletedEvent;
+import com.rolling.api.domain.openmat.event.OpenMatUpdatedEvent;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.repository.OpenMatRepository;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportTargetType;
+import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
@@ -17,12 +22,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -31,7 +38,9 @@ public class OpenMatService {
 
     private final OpenMatRepository openMatRepository;
     private final UserRepository userRepository;
+    private final ReportService reportService;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OpenMatResponse create(Long hostId, OpenMatCreateRequest request) {
@@ -94,6 +103,8 @@ public class OpenMatService {
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
 
         validateHost(openMat, userId);
+        boolean shouldNotifyParticipants = openMat.hasParticipants() && hasScheduleOrLocationChanged(openMat, request);
+        List<Long> participantUserIds = List.copyOf(openMat.getParticipantUids());
 
         LocalDateTime effectiveStart = request.getStartDateTime() != null ? request.getStartDateTime() : openMat.getStartDateTime();
         LocalDateTime effectiveEnd = request.getEndDateTime() != null ? request.getEndDateTime() : openMat.getEndDateTime();
@@ -120,6 +131,10 @@ public class OpenMatService {
         );
         openMat.synchronizeStatus(now());
 
+        if (shouldNotifyParticipants) {
+            eventPublisher.publishEvent(new OpenMatUpdatedEvent(openMat.getId(), openMat.getTitle(), participantUserIds));
+        }
+
         return OpenMatResponse.from(openMat);
     }
 
@@ -129,12 +144,17 @@ public class OpenMatService {
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
 
         validateHost(openMat, userId);
+        List<Long> participantUserIds = List.copyOf(openMat.getParticipantUids());
 
         if (openMat.hasParticipants() && !force) {
             throw BusinessException.badRequest("신청자가 있는 오픈매트는 force=true 파라미터가 필요합니다");
         }
 
         openMat.hide();
+
+        if (!participantUserIds.isEmpty()) {
+            eventPublisher.publishEvent(new OpenMatDeletedEvent(openMat.getId(), openMat.getTitle(), participantUserIds));
+        }
     }
 
     @Transactional
@@ -180,6 +200,22 @@ public class OpenMatService {
 
         openMat.removeParticipant(userId);
         openMat.synchronizeStatus(now);
+    }
+
+    @Transactional
+    public void report(Long userId, Long openMatId, ReportReason reason, String customReason) {
+        OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
+                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+
+        reportService.createReport(
+                userId,
+                ReportTargetType.OPEN_MAT,
+                openMatId,
+                openMat.getHost().getId(),
+                reason,
+                customReason
+        );
+        openMat.report();
     }
 
     @Transactional
@@ -229,6 +265,18 @@ public class OpenMatService {
         if (maxCapacity != null && maxCapacity != -1 && maxCapacity < 1) {
             throw BusinessException.badRequest("정원은 -1(무제한) 또는 1 이상이어야 합니다");
         }
+    }
+
+    private boolean hasScheduleOrLocationChanged(OpenMat openMat, OpenMatUpdateRequest request) {
+        return isChanged(openMat.getStartDateTime(), request.getStartDateTime())
+                || isChanged(openMat.getEndDateTime(), request.getEndDateTime())
+                || isChanged(openMat.getLocationName(), request.getLocationName())
+                || isChanged(openMat.getAddress(), request.getAddress())
+                || isChanged(openMat.getRegion(), request.getRegion());
+    }
+
+    private boolean isChanged(Object currentValue, Object newValue) {
+        return newValue != null && !Objects.equals(currentValue, newValue);
     }
 
     private Page<OpenMat> findOpenMats(Region region, OpenMatStatus status, String keyword, Pageable pageable) {

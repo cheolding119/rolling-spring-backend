@@ -5,6 +5,8 @@ import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.entity.UserDevice;
+import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +29,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserDeviceRepository userDeviceRepository;
 
     @InjectMocks
     private UserService userService;
@@ -99,8 +106,8 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("FCM 토큰 등록 시 사용자 토큰을 갱신한다")
-    void registerFcmToken_updatesUserToken() {
+    @DisplayName("FCM 토큰 등록 시 사용자 디바이스를 생성한다")
+    void registerFcmToken_createsUserDevice() {
         User user = User.builder()
                 .socialId("social-4")
                 .socialProvider(SocialProvider.GOOGLE)
@@ -111,10 +118,78 @@ class UserServiceTest {
         ReflectionTestUtils.setField(user, "id", 4L);
 
         when(userRepository.findByIdAndIsWithdrawnFalse(4L)).thenReturn(Optional.of(user));
+        when(userDeviceRepository.findByFcmToken("fcm-token-123")).thenReturn(Optional.empty());
+        when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         userService.registerFcmToken(4L, "fcm-token-123");
 
+        assertThat(user.getDevices()).hasSize(1);
+        assertThat(user.getDevices().get(0).getUser()).isEqualTo(user);
+        assertThat(user.getDevices().get(0).getFcmToken()).isEqualTo("fcm-token-123");
         assertThat(user.getFcmToken()).isEqualTo("fcm-token-123");
+        verify(userDeviceRepository).save(any(UserDevice.class));
+    }
+
+    @Test
+    @DisplayName("같은 사용자는 여러 FCM 토큰을 등록할 수 있다")
+    void registerFcmToken_allowsMultipleTokensPerUser() {
+        User user = User.builder()
+                .socialId("social-4b")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("push-user")
+                .email("user4b@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 44L);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(44L)).thenReturn(Optional.of(user));
+        when(userDeviceRepository.findByFcmToken("fcm-token-1")).thenReturn(Optional.empty());
+        when(userDeviceRepository.findByFcmToken("fcm-token-2")).thenReturn(Optional.empty());
+        when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.registerFcmToken(44L, "fcm-token-1");
+        userService.registerFcmToken(44L, "fcm-token-2");
+
+        assertThat(user.getDevices()).hasSize(2);
+        assertThat(user.getDevices()).extracting(UserDevice::getFcmToken)
+                .containsExactly("fcm-token-1", "fcm-token-2");
+    }
+
+    @Test
+    @DisplayName("이미 등록된 토큰은 현재 사용자에게 재연결된다")
+    void registerFcmToken_reassignsExistingTokenToCurrentUser() {
+        User previousUser = User.builder()
+                .socialId("social-prev")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("previous")
+                .email("previous@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(previousUser, "id", 40L);
+
+        User currentUser = User.builder()
+                .socialId("social-current")
+                .socialProvider(SocialProvider.KAKAO)
+                .nickname("current")
+                .email("current@test.com")
+                .beltColor(BeltColor.BLUE)
+                .build();
+        ReflectionTestUtils.setField(currentUser, "id", 41L);
+
+        UserDevice existingDevice = UserDevice.builder()
+                .user(previousUser)
+                .fcmToken("shared-token")
+                .build();
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(41L)).thenReturn(Optional.of(currentUser));
+        when(userDeviceRepository.findByFcmToken("shared-token")).thenReturn(Optional.of(existingDevice));
+        when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.registerFcmToken(41L, "shared-token");
+
+        assertThat(existingDevice.getUser()).isEqualTo(currentUser);
+        assertThat(previousUser.getDevices()).isEmpty();
+        assertThat(currentUser.getDevices()).containsExactly(existingDevice);
     }
 
     @Test

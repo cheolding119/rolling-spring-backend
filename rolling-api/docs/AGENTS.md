@@ -43,6 +43,7 @@ enum ReportReason {
   other           // 기타
 }
 ```
+- API raw value: `FALSE_INFO`, `INAPPROPRIATE`, `SPAM`, `OTHER`
 
 ### ReportTargetType
 신고 대상 타입
@@ -52,6 +53,7 @@ enum ReportTargetType {
   tournament  // 대회
 }
 ```
+- API raw value: `OPEN_MAT`, `TOURNAMENT`
 
 ---
 
@@ -66,8 +68,20 @@ enum ReportTargetType {
 | `nickname` | `String` | 프로필 닉네임 |  |
 | `beltColor` | `BeltColor` | 주짓수 벨트 색상 | Enum 타입 |
 | `socialProvider` | `SocialProvider` | 소셜 로그인 제공자 | Enum 타입 |
+| `devices` | `List<UserDeviceModel>` | 등록된 사용자 디바이스 목록 | 1:N |
 | `joinedOpenMats` | `List<int>` | 신청한 오픈매트 ID 리스트 |  |
 | `createdAt` | `DateTime` | 계정 생성 일시 |  |
+
+### UserDevice
+
+**도메인 네임**: `UserDeviceModel`
+
+| **필드명** | **타입** | **설명** | **비고** |
+| --- | --- | --- | --- |
+| `id` | `int` | 사용자 디바이스 고유 ID | PK |
+| `userId` | `int` | 소유 사용자 ID | FK |
+| `fcmToken` | `String` | 디바이스 FCM 토큰 | Unique |
+| `createdAt` | `DateTime` | 등록 일시 |  |
 
 ---
 
@@ -504,6 +518,10 @@ POST /api/v1/auth/logout
 }
 ```
 
+> FCM 토큰은 `User` 단일 필드가 아니라 `user_devices` 기준으로 저장됩니다.
+> 동일 사용자는 여러 디바이스 토큰을 등록할 수 있습니다.
+> 이미 등록된 토큰이면 기존 디바이스 레코드를 재사용하고 현재 사용자에게 연결합니다.
+
 ---
 
 ### 1.4 회원 탈퇴
@@ -701,6 +719,7 @@ GET /api/v1/open-mats
         "maxCapacity": 20,
         "currentParticipants": 5,
         "status": "RECRUITING",
+        "reported": false,
         "hostId": 1,
         "hostNickname": "관장님",
         "hostInstagramId": "rolling_bjj",
@@ -719,6 +738,7 @@ GET /api/v1/open-mats
 > 숨김 처리된 오픈매트(`isHidden = true`)는 리스트에 노출되지 않습니다.
 > `status`를 지정하지 않으면 전체 상태를 조회하며, 기본 정렬은 `startDateTime ASC` 입니다.
 > `q`를 지정하면 제목, 장소명, 주소에서 부분 일치 검색을 수행합니다.
+> 응답의 `reported=true`는 신고 누적 3건 이상으로 신규 신청이 차단된 상태를 의미합니다.
 
 ---
 
@@ -749,8 +769,8 @@ GET /api/v1/open-mats/{id}
     "address": "서울시 강남구 역삼동 123-45",
     "maxCapacity": 20,
     "currentParticipants": 5,
-    "participantUids": [2, 3, 5, 7, 11],
     "status": "RECRUITING",
+    "reported": false,
     "hostId": 1,
     "hostNickname": "관장님",
     "hostInstagramId": "rolling_bjj",
@@ -943,12 +963,57 @@ GET /api/v1/open-mats/my
       "maxCapacity": 20,
       "currentParticipants": 5,
       "status": "RECRUITING",
+      "reported": false,
       "hostNickname": "관장님",
       "hostInstagramId": "rolling_bjj"
     }
   ]
 }
 ```
+
+---
+
+### 3.9 오픈매트 신고
+
+```
+POST /api/v1/open-mats/{id}/report
+```
+
+**인증**: 필요
+
+**Path Parameter**
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `id` | `Long` | 오픈매트 ID |
+
+**Request Body**
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|:----:|------|
+| `reason` | `String` | O | 신고 사유 (`FALSE_INFO`, `INAPPROPRIATE`, `SPAM`, `OTHER`) |
+| `customReason` | `String` | - | 기타 사유 (`reason = OTHER`일 때 필수) |
+
+```json
+{
+  "reason": "SPAM",
+  "customReason": null
+}
+```
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": null
+}
+```
+
+**에러**
+| 코드 | 상황 |
+|------|------|
+| `ALREADY_REPORTED` | 동일 유저가 같은 오픈매트를 중복 신고 |
+| `SELF_REPORT_NOT_ALLOWED` | 작성자가 자신의 오픈매트를 신고 |
+| `VALIDATION_ERROR` | `reason` 누락 또는 `OTHER`인데 `customReason` 없음 |
+| `NOT_FOUND` | 오픈매트를 찾을 수 없음 |
 
 ---
 
@@ -1285,3 +1350,33 @@ enum BeltColor {
 - `POST /api/v1/tournaments/crawl`는 관리자만 호출할 수 있습니다.
 - 관리자 계정은 `ADMIN_USER_IDS` 환경변수로 지정합니다.
 - Apidog 등 운영 도구에서는 `X-Crawler-Admin-Key` 헤더와 `TOURNAMENT_CRAWLER_ADMIN_KEY` 환경변수로 로그인 없이 호출할 수 있습니다.
+
+---
+
+## 변경사항 (2026-03-16)
+
+### OpenMat 신고 API 추가
+- `POST /api/v1/open-mats/{id}/report`가 추가되었습니다.
+- 동일 유저는 같은 오픈매트를 한 번만 신고할 수 있습니다.
+- 작성자는 자신의 오픈매트를 신고할 수 없습니다.
+- `reason = OTHER`인 경우 `customReason` 입력이 필수입니다.
+
+### OpenMat 응답 모델 신고 상태 필드 추가
+- 오픈매트 리스트/상세/내 신청 목록 응답에 `reported` 필드가 추가되었습니다.
+- `reported = true`는 신고 누적 3건 이상으로 신규 신청이 차단된 상태를 의미합니다.
+
+### User FCM 멀티 디바이스 저장 구조 반영
+- FCM 토큰 저장 구조가 `users` 단일 필드에서 `user_devices` 1:N 구조로 변경되었습니다.
+- `POST /api/v1/users/me/fcm`는 사용자별 복수 디바이스 토큰 등록을 지원합니다.
+- 이미 등록된 동일 토큰은 기존 레코드를 재사용하고 현재 사용자에게 재연결됩니다.
+
+
+
+
+
+### Firebase Admin 기반 OpenMat 푸시 알림 연동
+- Firebase Admin SDK와 `FirebaseAdminConfig`가 추가되었습니다.
+- 서버는 `FIREBASE_ENABLED`, `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` 또는 ADC(`GOOGLE_APPLICATION_CREDENTIALS`)로 Firebase 인증을 구성합니다.
+- 오픈매트 신청자가 있는 상태에서 `일정/장소`가 변경되면 `OPEN_MAT_UPDATED` 푸시가 발송됩니다.
+- 오픈매트가 삭제되면 신청자들에게 `OPEN_MAT_DELETED` 푸시가 발송됩니다.
+- 무효한 FCM 토큰(`UNREGISTERED`, `INVALID_ARGUMENT`)은 발송 실패 시 `user_devices`에서 정리됩니다.
