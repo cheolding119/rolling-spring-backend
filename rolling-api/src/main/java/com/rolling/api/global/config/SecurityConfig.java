@@ -1,5 +1,6 @@
 package com.rolling.api.global.config;
 
+import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
@@ -30,6 +31,7 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
+    private final OpenMatTestingAccessConfig openMatTestingAccessConfig;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,6 +58,10 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my").authenticated();
                     // 오픈매트 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}").permitAll();
+                    if (openMatTestingAccessConfig.isAllowUnauthenticatedUpdate()) {
+                        auth.requestMatchers(HttpMethod.PUT, "/api/v1/open-mats/{id}").permitAll();
+                        auth.requestMatchers(HttpMethod.DELETE, "/api/v1/open-mats/{id}").permitAll();
+                    }
                     // 대회 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments", "/api/v1/tournaments/{id}").permitAll();
                     // 나머지는 모두 인증 필요

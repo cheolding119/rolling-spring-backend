@@ -107,7 +107,8 @@ public class OpenMatController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id,
             @RequestBody OpenMatUpdateRequest request) {
-        OpenMatResponse response = openMatService.update(requireUserId(principal), id, request);
+        Long userId = principal != null ? principal.getUserId() : null;
+        OpenMatResponse response = openMatService.update(userId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -176,7 +177,8 @@ public class OpenMatController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id,
             @Parameter(description = "신청자가 있을 때 강제 삭제 여부") @RequestParam(defaultValue = "false") boolean force) {
-        openMatService.delete(requireUserId(principal), id, force);
+        Long userId = principal != null ? principal.getUserId() : null;
+        openMatService.delete(userId, id, force);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -187,3 +189,4 @@ public class OpenMatController {
         return principal.getUserId();
     }
 }
+
