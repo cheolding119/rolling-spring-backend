@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -45,10 +45,7 @@ jwt:
 admin:
   user-ids: ${ADMIN_USER_IDS:}
 
-firebase:
-  enabled: ${FIREBASE_ENABLED:false}
-  project-id: ${FIREBASE_PROJECT_ID:}
-  credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+
 
 openmat:
   status:
@@ -56,6 +53,16 @@ openmat:
       enabled: true
       cron: "0 * * * * *"
       zone: "Asia/Seoul"
+  testing:
+    allow-unauthenticated-update: ${OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE:false}
+
+firebase:
+  enabled: true
+  project-id: ${FIREBASE_PROJECT_ID:}
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+
+push-notification:
+  android-channel-id: ${PUSH_NOTIFICATION_ANDROID_CHANNEL_ID:rolling_open_mat_alerts}
 
 # 대회 크롤링 스케줄링 주기
 tournament:
@@ -82,3 +89,4 @@ cloud:
       auto: false
     stack:
       auto: false
+

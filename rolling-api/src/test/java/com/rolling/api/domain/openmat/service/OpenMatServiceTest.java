@@ -1,5 +1,6 @@
 package com.rolling.api.domain.openmat.service;
 
+import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMat;
@@ -62,11 +63,19 @@ class OpenMatServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
 
     private OpenMatService openMatService;
+    private Clock fixedClock;
 
     @BeforeEach
     void setUp() {
-        Clock fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), SEOUL_ZONE);
-        openMatService = new OpenMatService(openMatRepository, userRepository, reportService, fixedClock, applicationEventPublisher);
+        fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), SEOUL_ZONE);
+        openMatService = new OpenMatService(
+                openMatRepository,
+                userRepository,
+                reportService,
+                fixedClock,
+                applicationEventPublisher,
+                new OpenMatTestingAccessConfig(false)
+        );
     }
 
     @Test
@@ -327,6 +336,38 @@ class OpenMatServiceTest {
     }
 
     @Test
+    @DisplayName("테스트 플래그가 켜져 있으면 인증 없이 오픈매트를 수정할 수 있다")
+    void update_whenUnauthenticatedUpdateAllowed_updatesWithoutHostValidation() {
+        OpenMatService unauthenticatedUpdateService = new OpenMatService(
+                openMatRepository,
+                userRepository,
+                reportService,
+                fixedClock,
+                applicationEventPublisher,
+                new OpenMatTestingAccessConfig(true)
+        );
+        User host = createUser(1L, "host-update-test", "host");
+        OpenMat openMat = createOpenMat(
+                30L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "locationName", "롤링짐 신촌 2관");
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(30L)).thenReturn(java.util.Optional.of(openMat));
+
+        unauthenticatedUpdateService.update(null, 30L, request);
+
+        assertThat(openMat.getLocationName()).isEqualTo("롤링짐 신촌 2관");
+        verify(applicationEventPublisher).publishEvent(any(OpenMatUpdatedEvent.class));
+    }
+
+    @Test
     @DisplayName("참가자가 있는 오픈매트를 강제 삭제하면 삭제 알림 이벤트를 발행한다")
     void delete_whenParticipantsExist_publishesDeletedEvent() {
         User host = createUser(1L, "host-delete-notify", "host");
@@ -418,3 +459,5 @@ class OpenMatServiceTest {
         return openMat;
     }
 }
+
+

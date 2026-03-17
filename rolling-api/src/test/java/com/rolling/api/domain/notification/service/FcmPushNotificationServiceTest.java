@@ -1,5 +1,8 @@
 package com.rolling.api.domain.notification.service;
 
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
+import com.google.firebase.messaging.ApnsConfig;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
@@ -13,11 +16,11 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,14 +37,24 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class FcmPushNotificationServiceTest {
 
+    private static final String ANDROID_CHANNEL_ID = "rolling_open_mat_alerts";
+
     @Mock
     private FirebaseMessaging firebaseMessaging;
 
     @Mock
     private UserDeviceRepository userDeviceRepository;
 
-    @InjectMocks
     private FcmPushNotificationService fcmPushNotificationService;
+
+    @BeforeEach
+    void setUp() {
+        fcmPushNotificationService = new FcmPushNotificationService(
+                firebaseMessaging,
+                userDeviceRepository,
+                ANDROID_CHANNEL_ID
+        );
+    }
 
     @Test
     @DisplayName("사용자 디바이스 토큰으로 푸시를 발송하고 무효 토큰은 정리한다")
@@ -86,7 +99,7 @@ class FcmPushNotificationServiceTest {
                         "오픈매트 일정이 변경되었습니다",
                         "테스트 알림입니다.",
                         99L,
-                        Map.of("openMatId", "99")
+                        Map.of("route", "/openmat/detail")
                 )
         );
 
@@ -98,12 +111,34 @@ class FcmPushNotificationServiceTest {
         List<String> tokens = (List<String>) ReflectionTestUtils.getField(message, "tokens");
         @SuppressWarnings("unchecked")
         Map<String, String> data = (Map<String, String>) ReflectionTestUtils.getField(message, "data");
+        AndroidConfig androidConfig = (AndroidConfig) ReflectionTestUtils.getField(message, "androidConfig");
+        AndroidNotification androidNotification =
+                (AndroidNotification) ReflectionTestUtils.getField(androidConfig, "notification");
+        ApnsConfig apnsConfig = (ApnsConfig) ReflectionTestUtils.getField(message, "apnsConfig");
+        @SuppressWarnings("unchecked")
+        Map<String, String> apnsHeaders = (Map<String, String>) ReflectionTestUtils.getField(apnsConfig, "headers");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> apnsPayload = (Map<String, Object>) ReflectionTestUtils.getField(apnsConfig, "payload");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> aps = (Map<String, Object>) apnsPayload.get("aps");
 
         assertThat(tokens).containsExactly("token-1", "token-2");
         assertThat(data)
                 .containsEntry("type", "OPEN_MAT_UPDATED")
                 .containsEntry("targetId", "99")
-                .containsEntry("openMatId", "99");
+                .containsEntry("route", "/openmat/detail")
+                .containsEntry("title", "오픈매트 일정이 변경되었습니다")
+                .containsEntry("body", "테스트 알림입니다.")
+                .doesNotContainKey("openMatId");
+        assertThat(ReflectionTestUtils.getField(androidConfig, "priority")).isEqualTo("high");
+        assertThat(ReflectionTestUtils.getField(androidNotification, "channelId")).isEqualTo(ANDROID_CHANNEL_ID);
+        assertThat(ReflectionTestUtils.getField(androidNotification, "priority")).isEqualTo("PRIORITY_HIGH");
+        assertThat(ReflectionTestUtils.getField(androidNotification, "defaultSound")).isEqualTo(true);
+        assertThat(ReflectionTestUtils.getField(androidNotification, "defaultVibrateTimings")).isEqualTo(true);
+        assertThat(apnsHeaders)
+                .containsEntry("apns-push-type", "alert")
+                .containsEntry("apns-priority", "10");
+        assertThat(aps).containsEntry("sound", "default");
 
         verify(userDeviceRepository).deleteAllByFcmTokenIn(java.util.Set.of("token-2"));
     }
@@ -120,3 +155,4 @@ class FcmPushNotificationServiceTest {
         return user;
     }
 }
+

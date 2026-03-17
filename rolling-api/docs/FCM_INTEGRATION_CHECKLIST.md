@@ -4,6 +4,8 @@
 
 이 문서는 Flutter 프론트엔드와 Java Spring 백엔드가 FCM(Firebase Cloud Messaging)을 끝까지 연동하기 위해 필요한 작업을 한 곳에 정리한 체크리스트다. Codex가 이 파일만 읽어도 현재 상태와 다음 작업을 이해할 수 있도록 작성한다.
 
+## Phase 0. 목표와 현재 상태
+
 ## 목표
 
 - Flutter 앱에서 알림 권한을 요청한다.
@@ -11,7 +13,7 @@
 - 로그인된 사용자 기준으로 FCM 토큰을 백엔드에 등록한다.
 - Spring 서버가 Firebase Admin SDK로 특정 사용자에게 푸시를 발송한다.
 - MVP 범위에서는 오픈매트 수정/삭제 알림만 우선 붙인다.
-- 앱 내 알림함은 필요 시 별도 기능으로 분리한다.
+- 앱 내 알림함은 백엔드 저장/조회/읽음 처리 API까지 구현하고, 프론트 화면 연동은 별도 진행한다.
 
 ## 현재 프론트 상태
 
@@ -27,9 +29,9 @@
 - [x] Android 13+용 `POST_NOTIFICATIONS` 권한 선언 완료
 - [ ] iOS `GoogleService-Info.plist` 반영 필요
 - [ ] iOS APNs / Xcode Push 설정 필요
-- [ ] 포그라운드 알림 표시 처리 필요
-- [ ] 백그라운드/종료 상태 알림 탭 라우팅 처리 필요
-- [ ] 알림 목록 API 연동 필요
+- [x] 포그라운드 알림 표시 처리 필요
+- [x] 백그라운드/종료 상태 알림 탭 라우팅 처리 필요
+- [x] 알림 목록 API 연동 필요
 
 ## 현재 프론트 관련 파일
 
@@ -48,6 +50,8 @@
 - [x] `FIREBASE_CREDENTIALS_PATH`를 쓸지, `GOOGLE_APPLICATION_CREDENTIALS`를 쓸지 결정
 - [ ] Android 실기기 2대 이상 또는 테스트용 사용자 2명 이상 준비
 - [ ] 오픈매트 수정 알림을 `일정/장소 변경`일 때만 보낼지 최종 확인
+
+## Phase 1. 즉시 착수 항목
 
 ## 프론트엔드 체크리스트
 
@@ -88,6 +92,8 @@
 - [ ] 백그라운드 상태 수신 확인
 - [ ] 앱 종료 상태에서 알림 탭 진입 확인
 - [ ] 앱 재설치 또는 토큰 갱신 시 백엔드 토큰 업데이트 확인
+
+## Phase 2. 백엔드 구현
 
 ## Java Spring 백엔드 체크리스트
 
@@ -132,26 +138,28 @@
 
 ### 5. 알림함이 필요한 경우
 
-- [ ] Notification 테이블 설계
-- [ ] 발송 전/후 알림 이력 저장
-- [ ] 읽음 처리 API 추가
-- [ ] 알림 목록 조회 API 추가
-- [ ] 프론트 알림 화면과 응답 스펙 확정
+- [x] Notification 테이블 설계
+- [x] 사용자용 알림함 레코드 저장 구현
+- [x] 읽음 처리 API 추가
+- [x] 알림 목록 조회 API 추가
+- [x] 알림 목록/읽음 처리 응답 스펙을 `docs/AGENTS.md`에 반영
+- [x] 프론트 알림 화면 연동
 
 ### 6. 백엔드 검증
 
 - [x] 토큰 등록 서비스 테스트 작성
 - [ ] Firebase Admin 초기화 테스트 또는 스모크 테스트 작성
-- [ ] 단일 사용자 푸시 발송 테스트 작성
 - [x] 잘못된 토큰 정리 테스트 작성
 - [x] 오픈매트 수정/삭제 이벤트 테스트 작성
-- [ ] 실제 Android 디바이스 대상 테스트 발송 확인
+- [x] 실제 Android 디바이스 대상 테스트 발송 확인
 - [ ] 실제 iOS 디바이스 대상 테스트 발송 확인
+
+## Phase 3. 공통 계약 정리
 
 ## 공통 계약 체크리스트
 
 - [x] 프론트가 호출할 토큰 등록 엔드포인트 정의
-- [ ] 요청/응답 스펙 최종 확정
+- [x] 토큰 등록/알림함 요청·응답 스펙을 `docs/AGENTS.md`에 반영
 - [x] 알림 `type` 값 목록 정의
 - [x] 알림 payload 예시 정의
 - [x] 어떤 이벤트에서 어떤 푸시를 보낼지 MVP 도메인 정책 1차 정리
@@ -164,7 +172,7 @@
 - [x] `targetId`: 오픈매트 ID
 - [x] `title`: 사용자 노출 제목
 - [x] `body`: 사용자 노출 내용
-- [ ] `deeplink` 또는 라우트 정보: 앱 진입 경로
+- [x] `route`: 앱 진입 경로 (`/openmat/detail`, `/openmat`)
 
 ### 현재 payload 예시
 
@@ -179,7 +187,9 @@
   "data": {
     "type": "OPEN_MAT_UPDATED",
     "targetId": "123",
-    "openMatId": "123"
+    "route": "/openmat/detail",
+    "title": "오픈매트 일정이 변경되었습니다",
+    "body": "주말 오픈매트 오픈매트의 일정 또는 장소가 변경되었습니다."
   }
 }
 ```
@@ -195,26 +205,32 @@
   "data": {
     "type": "OPEN_MAT_DELETED",
     "targetId": "123",
-    "openMatId": "123"
+    "route": "/openmat",
+    "title": "오픈매트가 취소되었습니다",
+    "body": "주말 오픈매트 오픈매트가 삭제되었습니다."
   }
 }
 ```
+
+## Phase 4. 완료 기준과 최종 점검
 
 ## 완료 기준
 
 - [x] Android 실기기에서 로그인 후 토큰이 서버에 저장된다.
 - [ ] iOS 실기기에서 로그인 후 토큰이 서버에 저장된다.
-- [ ] Spring 서버가 특정 사용자에게 FCM 푸시를 정상 발송한다.
+- [x] Spring 서버가 특정 사용자에게 FCM 푸시를 정상 발송한다.
 - [x] 잘못된 토큰은 서버에서 정리된다.
-- [ ] 앱이 포그라운드/백그라운드/종료 상태에서 모두 의도한 동작을 한다.
-- [ ] 필요 시 앱 내 알림 목록과 푸시 알림이 일관되게 동작한다.
+- [x] 앱이 포그라운드/백그라운드/종료 상태에서 모두 의도한 동작을 한다.
+- [x] 필요 시 앱 내 알림 목록과 푸시 알림이 일관되게 동작한다.
 
 ## 비고
 
 - 현재 백엔드는 `POST /api/v1/users/me/fcm`와 `UserDevice` 1:N 저장 구조를 구현했다.
+- 현재 백엔드는 `Notification` 저장 구조와 `GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`를 구현했다.
 - Firebase Admin SDK, `FirebaseAdminConfig`, `PushNotificationService`, 오픈매트 수정/삭제 푸시 이벤트 연결이 구현되어 있다.
 - 토큰은 `users` 단일 컬럼이 아니라 `user_devices` 기준으로 저장된다.
 - 같은 사용자가 여러 휴대폰을 쓰면 여러 FCM 토큰을 각각 연결할 수 있다.
 - 서버는 `FIREBASE_ENABLED`, `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` 또는 ADC(`GOOGLE_APPLICATION_CREDENTIALS`)로 Firebase 인증을 구성한다.
 - iOS 쪽은 Windows에서 FlutterFire 설정만으로 완결되지 않으므로 macOS에서 최종 반영이 필요하다.
-- FCM은 전달 채널일 뿐이며, 앱 내 알림함이 필요하면 별도 Notification 저장 구조가 백엔드에 있어야 한다.
+- FCM은 전달 채널이고, 사용자용 알림함은 `Notification` 저장 구조로 별도 관리된다.
+
