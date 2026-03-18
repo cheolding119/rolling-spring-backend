@@ -72,7 +72,7 @@ public class User extends BaseTimeEntity {
         this.phone = phone;
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
         if (fcmToken != null && !fcmToken.isBlank()) {
-            new UserDevice(this, fcmToken.trim());
+            new UserDevice(this, fcmToken.trim(), null, null, null);
         }
     }
 

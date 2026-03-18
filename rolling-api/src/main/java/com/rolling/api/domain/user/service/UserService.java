@@ -4,10 +4,12 @@ import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
+import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,17 +37,32 @@ public class UserService {
     }
 
     @Transactional
-    public void registerFcmToken(Long userId, String fcmToken) {
+    public void registerFcmToken(Long userId, UserFcmTokenRequest request) {
         User user = getActiveUser(userId);
-        String normalizedToken = normalizeFcmToken(fcmToken);
+        String normalizedToken = normalizeRequired(fcmToken(request), "fcmToken은 비어 있을 수 없습니다");
+        String platform = normalizeOptional(request.getPlatform());
+        String deviceId = normalizeOptional(request.getDeviceId());
+        String appVersion = normalizeOptional(request.getAppVersion());
 
         UserDevice userDevice = userDeviceRepository.findByFcmToken(normalizedToken)
                 .orElseGet(() -> UserDevice.builder()
                         .fcmToken(normalizedToken)
+                        .platform(platform)
+                        .deviceId(deviceId)
+                        .appVersion(appVersion)
                         .build());
 
+        userDevice.updateRegistrationInfo(normalizedToken, platform, deviceId, appVersion);
         userDevice.assignUser(user);
         userDeviceRepository.save(userDevice);
+    }
+
+    @Transactional
+    public void unregisterFcmToken(Long userId, String fcmToken) {
+        getActiveUser(userId);
+        String normalizedToken = normalizeRequired(fcmToken, "fcmToken은 비어 있을 수 없습니다");
+        userDeviceRepository.findByUser_IdAndFcmToken(userId, normalizedToken)
+                .ifPresent(this::deleteUserDevice);
     }
 
     @Transactional
@@ -75,10 +92,23 @@ public class UserService {
                 .orElseThrow(() -> BusinessException.notFound("User not found"));
     }
 
-    private String normalizeFcmToken(String fcmToken) {
-        if (fcmToken == null || fcmToken.isBlank()) {
-            throw BusinessException.badRequest("fcmToken은 비어 있을 수 없습니다");
+    private void deleteUserDevice(UserDevice userDevice) {
+        userDevice.assignUser(null);
+        userDeviceRepository.delete(userDevice);
+    }
+
+    private String fcmToken(UserFcmTokenRequest request) {
+        return request == null ? null : request.getFcmToken();
+    }
+
+    private String normalizeRequired(String value, String message) {
+        if (!StringUtils.hasText(value)) {
+            throw BusinessException.badRequest(message);
         }
-        return fcmToken.trim();
+        return value.trim();
+    }
+
+    private String normalizeOptional(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }

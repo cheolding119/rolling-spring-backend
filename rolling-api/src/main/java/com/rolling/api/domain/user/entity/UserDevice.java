@@ -35,9 +35,21 @@ public class UserDevice extends BaseTimeEntity {
     @Column(name = "fcm_token", nullable = false, length = 512)
     private String fcmToken;
 
+    @Column(length = 30)
+    private String platform;
+
+    @Column(length = 255)
+    private String deviceId;
+
+    @Column(length = 50)
+    private String appVersion;
+
     @Builder
-    public UserDevice(User user, String fcmToken) {
+    public UserDevice(User user, String fcmToken, String platform, String deviceId, String appVersion) {
         this.fcmToken = fcmToken;
+        this.platform = platform;
+        this.deviceId = deviceId;
+        this.appVersion = appVersion;
         assignUser(user);
     }
 
@@ -55,5 +67,12 @@ public class UserDevice extends BaseTimeEntity {
         if (user != null) {
             user.linkDevice(this);
         }
+    }
+
+    public void updateRegistrationInfo(String fcmToken, String platform, String deviceId, String appVersion) {
+        this.fcmToken = fcmToken;
+        this.platform = platform;
+        this.deviceId = deviceId;
+        this.appVersion = appVersion;
     }
 }

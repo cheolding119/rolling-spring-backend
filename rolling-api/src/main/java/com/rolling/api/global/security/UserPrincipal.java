@@ -13,22 +13,31 @@ public class UserPrincipal implements UserDetails {
 
     private final Long userId;
     private final boolean admin;
+    private final boolean internalApi;
 
     public static UserPrincipal systemAdmin() {
-        return new UserPrincipal(-1L, true);
+        return new UserPrincipal(-1L, false, true);
     }
 
     public UserPrincipal(Long userId) {
-        this(userId, false);
+        this(userId, false, false);
     }
 
     public UserPrincipal(Long userId, boolean admin) {
+        this(userId, admin, false);
+    }
+
+    public UserPrincipal(Long userId, boolean admin, boolean internalApi) {
         this.userId = userId;
         this.admin = admin;
+        this.internalApi = internalApi;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (internalApi) {
+            return List.of(new SimpleGrantedAuthority("ROLE_INTERNAL_API"));
+        }
         if (admin) {
             return List.of(
                     new SimpleGrantedAuthority("ROLE_USER"),

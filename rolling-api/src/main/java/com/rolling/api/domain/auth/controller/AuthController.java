@@ -6,6 +6,8 @@ import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
 import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.service.AuthService;
+import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
+import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,7 +63,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "로그아웃", description = "Refresh Token을 무효화합니다. Authorization 헤더에 Bearer Access Token이 필요합니다.")
+    @Operation(summary = "로그아웃", description = "Refresh Token을 무효화합니다. 요청 본문에 현재 디바이스 FCM 토큰을 함께 보내면 해당 토큰도 제거합니다. Authorization 헤더에 Bearer Access Token이 필요합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공"),
@@ -69,8 +71,10 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal UserPrincipal principal) {
-        authService.logout(principal.getUserId());
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody(required = false) UserFcmTokenRequest request) {
+        authService.logout(requireUserId(principal), request == null ? null : request.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -83,7 +87,7 @@ public class AuthController {
     })
     @DeleteMapping("/withdraw")
     public ResponseEntity<ApiResponse<WithdrawStatusResponse>> withdraw(@AuthenticationPrincipal UserPrincipal principal) {
-        WithdrawStatusResponse response = authService.withdraw(principal.getUserId());
+        WithdrawStatusResponse response = authService.withdraw(requireUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -98,7 +102,14 @@ public class AuthController {
     })
     @PostMapping("/withdraw/cancel")
     public ResponseEntity<ApiResponse<WithdrawStatusResponse>> cancelWithdraw(@AuthenticationPrincipal UserPrincipal principal) {
-        WithdrawStatusResponse response = authService.cancelWithdraw(principal.getUserId());
+        WithdrawStatusResponse response = authService.cancelWithdraw(requireUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    private Long requireUserId(UserPrincipal principal) {
+        if (principal == null) {
+            throw new AuthException("UNAUTHORIZED", "인증이 필요합니다");
+        }
+        return principal.getUserId();
     }
 }
