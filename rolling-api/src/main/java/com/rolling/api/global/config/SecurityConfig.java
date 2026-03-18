@@ -52,7 +52,7 @@ public class SecurityConfig {
                     ).permitAll();
 
                     // 수동 대회 크롤링은 관리자만 실행 가능
-                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("INTERNAL_API");
 
                     // 내 신청 목록은 인증 필요 (/{id} 공개 조회 규칙과 충돌 방지)
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my").authenticated();
@@ -64,6 +64,12 @@ public class SecurityConfig {
                     }
                     // 대회 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments", "/api/v1/tournaments/{id}").permitAll();
+                    // 공지사항 조회는 비로그인 허용
+                    auth.requestMatchers(HttpMethod.GET, "/api/v1/notices", "/api/v1/notices/{id}").permitAll();
+                    // 공지사항 운영 API는 관리자만 실행 가능
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
+                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
                     // 나머지는 모두 인증 필요
                     auth.anyRequest().authenticated();
                 })

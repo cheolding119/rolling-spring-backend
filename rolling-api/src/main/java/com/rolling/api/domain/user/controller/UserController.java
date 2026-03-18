@@ -78,7 +78,25 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> registerFcmToken(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UserFcmTokenRequest request) {
-        userService.registerFcmToken(requireUserId(principal), request.getFcmToken());
+        userService.registerFcmToken(requireUserId(principal), request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
+            summary = "FCM 토큰 삭제",
+            description = "현재 로그인한 사용자에게 연결된 현재 디바이스 FCM 토큰을 제거합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @DeleteMapping("/me/fcm")
+    public ResponseEntity<ApiResponse<Void>> unregisterFcmToken(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody UserFcmTokenRequest request) {
+        userService.unregisterFcmToken(requireUserId(principal), request.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

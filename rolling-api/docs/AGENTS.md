@@ -76,6 +76,15 @@
 | `VALIDATION_ERROR` | 400 | 요청 데이터 유효성 검증 실패 |
 | `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
 
+### 0.5 공지사항 기능 상태
+
+- 제품 목표: 앱에서 공지사항 목록과 상세를 조회할 수 있어야 한다.
+- 현재 서버 구현: `GET /api/v1/notices`, `GET /api/v1/notices/{id}` 조회 API와 운영 `POST/PUT/DELETE /api/v1/notices` API를 지원한다.
+- 현재 앱/프론트 범위: 공지사항 작성 화면은 만들지 않고 조회 화면만 고려한다.
+- 운영 작성 방식: 운영자는 Apidog에서 `X-Crawler-Admin-Key` 헤더로 공지사항을 작성/수정/삭제한다.
+- 현재 운영 호출 정책: 크롤링 수동 실행과 공지사항 운영 API는 임시로 `Bearer accessToken` 없이 `X-Crawler-Admin-Key`만으로 호출한다.
+- 일반 사용자 앱 관점에서는 계속 `조회 전용` 범위로 이해한다.
+
 ## 1. Enum 정의
 
 ### SocialProvider
@@ -224,7 +233,11 @@ enum NotificationType {
 | `id` | `int` | 사용자 디바이스 고유 ID | PK |
 | `userId` | `int` | 소유 사용자 ID | FK |
 | `fcmToken` | `String` | 디바이스 FCM 토큰 | Unique |
-| `createdAt` | `DateTime` | 등록 일시 | |
+| `platform` | `String?` | 디바이스 플랫폼 | 예: `ANDROID`, `IOS` |
+| `deviceId` | `String?` | 앱이 관리하는 디바이스 식별자 | optional |
+| `appVersion` | `String?` | 등록 시점 앱 버전 | optional |
+| `createdAt` | `DateTime` | 최초 등록 일시 | |
+| `updatedAt` | `DateTime` | 마지막 토큰 등록/갱신 일시 | |
 
 ### 2.3 OpenMat
 
@@ -306,6 +319,33 @@ enum NotificationType {
 | `readAt` | `DateTime?` | 읽음 처리 일시 | `null`이면 미읽음 |
 | `createdAt` | `DateTime` | 알림 생성 일시 | 최신순 정렬 기준 |
 
+### 2.7 Notice
+
+도메인 네임: `NoticeModel`
+
+| 필드명 | 타입 | 설명 | 비고 |
+| --- | --- | --- | --- |
+| `id` | `int` | 공지사항 고유 ID | PK |
+| `title` | `String` | 공지사항 제목 | 리스트/상세 공통 |
+| `content` | `String` | 공지사항 본문 | 리스트/상세 공통 |
+| `authorName` | `String` | 작성 관리자 이름 | 프론트 노출용 |
+| `createdAt` | `DateTime` | 작성 일시 | 최신순 정렬 기준 |
+| `updatedAt` | `DateTime` | 마지막 수정 일시 | 상세/운영 응답에서 사용 |
+
+프론트 구현 메모:
+
+- 현재 목표 계약은 목록 응답 item과 상세 응답 모두 위 필드를 동일하게 사용한다.
+- 목록 화면에서 본문 전체를 그대로 노출할지, 일부만 잘라서 노출할지는 프론트 UI에서 결정한다.
+- 현재 구현 기준으로 목록 응답에는 `updatedAt`만 제외되고 나머지 필드는 포함된다.
+- 작성자 표기가 필요하면 응답의 `authorName`을 그대로 사용한다.
+- 작성/수정/삭제 UI는 앱 범위 밖이며, 일반 사용자 앱에서는 조회만 고려한다.
+
+백엔드 내부 개념 메모:
+
+- 운영 작성자 추적용 내부 필드는 `createdBy`로 관리한다.
+- 운영 생성 시 `createdBy`를 생략하면 `authorName` 값을 그대로 저장한다.
+- 일반 사용자 앱 응답에는 내부 식별자 대신 `authorName`만 노출하는 방향을 기본 계약으로 본다.
+
 ## 3. 프로젝트/기능 규칙
 
 ### 3.1 프로젝트 정의
@@ -344,6 +384,9 @@ enum NotificationType {
 - 오픈매트 수정/삭제 이벤트 발생 시 알림 레코드를 먼저 저장하고 그 다음 FCM 발송을 시도한다.
 - 읽음 여부는 `isRead`가 아니라 `readAt == null` 여부로 판단한다.
 - 현재 알림 클릭 규칙은 `route` 우선이다.
+- `withdrawalPending = true` 사용자는 FCM 발송 대상에서 제외한다.
+- 로그아웃 시 현재 디바이스 토큰은 `POST /api/v1/auth/logout` 요청 본문 또는 `DELETE /api/v1/users/me/fcm`로 제거한다.
+- FCM 발송 실패 시 서버는 자동 재시도하지 않는다. `UNREGISTERED`, `INVALID_ARGUMENT`는 토큰 정리 대상으로 처리하고, 그 외 오류는 로그 후 예외로 남긴다.
 
 알림 클릭 규칙:
 
@@ -357,6 +400,16 @@ enum NotificationType {
 - 알림 클릭 시 `PATCH /api/v1/notifications/{id}/read` 호출
 - 읽음 처리 API는 idempotent
 - `OPEN_MAT_UPDATED` 상세 재조회가 `404 NOT_FOUND`면 `/openmat` fallback
+
+### 3.6 공지사항 핵심 규칙
+
+- 공지사항은 일반 사용자 앱에서 `읽기 전용` 기능으로 다룬다.
+- 앱에서 필요한 화면은 `목록 페이지`와 `상세 페이지` 두 가지다.
+- 목록은 페이징 조회를 기준으로 하고, 기본 정렬은 최신 작성일(`createdAt DESC`)이다.
+- 상세는 `id`로 단건 조회한다.
+- 운영 작성/수정/삭제는 일반 앱 인증 플로우가 아니라 `X-Crawler-Admin-Key` 기반 운영 호출로 분리한다.
+- 운영 삭제 정책은 soft delete가 아니라 `hard delete`다.
+- 프론트는 공지사항 작성/수정/삭제 버튼이나 화면을 전제로 구현하지 않는다.
 
 ## 4. 프론트엔드 구현 원칙
 
@@ -378,6 +431,9 @@ enum NotificationType {
 - `OpenMatModel.reported`는 서버 응답 필드 그대로 신뢰한다.
 - `NotificationModel.readAt == null`이면 미읽음이다.
 - 로그인 버튼/UI는 `GOOGLE`, `KAKAO`, `APPLE` 3개 기준으로 설계하되, 서버 호출 가능 여부는 구현 상태를 따른다.
+- 공지사항은 별도 작성 플로우 없이 `목록 -> 상세` 읽기 흐름만 잡으면 된다.
+- 공지사항 목록 item은 `id`, `title`, `content`, `authorName`, `createdAt`를 사용한다.
+- 공지사항 상세는 같은 필드를 그대로 사용해 상세 페이지를 구성하면 된다.
 
 ### 4.3 프론트 주의사항
 
@@ -457,7 +513,19 @@ Response data:
 `POST /api/v1/auth/logout`
 
 - 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `fcmToken` | `String` | - | 현재 디바이스 토큰을 함께 제거할 때 전달 |
+
 - Response data: `null`
+
+현재 구현 메모:
+
+- 요청 본문에 `fcmToken`을 보내면 현재 사용자에게 연결된 해당 디바이스 토큰도 같이 제거한다.
+- `fcmToken` 없이 호출하면 Refresh Token만 무효화한다.
 
 ### 5.1.4 회원 탈퇴 요청
 
@@ -544,6 +612,9 @@ Request body:
 | 필드 | 타입 | 필수 |
 | --- | --- | --- |
 | `fcmToken` | `String` | O |
+| `platform` | `String` | - |
+| `deviceId` | `String` | - |
+| `appVersion` | `String` | - |
 
 Response data: `null`
 
@@ -551,15 +622,35 @@ Response data: `null`
 
 - 토큰 저장 구조는 `user_devices` 1:N 이다.
 - 동일 토큰 재등록 시 기존 디바이스 레코드를 재사용한다.
+- 동일 토큰 재등록 시 `platform`, `deviceId`, `appVersion`, `updatedAt`도 최신값으로 갱신한다.
 
-### 5.2.4 사용자 차단
+### 5.2.4 FCM 토큰 삭제
+
+`DELETE /api/v1/users/me/fcm`
+
+- 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 |
+| --- | --- | --- |
+| `fcmToken` | `String` | O |
+
+Response data: `null`
+
+현재 구현 메모:
+
+- 현재 로그인한 사용자에게 연결된 토큰만 삭제한다.
+- 존재하지 않는 토큰이어도 성공 응답을 반환한다.
+
+### 5.2.5 사용자 차단
 
 `POST /api/v1/users/{id}/block`
 
 - 인증: 필요
 - Response data: `null`
 
-### 5.2.5 사용자 차단 해제
+### 5.2.6 사용자 차단 해제
 
 `DELETE /api/v1/users/{id}/block`
 
@@ -838,7 +929,7 @@ Response: `TournamentModel`
 
 `POST /api/v1/tournaments/crawl`
 
-- 인증: 관리자만 가능
+- 인증: 운영 `X-Crawler-Admin-Key` 필요
 
 Query parameters:
 
@@ -860,6 +951,118 @@ Response data:
 - 관리자 userId 목록: `admin.user-ids`
 - 운영용 우회 헤더: `X-Crawler-Admin-Key`
 - 운영 키 설정: `tournament.crawler.admin-key`
+- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+
+## 5.6 공지사항 API
+
+구현 상태 메모:
+
+- 현재 서버는 조회 API(`GET /api/v1/notices`, `GET /api/v1/notices/{id}`)와 운영 API(`POST/PUT/DELETE /api/v1/notices`)를 지원한다.
+- 앱 범위에서는 계속 조회 API만 사용한다.
+- 운영자는 Apidog에서 `X-Crawler-Admin-Key` 헤더로 공지사항 작성/수정/삭제를 수행한다.
+- 운영 인증 키는 대회 크롤링 운영 호출과 같은 `tournament.crawler.admin-key` 설정값을 재사용한다.
+
+### 5.6.1 공지사항 목록 조회
+
+`GET /api/v1/notices`
+
+- 인증: 불필요
+
+Query parameters:
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `page` | `Integer` | `0` | 페이지 번호 |
+| `size` | `Integer` | `20` | 페이지 크기 |
+
+기본 정렬:
+
+- `createdAt DESC`
+
+Response: 페이징된 `NoticeModel`
+
+프론트 메모:
+
+- 목록 item에 `content`가 포함되어도 된다.
+- 현재 구현 기준으로 목록 item에는 `updatedAt`이 포함되지 않는다.
+- 앱에서는 목록에서 본문 일부만 잘라 보여줘도 되고, 상세에서는 전체 본문을 보여주면 된다.
+
+### 5.6.2 공지사항 상세 조회
+
+`GET /api/v1/notices/{id}`
+
+- 인증: 불필요
+- Response: `NoticeModel`
+
+에러:
+
+- `NOT_FOUND`
+
+### 5.6.3 공지사항 생성
+
+`POST /api/v1/notices`
+
+- 인증: 운영 `X-Crawler-Admin-Key` 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `title` | `String` | O | 공지사항 제목 |
+| `content` | `String` | O | 공지사항 본문 |
+| `authorName` | `String` | O | 앱에 노출할 작성자 이름 |
+| `createdBy` | `String` | - | 운영 내부 추적용 작성자 식별자 |
+
+Response: `NoticeModel`
+
+현재 구현 메모:
+
+- `createdBy`가 없으면 `authorName` 값을 그대로 저장한다.
+- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+
+### 5.6.4 공지사항 수정
+
+`PUT /api/v1/notices/{id}`
+
+- 인증: 운영 `X-Crawler-Admin-Key` 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `title` | `String` | - | 공지사항 제목 |
+| `content` | `String` | - | 공지사항 본문 |
+| `authorName` | `String` | - | 앱에 노출할 작성자 이름 |
+| `createdBy` | `String` | - | 운영 내부 추적용 작성자 식별자 |
+
+Response: `NoticeModel`
+
+현재 구현 메모:
+
+- 최소 1개 필드는 전달해야 한다.
+- 전달하지 않은 필드는 기존 값을 유지한다.
+- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+
+에러:
+
+- `VALIDATION_ERROR`
+- `NOT_FOUND`
+
+### 5.6.5 공지사항 삭제
+
+`DELETE /api/v1/notices/{id}`
+
+- 인증: 운영 `X-Crawler-Admin-Key` 필요
+- Response data: `null`
+
+현재 구현 메모:
+
+- 삭제는 soft delete가 아니라 `hard delete`다.
+- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+
+에러:
+
+- `NOT_FOUND`
 
 ## 6. 날짜/시간 형식
 
@@ -867,3 +1070,8 @@ Response data:
 | --- | --- | --- |
 | `DateTime` | ISO 8601 | `2026-03-17T21:00:00` |
 | `Date` | ISO 8601 | `2026-03-17` |
+
+## 7. 변경 이력
+
+- 2026-03-18: `B-16` 반영. `POST /api/v1/users/me/fcm`에 `platform`, `deviceId`, `appVersion` 계약 추가, `DELETE /api/v1/users/me/fcm` 추가, `POST /api/v1/auth/logout`에 선택적 `fcmToken` 요청 본문 계약 추가, `withdrawalPending=true` 사용자는 FCM 발송 대상에서 제외하도록 정책 명시.
+- 2026-03-18: `B-17` 진행. `FirebaseApp` 초기화 스모크 테스트 추가, FCM 실패 로그에 `errorCode`/`retryPolicy`/토큰 정리 여부를 남기도록 보강, 자동 재시도 안 함 정책과 payload 계약 회귀 테스트 기준 문서화.

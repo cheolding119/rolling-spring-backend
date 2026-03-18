@@ -40,7 +40,7 @@
 - `lib/core/services/api_service.dart`
 - `android/app/src/main/AndroidManifest.xml`
 - `lib/firebase_options.dart`
-- `docs/AGENTS.md`의 `POST /api/v1/users/me/fcm` 명세
+- `docs/AGENTS.md`의 `POST/DELETE /api/v1/users/me/fcm` 명세
 
 ## 지금 바로 내가 해야 할 것
 
@@ -111,9 +111,9 @@
 - [x] 사용자-디바이스 1:N 기준 토큰 저장 처리
 - [x] 동일 토큰 중복 저장 방지
 - [x] 동일 토큰 재등록 시 기존 디바이스 레코드 재사용 및 현재 사용자에게 재연결
-- [ ] 필요하면 `platform`, `deviceId`, `appVersion`, `updatedAt` 함께 저장
-- [ ] 로그아웃 시 토큰 비활성화 정책 결정
-- [ ] 필요하면 `DELETE /api/v1/users/me/fcm` 또는 비활성화 API 추가
+- [x] `platform`, `deviceId`, `appVersion`, `updatedAt` 함께 저장
+- [x] 로그아웃 시 현재 디바이스 토큰 삭제 정책 결정
+- [x] `DELETE /api/v1/users/me/fcm` API 추가
 
 ### 3. 추천 서버 구조
 
@@ -148,7 +148,7 @@
 ### 6. 백엔드 검증
 
 - [x] 토큰 등록 서비스 테스트 작성
-- [ ] Firebase Admin 초기화 테스트 또는 스모크 테스트 작성
+- [x] Firebase Admin 초기화 테스트 또는 스모크 테스트 작성
 - [x] 잘못된 토큰 정리 테스트 작성
 - [x] 오픈매트 수정/삭제 이벤트 테스트 작성
 - [x] 실제 Android 디바이스 대상 테스트 발송 확인
@@ -163,7 +163,7 @@
 - [x] 알림 `type` 값 목록 정의
 - [x] 알림 payload 예시 정의
 - [x] 어떤 이벤트에서 어떤 푸시를 보낼지 MVP 도메인 정책 1차 정리
-- [ ] 로그아웃/탈퇴 시 토큰 처리 정책 정리
+- [x] 로그아웃/탈퇴 시 토큰 처리 정책 정리
 - [x] 토큰 저장 단위를 `device 기준`으로 확정
 
 ## 권장 payload 규칙
@@ -223,13 +223,34 @@
 - [x] 앱이 포그라운드/백그라운드/종료 상태에서 모두 의도한 동작을 한다.
 - [x] 필요 시 앱 내 알림 목록과 푸시 알림이 일관되게 동작한다.
 
+## 릴리스 검증 매트릭스
+
+| 플랫폼 | 앱 상태 | 권한 상태 | 푸시 수신 | 알림 탭 라우팅 | 비고 |
+| --- | --- | --- | --- | --- | --- |
+| Android | foreground | 허용 | pending | pending | 수동 검증 필요 |
+| Android | background | 허용 | pending | pending | 수동 검증 필요 |
+| Android | terminated | 허용 | pending | pending | 수동 검증 필요 |
+| Android | foreground/background/terminated | 거부 | pending | n/a | 핵심 기능 사용 가능 여부 수동 확인 필요 |
+| iOS | foreground | 허용 | pending | pending | APNs/Xcode 설정 후 실기기 검증 필요 |
+| iOS | background | 허용 | pending | pending | APNs/Xcode 설정 후 실기기 검증 필요 |
+| iOS | terminated | 허용 | pending | pending | APNs/Xcode 설정 후 실기기 검증 필요 |
+
+## 운영 메모
+
+- 현재 FCM 발송 실패 시 서버는 자동 재시도하지 않는다.
+- `UNREGISTERED`, `INVALID_ARGUMENT`는 토큰 정리 대상으로 처리한다.
+- 그 외 FCM 오류는 `errorCode`, `retryPolicy`, `tokenPrefix`를 포함한 로그로 남기고 예외로 종료한다.
+- 알림 payload 계약 회귀 테스트는 `route`, `targetId` 필수 검증 기준으로 유지한다.
+
 ## 비고
 
 - 현재 백엔드는 `POST /api/v1/users/me/fcm`와 `UserDevice` 1:N 저장 구조를 구현했다.
+- 현재 백엔드는 `DELETE /api/v1/users/me/fcm`를 구현했고, 로그아웃 시 `POST /api/v1/auth/logout` 본문에 `fcmToken`을 함께 보내면 현재 디바이스 토큰도 제거할 수 있다.
 - 현재 백엔드는 `Notification` 저장 구조와 `GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`를 구현했다.
 - Firebase Admin SDK, `FirebaseAdminConfig`, `PushNotificationService`, 오픈매트 수정/삭제 푸시 이벤트 연결이 구현되어 있다.
 - 토큰은 `users` 단일 컬럼이 아니라 `user_devices` 기준으로 저장된다.
 - 같은 사용자가 여러 휴대폰을 쓰면 여러 FCM 토큰을 각각 연결할 수 있다.
+- `withdrawalPending = true` 사용자는 FCM 발송 대상에서 제외되고, 최종 탈퇴 실행 시 `user_devices`가 삭제된다.
 - 서버는 `FIREBASE_ENABLED`, `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` 또는 ADC(`GOOGLE_APPLICATION_CREDENTIALS`)로 Firebase 인증을 구성한다.
 - iOS 쪽은 Windows에서 FlutterFire 설정만으로 완결되지 않으므로 macOS에서 최종 반영이 필요하다.
 - FCM은 전달 채널이고, 사용자용 알림함은 `Notification` 저장 구조로 별도 관리된다.

@@ -34,4 +34,14 @@ class AdminAccessConfigTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("admin.user-ids");
     }
+
+    @Test
+    @DisplayName("운영 admin key는 공백을 제거해 비교한다")
+    void matchesAdminApiKey() {
+        AdminAccessConfig config = new AdminAccessConfig("1,2", " notice-secret ");
+
+        assertThat(config.matchesAdminApiKey("notice-secret")).isTrue();
+        assertThat(config.matchesAdminApiKey(" notice-secret ")).isTrue();
+        assertThat(config.matchesAdminApiKey("wrong-secret")).isFalse();
+    }
 }

@@ -29,8 +29,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -75,7 +77,7 @@ class FcmPushNotificationServiceTest {
                 .fcmToken("token-2")
                 .build();
 
-        when(userDeviceRepository.findAllByUser_IdIn(List.of(1L, 2L)))
+        when(userDeviceRepository.findPushTargetDevicesByUserIds(List.of(1L, 2L)))
                 .thenReturn(List.of(firstDevice, duplicateDevice, secondDevice));
 
         BatchResponse batchResponse = mock(BatchResponse.class);
@@ -141,6 +143,39 @@ class FcmPushNotificationServiceTest {
         assertThat(aps).containsEntry("sound", "default");
 
         verify(userDeviceRepository).deleteAllByFcmTokenIn(java.util.Set.of("token-2"));
+    }
+
+    @Test
+    @DisplayName("FCM 배치 전송 예외가 발생하면 자동 재시도 없이 예외를 그대로 올린다")
+    void sendToUsers_whenBatchSendFails_throwsWithoutRetry() throws Exception {
+        User firstUser = createUser(1L, "user-1");
+        UserDevice firstDevice = UserDevice.builder()
+                .user(firstUser)
+                .fcmToken("token-1")
+                .build();
+
+        FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+
+        when(userDeviceRepository.findPushTargetDevicesByUserIds(List.of(1L)))
+                .thenReturn(List.of(firstDevice));
+        when(firebaseMessaging.sendEachForMulticast(any(MulticastMessage.class))).thenThrow(exception);
+        when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.INTERNAL);
+
+        assertThatThrownBy(() -> fcmPushNotificationService.sendToUsers(
+                List.of(1L),
+                new PushNotificationCommand(
+                        PushNotificationType.OPEN_MAT_UPDATED,
+                        "오픈매트 일정이 변경되었습니다",
+                        "테스트 알림입니다.",
+                        99L,
+                        Map.of("route", "/openmat/detail")
+                )
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("FCM push send failed");
+
+        verify(firebaseMessaging).sendEachForMulticast(any(MulticastMessage.class));
+        verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
     }
 
     private User createUser(Long id, String socialId) {

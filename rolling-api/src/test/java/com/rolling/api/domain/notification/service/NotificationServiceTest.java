@@ -168,6 +168,38 @@ class NotificationServiceTest {
                 .hasMessage("알림을 찾을 수 없습니다");
     }
 
+    @Test
+    @DisplayName("알림함 저장은 route가 없으면 실패한다")
+    void saveNotificationsForUsers_withoutRoute_throwsValidationError() {
+        PushNotificationCommand command = new PushNotificationCommand(
+                PushNotificationType.OPEN_MAT_UPDATED,
+                "오픈매트 일정이 변경되었습니다",
+                "본문",
+                11L,
+                Map.of()
+        );
+
+        assertThatThrownBy(() -> notificationService.saveNotificationsForUsers(List.of(2L), command))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("알림 route는 비어 있을 수 없습니다");
+    }
+
+    @Test
+    @DisplayName("알림함 저장은 targetId가 없으면 실패한다")
+    void saveNotificationsForUsers_withoutTargetId_throwsValidationError() {
+        PushNotificationCommand command = new PushNotificationCommand(
+                PushNotificationType.OPEN_MAT_UPDATED,
+                "오픈매트 일정이 변경되었습니다",
+                "본문",
+                null,
+                Map.of("route", "/openmat/detail")
+        );
+
+        assertThatThrownBy(() -> notificationService.saveNotificationsForUsers(List.of(2L), command))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("알림 targetId는 비어 있을 수 없습니다");
+    }
+
     private User createUser(Long id, String socialId) {
         User user = User.builder()
                 .socialId(socialId)

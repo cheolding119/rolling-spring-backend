@@ -33,6 +33,7 @@ public class FcmPushNotificationService implements PushNotificationService {
     private static final int MAX_MULTICAST_SIZE = 500;
     private static final int TOKEN_PREFIX_LENGTH = 12;
     private static final String DEFAULT_SOUND = "default";
+    private static final String RETRY_POLICY = "NO_RETRY_AUTOMATIC";
 
     private final FirebaseMessaging firebaseMessaging;
     private final UserDeviceRepository userDeviceRepository;
@@ -46,7 +47,7 @@ public class FcmPushNotificationService implements PushNotificationService {
             return;
         }
 
-        List<UserDevice> userDevices = userDeviceRepository.findAllByUser_IdIn(normalizedUserIds);
+        List<UserDevice> userDevices = userDeviceRepository.findPushTargetDevicesByUserIds(normalizedUserIds);
         List<String> tokens = userDevices.stream()
                 .map(UserDevice::getFcmToken)
                 .filter(StringUtils::hasText)
@@ -79,16 +80,26 @@ public class FcmPushNotificationService implements PushNotificationService {
             try {
                 BatchResponse response = firebaseMessaging.sendEachForMulticast(buildMessage(batch, command, data));
 
-                collectInvalidTokens(batch, response.getResponses(), invalidTokens);
+                collectInvalidTokens(command, batch, response.getResponses(), invalidTokens);
                 log.info(
-                        "Sent push notification. type={}, tokenCount={}, successCount={}, failureCount={}, tokenPrefixes={}",
+                        "Sent push notification. type={}, tokenCount={}, successCount={}, failureCount={}, tokenPrefixes={}, retryPolicy={}",
                         command.type(),
                         batch.size(),
                         response.getSuccessCount(),
                         response.getFailureCount(),
-                        summarizeTokens(batch)
+                        summarizeTokens(batch),
+                        RETRY_POLICY
                 );
             } catch (FirebaseMessagingException exception) {
+                log.error(
+                        "FCM batch send failed. type={}, tokenCount={}, tokenPrefixes={}, errorCode={}, retryPolicy={}",
+                        command.type(),
+                        batch.size(),
+                        summarizeTokens(batch),
+                        exception.getMessagingErrorCode(),
+                        RETRY_POLICY,
+                        exception
+                );
                 throw new IllegalStateException("FCM push send failed", exception);
             }
         }
@@ -163,7 +174,12 @@ public class FcmPushNotificationService implements PushNotificationService {
         return data;
     }
 
-    private void collectInvalidTokens(List<String> tokens, List<SendResponse> responses, List<String> invalidTokens) {
+    private void collectInvalidTokens(
+            PushNotificationCommand command,
+            List<String> tokens,
+            List<SendResponse> responses,
+            List<String> invalidTokens
+    ) {
         for (int i = 0; i < Math.min(tokens.size(), responses.size()); i++) {
             SendResponse response = responses.get(i);
             if (response.isSuccessful()) {
@@ -172,14 +188,35 @@ public class FcmPushNotificationService implements PushNotificationService {
 
             FirebaseMessagingException exception = response.getException();
             if (exception == null || exception.getMessagingErrorCode() == null) {
+                log.warn(
+                        "FCM token send failed without error code. type={}, tokenPrefix={}, retryPolicy={}",
+                        command.type(),
+                        summarizeToken(tokens.get(i)),
+                        RETRY_POLICY
+                );
                 continue;
             }
 
             MessagingErrorCode errorCode = exception.getMessagingErrorCode();
-            if (errorCode == MessagingErrorCode.UNREGISTERED || errorCode == MessagingErrorCode.INVALID_ARGUMENT) {
+            boolean cleanupTarget = isInvalidTokenError(errorCode);
+
+            log.warn(
+                    "FCM token send failed. type={}, tokenPrefix={}, errorCode={}, cleanupTarget={}, retryPolicy={}",
+                    command.type(),
+                    summarizeToken(tokens.get(i)),
+                    errorCode,
+                    cleanupTarget,
+                    RETRY_POLICY
+            );
+
+            if (cleanupTarget) {
                 invalidTokens.add(tokens.get(i));
             }
         }
+    }
+
+    private boolean isInvalidTokenError(MessagingErrorCode errorCode) {
+        return errorCode == MessagingErrorCode.UNREGISTERED || errorCode == MessagingErrorCode.INVALID_ARGUMENT;
     }
 
     private List<String> summarizeTokens(Collection<String> tokens) {

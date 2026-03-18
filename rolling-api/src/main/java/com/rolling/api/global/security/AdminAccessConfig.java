@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 public class AdminAccessConfig {
 
     private final Set<Long> adminUserIds;
-    private final String tournamentCrawlerAdminKey;
+    private final String adminApiKey;
 
     public AdminAccessConfig(String adminUserIdsProperty) {
         this(adminUserIdsProperty, "");
@@ -21,19 +21,19 @@ public class AdminAccessConfig {
     @Autowired
     public AdminAccessConfig(
             @Value("${admin.user-ids:}") String adminUserIdsProperty,
-            @Value("${tournament.crawler.admin-key:}") String tournamentCrawlerAdminKey
+            @Value("${tournament.crawler.admin-key:}") String adminApiKey
     ) {
         this.adminUserIds = parseAdminUserIds(adminUserIdsProperty);
-        this.tournamentCrawlerAdminKey = normalizeSecret(tournamentCrawlerAdminKey);
+        this.adminApiKey = normalizeSecret(adminApiKey);
     }
 
     public boolean isAdmin(Long userId) {
         return userId != null && adminUserIds.contains(userId);
     }
 
-    public boolean matchesCrawlerAdminKey(String value) {
+    public boolean matchesAdminApiKey(String value) {
         String normalized = normalizeSecret(value);
-        return tournamentCrawlerAdminKey != null && tournamentCrawlerAdminKey.equals(normalized);
+        return adminApiKey != null && adminApiKey.equals(normalized);
     }
 
     private Set<Long> parseAdminUserIds(String adminUserIdsProperty) {

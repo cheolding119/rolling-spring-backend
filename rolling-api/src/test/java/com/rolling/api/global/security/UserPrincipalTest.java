@@ -26,4 +26,14 @@ class UserPrincipalTest {
                 .extracting("authority")
                 .containsExactly("ROLE_USER");
     }
+
+    @Test
+    @DisplayName("운영 admin key 인증 사용자는 ROLE_INTERNAL_API 권한만 가진다")
+    void systemAdminHasInternalApiAuthorityOnly() {
+        UserPrincipal principal = UserPrincipal.systemAdmin();
+
+        assertThat(principal.getAuthorities())
+                .extracting("authority")
+                .containsExactly("ROLE_INTERNAL_API");
+    }
 }

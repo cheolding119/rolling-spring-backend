@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -154,7 +155,10 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(Long userId) {
+    public void logout(Long userId, String fcmToken) {
+        if (StringUtils.hasText(fcmToken)) {
+            removeUserDeviceToken(userId, fcmToken.trim());
+        }
         refreshTokenRepository.deleteByUserId(userId);
         log.info("Logout success - userId: {}", userId);
     }
@@ -251,6 +255,24 @@ public class AuthService {
 
     private LocalDateTime nowInWithdrawZone() {
         return ZonedDateTime.now(WITHDRAW_ZONE).toLocalDateTime();
+    }
+
+    private void removeUserDeviceToken(Long userId, String fcmToken) {
+        userDeviceRepository.findByUser_IdAndFcmToken(userId, fcmToken)
+                .ifPresent(userDevice -> {
+                    userDevice.assignUser(null);
+                    userDeviceRepository.delete(userDevice);
+                    log.info("Removed FCM token during auth lifecycle. userId={}, tokenPrefix={}", userId, summarizeToken(fcmToken));
+                });
+    }
+
+    private String summarizeToken(String token) {
+        if (!StringUtils.hasText(token)) {
+            return "<blank>";
+        }
+
+        int prefixLength = Math.min(12, token.length());
+        return token.substring(0, prefixLength) + (token.length() > prefixLength ? "..." : "");
     }
 
     private User findOrCreateUser(String socialId, SocialProvider provider, String nickname, String email, boolean[] isNewUser) {

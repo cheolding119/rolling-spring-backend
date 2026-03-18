@@ -1,6 +1,7 @@
 package com.rolling.api.domain.user.service;
 
 import com.rolling.api.domain.user.dto.UserResponse;
+import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -121,11 +122,14 @@ class UserServiceTest {
         when(userDeviceRepository.findByFcmToken("fcm-token-123")).thenReturn(Optional.empty());
         when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        userService.registerFcmToken(4L, "fcm-token-123");
+        userService.registerFcmToken(4L, createFcmRequest("fcm-token-123", "ANDROID", "device-1", "1.0.0"));
 
         assertThat(user.getDevices()).hasSize(1);
         assertThat(user.getDevices().get(0).getUser()).isEqualTo(user);
         assertThat(user.getDevices().get(0).getFcmToken()).isEqualTo("fcm-token-123");
+        assertThat(user.getDevices().get(0).getPlatform()).isEqualTo("ANDROID");
+        assertThat(user.getDevices().get(0).getDeviceId()).isEqualTo("device-1");
+        assertThat(user.getDevices().get(0).getAppVersion()).isEqualTo("1.0.0");
         assertThat(user.getFcmToken()).isEqualTo("fcm-token-123");
         verify(userDeviceRepository).save(any(UserDevice.class));
     }
@@ -147,8 +151,8 @@ class UserServiceTest {
         when(userDeviceRepository.findByFcmToken("fcm-token-2")).thenReturn(Optional.empty());
         when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        userService.registerFcmToken(44L, "fcm-token-1");
-        userService.registerFcmToken(44L, "fcm-token-2");
+        userService.registerFcmToken(44L, createFcmRequest("fcm-token-1", "ANDROID", "device-1", "1.0.0"));
+        userService.registerFcmToken(44L, createFcmRequest("fcm-token-2", "ANDROID", "device-2", "1.0.0"));
 
         assertThat(user.getDevices()).hasSize(2);
         assertThat(user.getDevices()).extracting(UserDevice::getFcmToken)
@@ -185,11 +189,63 @@ class UserServiceTest {
         when(userDeviceRepository.findByFcmToken("shared-token")).thenReturn(Optional.of(existingDevice));
         when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        userService.registerFcmToken(41L, "shared-token");
+        userService.registerFcmToken(41L, createFcmRequest("shared-token", "IOS", "device-shared", "2.0.0"));
 
         assertThat(existingDevice.getUser()).isEqualTo(currentUser);
         assertThat(previousUser.getDevices()).isEmpty();
         assertThat(currentUser.getDevices()).containsExactly(existingDevice);
+        assertThat(existingDevice.getPlatform()).isEqualTo("IOS");
+        assertThat(existingDevice.getDeviceId()).isEqualTo("device-shared");
+        assertThat(existingDevice.getAppVersion()).isEqualTo("2.0.0");
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 삭제 시 현재 사용자에게 연결된 디바이스만 제거한다")
+    void unregisterFcmToken_deletesCurrentUserDevice() {
+        User user = User.builder()
+                .socialId("social-8")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("push-user")
+                .email("user8@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 8L);
+
+        UserDevice userDevice = UserDevice.builder()
+                .user(user)
+                .fcmToken("remove-token")
+                .platform("ANDROID")
+                .deviceId("device-remove")
+                .appVersion("1.0.1")
+                .build();
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(8L)).thenReturn(Optional.of(user));
+        when(userDeviceRepository.findByUser_IdAndFcmToken(8L, "remove-token")).thenReturn(Optional.of(userDevice));
+
+        userService.unregisterFcmToken(8L, " remove-token ");
+
+        assertThat(user.getDevices()).isEmpty();
+        verify(userDeviceRepository).delete(userDevice);
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 삭제는 존재하지 않는 토큰에 대해 idempotent하게 동작한다")
+    void unregisterFcmToken_isIdempotentWhenTokenMissing() {
+        User user = User.builder()
+                .socialId("social-9")
+                .socialProvider(SocialProvider.KAKAO)
+                .nickname("push-user")
+                .email("user9@test.com")
+                .beltColor(BeltColor.BLUE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 9L);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(9L)).thenReturn(Optional.of(user));
+        when(userDeviceRepository.findByUser_IdAndFcmToken(9L, "missing-token")).thenReturn(Optional.empty());
+
+        userService.unregisterFcmToken(9L, "missing-token");
+
+        verify(userDeviceRepository, org.mockito.Mockito.never()).delete(any(UserDevice.class));
     }
 
     @Test
@@ -228,5 +284,14 @@ class UserServiceTest {
     void blockUser_rejectsSelfBlock() {
         assertThatThrownBy(() -> userService.blockUser(7L, 7L))
                 .hasMessage("자기 자신은 차단할 수 없습니다");
+    }
+
+    private UserFcmTokenRequest createFcmRequest(String fcmToken, String platform, String deviceId, String appVersion) {
+        UserFcmTokenRequest request = new UserFcmTokenRequest();
+        ReflectionTestUtils.setField(request, "fcmToken", fcmToken);
+        ReflectionTestUtils.setField(request, "platform", platform);
+        ReflectionTestUtils.setField(request, "deviceId", deviceId);
+        ReflectionTestUtils.setField(request, "appVersion", appVersion);
+        return request;
     }
 }
