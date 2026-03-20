@@ -1,0 +1,4 @@
+logging:
+  level:
+    com.rolling.api: DEBUG
+    org.hibernate.SQL: DEBUG

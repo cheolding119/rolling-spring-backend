@@ -28,9 +28,27 @@ spring:
 logging:
   level:
     root: INFO
-    com.rolling.api: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.rolling.api: INFO
+    org.hibernate.SQL: OFF
     org.hibernate.orm.jdbc.bind: OFF
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} level=%-5level requestId=%X{requestId:-} traceId=%X{traceId:-} userId=%X{userId:-} method=%X{method:-} path=%X{path:-} status=%X{status:-} errorCode=%X{errorCode:-} domainId=%X{domainId:-} logger=%logger{36} - %msg%n%wEx"
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+      roles: ADMIN
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 # port 번호
 server:
@@ -41,6 +59,12 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiry: 1800000
   refresh-token-expiry: 1209600000
+
+auth:
+  withdraw:
+    schedule:
+      cron: "0 * * * * *"
+      zone: "Asia/Seoul"
 
 admin:
   user-ids: ${ADMIN_USER_IDS:}
@@ -88,4 +112,3 @@ cloud:
       auto: false
     stack:
       auto: false
-

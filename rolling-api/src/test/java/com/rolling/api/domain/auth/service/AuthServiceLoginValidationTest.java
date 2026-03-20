@@ -5,6 +5,7 @@ import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
+import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
@@ -47,6 +48,9 @@ class AuthServiceLoginValidationTest {
 
     @Mock
     private AdminAccessConfig adminAccessConfig;
+
+    @Mock
+    private ScheduledTaskTracker scheduledTaskTracker;
 
     @InjectMocks
     private AuthService authService;

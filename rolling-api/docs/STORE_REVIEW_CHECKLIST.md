@@ -40,8 +40,8 @@
 
 - [x] [app_links.dart](/c:/rolling/rolling-flutter-frontend/rolling_flutter/lib/core/constants/app_links.dart)의 약관 URL이 실제 공개 페이지를 가리키도록 수정
 - [x] [app_links.dart](/c:/rolling/rolling-flutter-frontend/rolling_flutter/lib/core/constants/app_links.dart)의 개인정보처리방침 URL이 실제 공개 페이지를 가리키도록 수정
-- [ ] Android 릴리스 빌드로 전체 핵심 흐름 스모크 테스트 
-- [ ] 푸시 권한 요청과 알림함 진입 흐름 재확인
+- [x] Android 릴리스 빌드로 전체 핵심 흐름 스모크 테스트
+- [x] 푸시 권한 요청과 알림함 진입 흐름 재확인
 - [ ] 회원 탈퇴 후 세션 정리와 재로그인 흐름 재확인
 - [ ] 심사자가 볼 핵심 화면 기준으로 캡처용 데이터 정리
 

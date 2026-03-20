@@ -1,11 +1,14 @@
 package com.rolling.api.global.config;
 
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.logging.LogMdcKeys;
+import com.rolling.api.global.logging.RequestTrackingFilter;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,42 +36,47 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        JwtAuthenticationFilter jwtAuthenticationFilter =
+                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig);
+        RequestTrackingFilter requestTrackingFilter = new RequestTrackingFilter();
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
-                    // 인증 불필요 엔드포인트
                     auth.requestMatchers(
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
+                            "/actuator/health",
+                            "/actuator/health/**",
                             "/swagger-ui/**",
                             "/swagger-ui.html",
                             "/v3/api-docs/**",
                             "/error"
                     ).permitAll();
 
-                    // 수동 대회 크롤링은 관리자만 실행 가능
-                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
+                    auth.requestMatchers("/actuator/**").hasRole("ADMIN");
 
-                    // 내 신청/개최 목록은 인증 필요 (/{id} 공개 조회 규칙과 충돌 방지)
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
+                    auth.requestMatchers("/api/v1/admin/inquiries", "/api/v1/admin/inquiries/**").hasRole("ADMIN");
+                    auth.requestMatchers("/api/v1/admin/reports", "/api/v1/admin/reports/**").hasRole("ADMIN");
+
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my", "/api/v1/open-mats/my-hosting").authenticated();
-                    // 오픈매트 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}").permitAll();
-                    // 대회 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments", "/api/v1/tournaments/{id}").permitAll();
-                    // 공지사항 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/notices", "/api/v1/notices/{id}").permitAll();
-                    // 공지사항 운영 API는 관리자만 실행 가능
                     auth.requestMatchers(HttpMethod.POST, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
                     auth.requestMatchers(HttpMethod.PUT, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
                     auth.requestMatchers(HttpMethod.DELETE, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
-                    // 나머지는 모두 인증 필요
                     auth.anyRequest().authenticated();
                 })
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, e) -> {
+                            MDC.put(LogMdcKeys.ERROR_CODE, "UNAUTHORIZED");
+                            MDC.put(LogMdcKeys.STATUS, Integer.toString(HttpServletResponse.SC_UNAUTHORIZED));
+
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=UTF-8");
                             response.getWriter().write(
@@ -76,10 +84,8 @@ public class SecurityConfig {
                             );
                         })
                 )
-                .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig),
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                .addFilterBefore(requestTrackingFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, RequestTrackingFilter.class);
 
         return http.build();
     }
@@ -90,6 +96,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of(RequestTrackingFilter.REQUEST_ID_HEADER, RequestTrackingFilter.TRACE_ID_HEADER));
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -97,5 +104,3 @@ public class SecurityConfig {
         return source;
     }
 }
-
-

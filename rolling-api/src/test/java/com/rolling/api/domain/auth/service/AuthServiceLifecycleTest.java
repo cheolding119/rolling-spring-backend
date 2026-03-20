@@ -12,6 +12,7 @@ import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
@@ -57,6 +58,9 @@ class AuthServiceLifecycleTest {
 
     @Mock
     private AdminAccessConfig adminAccessConfig;
+
+    @Mock
+    private ScheduledTaskTracker scheduledTaskTracker;
 
     @InjectMocks
     private AuthService authService;

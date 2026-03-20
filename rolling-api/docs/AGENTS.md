@@ -10,6 +10,28 @@
 - 남은 `Phase 4` 범위는 로그인/리프레시/`/users/me` 응답의 `isAdmin`을 활용한 관리자 UI 제어와 기존 ADMIN API 연결 같은 프론트 작업에 가깝다.
 - 참고: 현재 `POST /api/v1/open-mats`, `GET /api/v1/open-mats`, `GET /api/v1/open-mats/{id}`, `PUT /api/v1/open-mats/{id}`, `GET /api/v1/open-mats/my`는 모두 `OpenMatResponse`를 사용하므로 `hostNickname` 필드가 공통으로 내려간다.
 
+### 0.7 프론트 연동 관점의 현재 상태
+
+- 오픈매트 작성자 관리 API는 아직 미구현이다. 프론트는 아직 `참가자 목록 조회`, `참가자 강제 취소`, `모집 상태 수동 변경` 화면을 전제로 잡지 않는다.
+- 소셜 로그인 버튼/UI는 `GOOGLE`, `KAKAO`, `APPLE` 3종 기준으로 설계할 수 있지만, 현재 서버 구현은 `GOOGLE`, `KAKAO`만 지원한다.
+- 특히 iOS 출시 범위에서 `APPLE` 로그인을 실제로 열지는 아직 최종 결정 전이다. 출시 전 정책 확정이 필요하다.
+- 관리자 페이지에서 필요한 백엔드 API는 준비돼 있으므로, 관리자 기능의 남은 핵심은 프론트 라우팅, 진입 가드, `isAdmin` 기반 UI 제어다.
+- FCM 백엔드 연동은 동작하지만 릴리스 관점의 남은 항목이 있다. 실제 iOS 디바이스 푸시 수신 검증, 알림 권한 거부 상태 UX, 스토어 제출 메타데이터는 별도 확인이 필요하다.
+- 앱 출시 전에는 회원 탈퇴 UI 노출 여부와 `DELETE /api/v1/auth/withdraw`, `POST /api/v1/auth/withdraw/cancel` 연결 상태를 한 번 더 점검한다.
+
+### 0.8 운영 준비 관점의 공용 이슈
+
+- 요청 추적용 `requestId`와 Actuator/Prometheus 기반 health, metrics endpoint는 준비돼 있다.
+- 다만 운영 채널 알림, 대시보드/로그 질의 기준, 장애별 런북은 아직 문서화가 끝나지 않았다. 장애 대응은 현재 개발자 수동 확인 비중이 높다.
+- 신고 기능은 현재 `접수`만 가능하다. 관리자용 `신고 목록/상세/상태 변경/처리 이력` API는 아직 없다.
+- 따라서 관리자 화면은 아직 신고 처리 워크플로우를 전제로 잡지 않는다. 현재 신고 데이터는 운영 참고용 raw data에 가깝다.
+- 앱 내 1:1 문의 도메인 명칭은 `Inquiry`로 확정됐다. 사용자 문의 생성/내 목록/내 상세, 관리자 목록/상세/답변 저장/상태 변경 API가 추가됐다.
+- 운영 제재 모델은 아직 없다. 현재 사용자 간 `block` 기능과 운영자 제재 기능은 같은 개념으로 취급하면 안 된다.
+- 관리자 검색/필터 API는 아직 제한적이다. 신고/문의/운영 데이터에 대한 상태별 검색, 기간 필터, 공통 정렬 규칙은 추후 확정 예정이다.
+- FCM 토큰 정책은 현재 동작하지만 문서/운영 관점 정합성 작업이 남아 있다. 로그아웃 요청의 `fcmToken` 처리와 `DELETE /api/v1/users/me/fcm` 사용 기준은 같은 라이프사이클 문서로 다시 정리할 예정이다.
+- FAQ/도움말을 정적 문서로 둘지, 별도 API/DB로 운영할지는 아직 결정되지 않았다. 프론트는 서버 관리형 FAQ를 전제로 먼저 결합하지 않는다.
+- 관리자 권한은 현재 `ROLE_ADMIN` 단일 기준이다. 공지 운영, 제재 운영, 크롤링 운영처럼 세분화된 권한 모델은 아직 없다.
+
 ## 1. Enum 정의
 
 ### SocialProvider
@@ -121,10 +143,23 @@ enum ReportTargetType {
 enum NotificationType {
   openMatUpdated, // 오픈매트 일정/장소 변경
   openMatDeleted, // 오픈매트 삭제/취소
+  inquiryAnswered, // 문의 답변 등록
 }
 ```
 
-- API raw value: `OPEN_MAT_UPDATED`, `OPEN_MAT_DELETED`
+- API raw value: `OPEN_MAT_UPDATED`, `OPEN_MAT_DELETED`, `INQUIRY_ANSWERED`
+
+### InquiryStatus
+
+```dart
+enum InquiryStatus {
+  received, // 접수됨
+  inReview, // 검토중
+  answered, // 답변 완료
+}
+```
+
+- API raw value: `RECEIVED`, `IN_REVIEW`, `ANSWERED`
 
 ## 2. 공용 도메인 모델
 
@@ -238,8 +273,8 @@ enum NotificationType {
 | `id` | `int` | 알림 고유 ID | PK |
 | `userId` | `int` | 알림 소유 사용자 ID | FK, 현재 응답 직접 노출 없음 |
 | `type` | `NotificationType` | 알림 타입 | Enum |
-| `targetId` | `int` | 관련 대상 ID | 현재는 OpenMat ID |
-| `route` | `String` | 앱 이동 경로 | 현재 오픈매트 알림은 `/openmat/detail` 사용 |
+| `targetId` | `int` | 관련 대상 ID | 현재는 OpenMat ID 또는 Inquiry ID |
+| `route` | `String` | 앱 이동 경로 | 현재 오픈매트 알림은 `/openmat/detail`, 문의 답변 알림은 `/inquiry/detail` 사용 |
 | `title` | `String` | 알림 제목 | |
 | `body` | `String` | 알림 본문 | |
 | `readAt` | `DateTime?` | 읽음 처리 일시 | `null`이면 미읽음 |
@@ -272,6 +307,30 @@ enum NotificationType {
 - 운영 생성 시 `createdBy`를 생략하면 `authorName` 값을 그대로 저장한다.
 - 일반 사용자 앱 응답에는 내부 식별자 대신 `authorName`만 노출하는 방향을 기본 계약으로 본다.
 
+### 2.8 Inquiry
+
+도메인 네임: `InquiryModel`
+
+| 필드명 | 타입 | 설명 | 비고 |
+| --- | --- | --- | --- |
+| `id` | `int` | 문의 고유 ID | PK |
+| `userId` | `int` | 문의 작성자 사용자 ID | FK |
+| `userNickname` | `String` | 문의 작성자 닉네임 | 관리자 화면 표시용 |
+| `title` | `String` | 문의 제목 | |
+| `content` | `String` | 문의 본문 | |
+| `status` | `InquiryStatus` | 문의 상태 | Enum |
+| `answerContent` | `String?` | 운영자 답변 본문 | 답변 전에는 `null` |
+| `answeredByUserId` | `int?` | 답변한 관리자 사용자 ID | 답변 전에는 `null` |
+| `answeredAt` | `DateTime?` | 답변 시각 | 답변 전에는 `null` |
+| `createdAt` | `DateTime` | 문의 생성 일시 | 최신순 정렬 기준 |
+| `updatedAt` | `DateTime` | 문의 수정 일시 | |
+
+프론트 구현 메모:
+
+- 현재 사용자 앱 범위에서 필요한 흐름은 `문의 작성 -> 내 문의 목록 -> 내 문의 상세 -> 답변 확인`이다.
+- 사용자 목록/상세 응답과 관리자 목록/상세 응답은 같은 필드 집합을 사용한다.
+- `status == ANSWERED`이고 `answerContent != null`이면 답변 완료 문의로 본다.
+- 문의 답변 알림 route는 `/inquiry/detail`이고 `targetId`는 문의 ID다.
 ## 3. 프로젝트/기능 규칙
 
 ### 3.1 프로젝트 정의
@@ -326,6 +385,7 @@ enum NotificationType {
 - 알림 클릭 시 `PATCH /api/v1/notifications/{id}/read` 호출
 - 읽음 처리 API는 idempotent
 - `OPEN_MAT_UPDATED` 상세 재조회가 `404 NOT_FOUND`면 `/openmat` fallback
+- `INQUIRY_ANSWERED`는 로그인 사용자 기준 문의 상세를 다시 조회해 최신 답변 상태를 반영한다.
 
 ### 3.6 공지사항 핵심 규칙
 
@@ -337,6 +397,16 @@ enum NotificationType {
 - 운영 삭제 정책은 soft delete가 아니라 `hard delete`다.
 - 프론트는 공지사항 작성/수정/삭제 버튼이나 화면을 전제로 구현하지 않는다.
 
+### 3.7 문의 핵심 규칙
+
+- 문의 도메인 명칭은 `Inquiry`로 통일한다.
+- 사용자는 본인 문의만 생성/조회할 수 있다.
+- 관리자만 전체 문의 목록/상세 조회, 답변 저장, 상태 변경을 할 수 있다.
+- 문의 생성 시 기본 상태는 `RECEIVED`다.
+- 관리자 답변 저장 API는 답변 본문을 저장하고 상태를 `ANSWERED`로 변경한다.
+- 답변이 없는 문의는 `ANSWERED` 상태로 직접 변경할 수 없다.
+- 이미 답변이 저장된 문의는 `ANSWERED` 외 상태로 되돌리지 않는다.
+- 첫 답변 완료 시 사용자 알림함에 `INQUIRY_ANSWERED` 알림을 저장한다.
 ## 4. 프론트엔드 구현 원칙
 
 ### 4.1 기술 스택
@@ -360,12 +430,17 @@ enum NotificationType {
 - 공지사항은 별도 작성 플로우 없이 `목록 -> 상세` 읽기 흐름만 잡으면 된다.
 - 공지사항 목록 item은 `id`, `title`, `content`, `authorName`, `createdAt`를 사용한다.
 - 공지사항 상세는 같은 필드를 그대로 사용해 상세 페이지를 구성하면 된다.
+- 문의는 인증 사용자 기준으로 `목록 -> 상세 -> 답변 확인` 흐름을 구현하면 된다.
 
 ### 4.3 프론트 주의사항
 
 - 현재 `/users/me` 수정 API는 `phone` 수정 미지원이다.
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
+- 현재 오픈매트 작성자 관리용 API는 없다. 참가자 관리나 수동 마감/재모집 화면은 백엔드 추가 전까지 구현 대상으로 잡지 않는다.
+- 현재 로그인 API 요청 허용값은 `GOOGLE`, `KAKAO`다. `APPLE` 버튼을 노출하더라도 실제 호출 가능 여부는 출시 정책 확정 후 다시 맞춘다.
+- 현재 FCM은 서버 저장 데이터 기반 알림함과 함께 동작한다. 다만 실제 릴리스 전에는 iOS 실기기 수신, 권한 거부 상태 UX, 리뷰어 안내 문구까지 별도 확인이 필요하다.
+- 알림 권한을 거부해도 오픈매트/대회/공지 핵심 조회와 신청 흐름은 막히지 않게 설계한다.
 
 
 ## 5. Rolling API 명세서
@@ -460,6 +535,7 @@ Request body:
 
 - 요청 본문에 `fcmToken`을 보내면 현재 사용자에게 연결된 해당 디바이스 토큰도 같이 제거한다.
 - `fcmToken` 없이 호출하면 Refresh Token만 무효화한다.
+- 로그아웃 시 토큰 제거와 `DELETE /api/v1/users/me/fcm`의 역할 분리는 현재 동작은 가능하지만, 운영 문서 기준으로는 한 번 더 정리할 예정이다.
 
 ### 5.1.4 회원 탈퇴 요청
 
@@ -568,6 +644,7 @@ Response data: `null`
 - 토큰 저장 구조는 `user_devices` 1:N 이다.
 - 동일 토큰 재등록 시 기존 디바이스 레코드를 재사용한다.
 - 동일 토큰 재등록 시 `platform`, `deviceId`, `appVersion`, `updatedAt`도 최신값으로 갱신한다.
+- 로그아웃/탈퇴/기기 변경 시점별 토큰 정리 규칙은 운영 문서에서 추가 정리 중이다.
 
 ### 5.2.4 FCM 토큰 삭제
 
@@ -587,6 +664,7 @@ Response data: `null`
 
 - 현재 로그인한 사용자에게 연결된 토큰만 삭제한다.
 - 존재하지 않는 토큰이어도 성공 응답을 반환한다.
+- 로그아웃 API의 선택적 `fcmToken` 제거와 함께 같은 토큰 라이프사이클 정책으로 관리한다.
 
 ### 5.2.5 사용자 차단
 
@@ -1041,6 +1119,139 @@ Response: `NoticeModel`
 
 - `NOT_FOUND`
 
+## 5.7 문의 API
+
+구현 상태 메모:
+
+- 문의 도메인 명칭은 `Inquiry`로 확정했다.
+- 사용자 API는 `POST /api/v1/inquiries`, `GET /api/v1/inquiries`, `GET /api/v1/inquiries/{id}`다.
+- 관리자 API는 `GET /api/v1/admin/inquiries`, `GET /api/v1/admin/inquiries/{id}`, `PATCH /api/v1/admin/inquiries/{id}/answer`, `PATCH /api/v1/admin/inquiries/{id}/status`다.
+- 관리자 API는 `Authorization: Bearer {accessToken}` + `ROLE_ADMIN` 기준으로 보호한다.
+- 첫 답변 완료 시 알림함에 `INQUIRY_ANSWERED` 알림을 저장한다.
+
+### 5.7.1 문의 생성
+
+`POST /api/v1/inquiries`
+
+- 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `title` | `String` | O | 문의 제목 |
+| `content` | `String` | O | 문의 본문 |
+
+Response: `InquiryModel`
+
+현재 구현 메모:
+
+- 생성 시 상태는 항상 `RECEIVED`다.
+- 생성자는 accessToken 기준 현재 로그인 사용자로 결정한다.
+
+### 5.7.2 내 문의 목록 조회
+
+`GET /api/v1/inquiries`
+
+- 인증: 필요
+- Response: 페이징된 `InquiryModel`
+
+Query parameters:
+
+| 파라미터 | 타입 | 기본값 |
+| --- | --- | --- |
+| `page` | `Integer` | `0` |
+| `size` | `Integer` | `20` |
+| `sort` | `String` | `createdAt,desc` |
+
+현재 구현 메모:
+
+- 현재 로그인한 사용자의 문의만 최신순으로 조회한다.
+
+### 5.7.3 내 문의 상세 조회
+
+`GET /api/v1/inquiries/{id}`
+
+- 인증: 필요
+- Response: `InquiryModel`
+
+에러:
+
+- `NOT_FOUND`
+
+현재 구현 메모:
+
+- 현재 로그인한 사용자 본인 문의가 아니면 `NOT_FOUND`로 처리한다.
+
+### 5.7.4 관리자 문의 목록 조회
+
+`GET /api/v1/admin/inquiries`
+
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
+- Response: 페이징된 `InquiryModel`
+
+Query parameters:
+
+| 파라미터 | 타입 | 기본값 |
+| --- | --- | --- |
+| `page` | `Integer` | `0` |
+| `size` | `Integer` | `20` |
+| `sort` | `String` | `createdAt,desc` |
+
+### 5.7.5 관리자 문의 상세 조회
+
+`GET /api/v1/admin/inquiries/{id}`
+
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
+- Response: `InquiryModel`
+
+에러:
+
+- `NOT_FOUND`
+
+### 5.7.6 관리자 문의 답변 저장
+
+`PATCH /api/v1/admin/inquiries/{id}/answer`
+
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `answerContent` | `String` | O | 운영자 답변 본문 |
+
+Response: `InquiryModel`
+
+현재 구현 메모:
+
+- 답변 저장 시 `answerContent`, `answeredByUserId`, `answeredAt`을 기록한다.
+- 답변 저장 시 상태는 `ANSWERED`로 변경된다.
+- 이미 `ANSWERED` 상태에서 답변 내용을 수정하는 것은 가능하지만, 추가 알림은 보내지 않는다.
+
+### 5.7.7 관리자 문의 상태 변경
+
+`PATCH /api/v1/admin/inquiries/{id}/status`
+
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `status` | `String` | O | `RECEIVED`, `IN_REVIEW`, `ANSWERED` |
+
+Response: `InquiryModel`
+
+에러:
+
+- `VALIDATION_ERROR`
+- `NOT_FOUND`
+
+현재 구현 메모:
+
+- 답변이 없는 문의는 `ANSWERED` 상태로 변경할 수 없다.
+- 답변이 저장된 문의는 `ANSWERED` 외 상태로 되돌리지 않는다.
 ## 6. 날짜/시간 형식
 
 | 타입 | 형식 | 예시 |
@@ -1048,11 +1259,7 @@ Response: `NoticeModel`
 | `DateTime` | ISO 8601 | `2026-03-17T21:00:00` |
 | `Date` | ISO 8601 | `2026-03-17` |
 
-## 7. 변경 이력
 
-- 2026-03-19: 다음 백엔드 개발 범위를 문서에 추가. 오픈매트 상세 생성자 닉네임 노출 점검, 내가 개최한 오픈매트 조회, 삭제된 오픈매트 정보 조회, 관리자 페이지용 운영 API 정리를 `미착수 계획`으로 반영.
-- 2026-03-18: `B-16` 반영. `POST /api/v1/users/me/fcm`에 `platform`, `deviceId`, `appVersion` 계약 추가, `DELETE /api/v1/users/me/fcm` 추가, `POST /api/v1/auth/logout`에 선택적 `fcmToken` 요청 본문 계약 추가, `withdrawalPending=true` 사용자는 FCM 발송 대상에서 제외하도록 정책 명시.
-- 2026-03-18: `B-17` 진행. `FirebaseApp` 초기화 스모크 테스트 추가, FCM 실패 로그에 `errorCode`/`retryPolicy`/토큰 정리 여부를 남기도록 보강, 자동 재시도 안 함 정책과 payload 계약 회귀 테스트 기준 문서화.
 
 
 
