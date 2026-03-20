@@ -1,17 +1,18 @@
 package com.rolling.api.domain.user.service;
 
+import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
-import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.security.AdminAccessConfig;
 import lombok.RequiredArgsConstructor;
-import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -19,11 +20,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserDeviceRepository userDeviceRepository;
+    private final AdminAccessConfig adminAccessConfig;
 
     @Transactional(readOnly = true)
     public UserResponse getMe(Long userId) {
         User user = getActiveUser(userId);
-        return UserResponse.from(user);
+        return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
     }
 
     @Transactional
@@ -33,7 +35,7 @@ public class UserService {
         user.updateNickname(request.getNickname());
         user.updateBeltColor(request.getBeltColor());
 
-        return UserResponse.from(user);
+        return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
     }
 
     @Transactional

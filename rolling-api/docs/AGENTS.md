@@ -1,89 +1,14 @@
-# Rolling Shared AGENTS
+### 0.6 다음 백엔드 개발 범위
 
-이 문서는 Rolling 프론트엔드/백엔드가 함께 보는 공용 계약 문서다.
-
-- 목적: Flutter와 Spring Boot가 같은 enum, 모델, API 계약을 기준으로 작업하게 한다.
-- 원칙: 기획 목표와 현재 구현이 다르면 반드시 둘을 분리해서 적는다.
-- 우선순위: 현재 서버 구현 > 이 문서. 다만 서버/문서 불일치가 보이면 바로 이 문서를 갱신한다.
-
-## 0. 문서 상태
-
-### 0.1 로그인 제공자 정책
-
-- 제품 목표 로그인 제공자: `GOOGLE`, `KAKAO`, `APPLE`
-- 현재 서버 구현: `GOOGLE`, `KAKAO`만 지원
-- `APPLE`은 목표 계약에는 포함하지만 아직 서버 미구현 상태
-
-프론트 작업 규칙:
-
-- Flutter enum과 UI 설계는 `GOOGLE`, `KAKAO`, `APPLE` 기준으로 가져간다.
-- 실제 호출 가능 여부는 현재 서버 구현 상태를 따른다.
-- Apple 로그인 서버 지원 전까지는 `APPLE`을 기본 활성 플로우로 가정하지 않는다.
-
-### 0.2 API 공통 규약
-
-- Base URL: `/api/v1`
-- 인증 방식: `Authorization: Bearer {accessToken}`
-- Content-Type: `application/json`
-- 시간대 기준: `Asia/Seoul`
-
-### 0.3 공통 응답 형식
-
-성공 응답:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-에러 응답:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "에러 설명"
-  }
-}
-```
-
-페이징 응답:
-
-```json
-{
-  "success": true,
-  "data": {
-    "content": [],
-    "page": 0,
-    "size": 20,
-    "totalElements": 0,
-    "totalPages": 0,
-    "last": true
-  }
-}
-```
-
-### 0.4 공통 에러 코드
-
-| 코드 | HTTP Status | 설명 |
-| --- | --- | --- |
-| `UNAUTHORIZED` | 401 | 인증 필요 또는 인증 실패 |
-| `FORBIDDEN` | 403 | 권한 없음 |
-| `NOT_FOUND` | 404 | 리소스를 찾을 수 없음 |
-| `VALIDATION_ERROR` | 400 | 요청 데이터 유효성 검증 실패 |
-| `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
-
-### 0.5 공지사항 기능 상태
-
-- 제품 목표: 앱에서 공지사항 목록과 상세를 조회할 수 있어야 한다.
-- 현재 서버 구현: `GET /api/v1/notices`, `GET /api/v1/notices/{id}` 조회 API와 운영 `POST/PUT/DELETE /api/v1/notices` API를 지원한다.
-- 현재 앱/프론트 범위: 공지사항 작성 화면은 만들지 않고 조회 화면만 고려한다.
-- 운영 작성 방식: 운영자는 Apidog에서 `X-Crawler-Admin-Key` 헤더로 공지사항을 작성/수정/삭제한다.
-- 현재 운영 호출 정책: 크롤링 수동 실행과 공지사항 운영 API는 임시로 `Bearer accessToken` 없이 `X-Crawler-Admin-Key`만으로 호출한다.
-- 일반 사용자 앱 관점에서는 계속 `조회 전용` 범위로 이해한다.
+- 아래 4개 항목을 다음 묶음의 우선 범위로 관리한다.
+- `Phase 1` 점검 완료: 오픈매트 상세 응답은 이미 `hostNickname`을 포함하며, 프론트 상세 화면은 별도 생성자 조회 API 없이 이 필드를 사용하면 된다.
+- `Phase 2` 완료: `GET /api/v1/open-mats/my-hosting`으로 내가 개최한 오픈매트 목록을 기존 `/my`와 같은 페이징 형식으로 조회할 수 있다.
+- `Phase 3` 완료: 삭제 알림을 받은 신청자, 호스트, 관리자는 `/openmat/detail`로 진입해 `deleted=true` 상태의 삭제된 오픈매트 정보를 다시 볼 수 있다.
+- `Phase 4` 정리: 현재 필요한 관리자 백엔드 기능은 이미 준비돼 있다.
+- 관리자 페이지에서 바로 사용할 API는 `POST /api/v1/tournaments/crawl`, `POST /api/v1/notices`, `PUT /api/v1/notices/{id}`, `DELETE /api/v1/notices/{id}`다.
+- 위 API는 모두 `Authorization: Bearer {accessToken}` + `ROLE_ADMIN` 기준으로 동작한다.
+- 남은 `Phase 4` 범위는 로그인/리프레시/`/users/me` 응답의 `isAdmin`을 활용한 관리자 UI 제어와 기존 ADMIN API 연결 같은 프론트 작업에 가깝다.
+- 참고: 현재 `POST /api/v1/open-mats`, `GET /api/v1/open-mats`, `GET /api/v1/open-mats/{id}`, `PUT /api/v1/open-mats/{id}`, `GET /api/v1/open-mats/my`는 모두 `OpenMatResponse`를 사용하므로 `hostNickname` 필드가 공통으로 내려간다.
 
 ## 1. Enum 정의
 
@@ -269,6 +194,7 @@ enum NotificationType {
 - `participantUids`는 내부 저장 필드다.
 - `reportCount`는 내부 저장 필드다.
 - 현재 클라이언트 응답에는 `participantUids`, `reportCount`를 직접 내려주지 않는다.
+- `hostNickname`은 `OpenMatResponse` 공통 필드라서 생성/목록/상세/수정/내 신청 목록 응답에서 모두 내려간다.
 
 ### 2.4 Tournament
 
@@ -313,7 +239,7 @@ enum NotificationType {
 | `userId` | `int` | 알림 소유 사용자 ID | FK, 현재 응답 직접 노출 없음 |
 | `type` | `NotificationType` | 알림 타입 | Enum |
 | `targetId` | `int` | 관련 대상 ID | 현재는 OpenMat ID |
-| `route` | `String` | 앱 이동 경로 | `/openmat/detail`, `/openmat` |
+| `route` | `String` | 앱 이동 경로 | 현재 오픈매트 알림은 `/openmat/detail` 사용 |
 | `title` | `String` | 알림 제목 | |
 | `body` | `String` | 알림 본문 | |
 | `readAt` | `DateTime?` | 읽음 처리 일시 | `null`이면 미읽음 |
@@ -393,7 +319,7 @@ enum NotificationType {
 | type | route | 프론트 동작 |
 | --- | --- | --- |
 | `OPEN_MAT_UPDATED` | `/openmat/detail` | `targetId`로 상세 진입 후 최신 데이터 재조회 |
-| `OPEN_MAT_DELETED` | `/openmat` | 오픈매트 목록 이동 |
+| `OPEN_MAT_DELETED` | `/openmat/detail` | `targetId`로 삭제 상세 진입 후 `deleted=true` 상태 화면 표시 |
 
 추가 규칙:
 
@@ -407,7 +333,7 @@ enum NotificationType {
 - 앱에서 필요한 화면은 `목록 페이지`와 `상세 페이지` 두 가지다.
 - 목록은 페이징 조회를 기준으로 하고, 기본 정렬은 최신 작성일(`createdAt DESC`)이다.
 - 상세는 `id`로 단건 조회한다.
-- 운영 작성/수정/삭제는 일반 앱 인증 플로우가 아니라 `X-Crawler-Admin-Key` 기반 운영 호출로 분리한다.
+- 운영 작성/수정/삭제는 같은 JWT 인증 플로우를 사용하되 `ROLE_ADMIN` 권한으로 제한한다.
 - 운영 삭제 정책은 soft delete가 아니라 `hard delete`다.
 - 프론트는 공지사항 작성/수정/삭제 버튼이나 화면을 전제로 구현하지 않는다.
 
@@ -440,7 +366,7 @@ enum NotificationType {
 - 현재 `/users/me` 수정 API는 `phone` 수정 미지원이다.
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
-- 테스트용 서버 설정으로 비인증 오픈매트 수정/삭제가 열릴 수 있지만, 일반 앱 플로우에서 이를 전제로 구현하면 안 된다.
+
 
 ## 5. Rolling API 명세서
 
@@ -471,6 +397,7 @@ Response data:
 | `userId` | `Long` | 사용자 ID |
 | `email` | `String` | 사용자 이메일 |
 | `name` | `String` | 사용자 이름 |
+| `isAdmin` | `Boolean` | 관리자 여부 |
 
 에러:
 
@@ -482,6 +409,7 @@ Response data:
 현재 구현 메모:
 
 - Apple 로그인은 아직 서버 미구현이다.
+- 로그인 응답에는 현재 사용자 기준 `isAdmin`이 포함된다.
 
 ### 5.1.2 토큰 갱신
 
@@ -501,12 +429,18 @@ Response data:
 - `refreshToken`
 - `tokenType`
 - `expiresIn`
+- `isAdmin`
 
 에러:
 
 - `INVALID_REFRESH_TOKEN`
 - `EXPIRED_REFRESH_TOKEN`
 - `VALIDATION_ERROR`
+
+
+현재 구현 메모:
+
+- 토큰 갱신 응답에도 현재 사용자 기준 `isAdmin`이 포함된다.
 
 ### 5.1.3 로그아웃
 
@@ -583,6 +517,17 @@ Response data:
 | `createdAt` | `DateTime` |
 | `withdrawalPending` | `Boolean` |
 | `withdrawalScheduledAt` | `DateTime?` |
+| `isAdmin` | `Boolean` |
+
+현재 구현 메모:
+
+- `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
+- 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
+- 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
+- 서버는 accessToken에서 확인한 `userId`와 `admin.user-ids` 설정값으로 `ROLE_USER`/`ROLE_ADMIN`을 내부 판단한다.
+- 프론트는 `isAdmin=true`일 때 관리자 UI를 노출할 수 있다.
+- 실제 보호는 계속 서버의 관리자 API 권한 검사와 `403 FORBIDDEN` 응답으로 처리한다.
+- `isAdmin`은 UI 제어용 보조 정보이고, 최종 권한 판단 기준은 항상 서버다.
 
 ### 5.2.2 내 정보 수정
 
@@ -724,6 +669,13 @@ Response: 페이징된 `OpenMatModel`
 - 인증: 불필요
 - Response: `OpenMatModel`
 
+현재 구현 메모:
+
+- 현재 상세 응답 모델은 `OpenMatModel`이며 `hostNickname`을 포함한다.
+- 프론트 상세 화면은 별도 생성자 조회 API 없이 상세 응답의 `hostNickname`을 그대로 사용하면 된다.
+- soft delete된 오픈매트는 비로그인 사용자에게는 `NOT_FOUND`다.
+- 삭제 알림을 받은 신청자, 호스트, 관리자에게는 `deleted=true`, `deletedAt`이 포함된 상세 응답을 반환한다.
+
 ### 5.4.3 오픈매트 등록
 
 `POST /api/v1/open-mats`
@@ -777,7 +729,7 @@ Response: `OpenMatModel`
 
 - 작성자만 수정 가능
 - 참가자가 있고 일정/장소 필드가 바뀌면 수정 알림 저장 후 FCM 발송 시도
-- 테스트 설정 `openmat.testing.allow-unauthenticated-update=true`면 비인증 수정 허용 가능
+- 수정은 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
 
 ### 5.4.5 오픈매트 삭제
 
@@ -785,21 +737,16 @@ Response: `OpenMatModel`
 
 - 인증: 필요
 
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 | 설명 |
-| --- | --- | --- | --- |
-| `force` | `Boolean` | `false` | 신청자가 있어도 강제 삭제 |
 
 Response data: `null`
 
 현재 구현 메모:
 
 - 작성자만 삭제 가능
-- 신청자가 있으면 `force=true` 필요
+- 신청자가 있어도 바로 삭제 가능
 - 실제로는 soft delete
 - 참가자가 있으면 삭제 알림 저장 후 FCM 발송 시도
-- 테스트 설정 `openmat.testing.allow-unauthenticated-update=true`면 비인증 삭제 허용 가능
+- 삭제는 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
 
 ### 5.4.6 오픈매트 신청
 
@@ -839,7 +786,34 @@ Query parameters:
 | `size` | `Integer` | `10` |
 | `sort` | `String` | `startDateTime,asc` |
 
-### 5.4.9 오픈매트 신고
+현재 구현 메모:
+
+- 현재 `/api/v1/open-mats/my`는 내가 신청한 오픈매트 목록만 조회한다.
+- 응답은 `OpenMatResponse`를 사용하므로 각 항목에 `hostNickname`이 포함된다.
+- 내가 개최한 오픈매트 목록은 `/api/v1/open-mats/my-hosting`으로 별도 조회한다.
+
+### 5.4.9 내가 개최한 오픈매트 목록
+
+`GET /api/v1/open-mats/my-hosting`
+
+- 인증: 필요
+- Response: 페이징된 `OpenMatModel`
+
+Query parameters:
+
+| 파라미터 | 타입 | 기본값 |
+| --- | --- | --- |
+| `page` | `Integer` | `0` |
+| `size` | `Integer` | `10` |
+| `sort` | `String` | `startDateTime,asc` |
+
+현재 구현 메모:
+
+- 내가 개최한 오픈매트만 조회한다.
+- soft delete된 오픈매트는 제외한다.
+- 응답은 `OpenMatResponse`를 사용하므로 각 항목에 `hostNickname`이 포함된다.
+
+### 5.4.10 오픈매트 신고
 
 `POST /api/v1/open-mats/{id}/report`
 
@@ -929,7 +903,7 @@ Response: `TournamentModel`
 
 `POST /api/v1/tournaments/crawl`
 
-- 인증: 운영 `X-Crawler-Admin-Key` 필요
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
 
 Query parameters:
 
@@ -949,9 +923,12 @@ Response data:
 권한 메모:
 
 - 관리자 userId 목록: `admin.user-ids`
-- 운영용 우회 헤더: `X-Crawler-Admin-Key`
-- 운영 키 설정: `tournament.crawler.admin-key`
-- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+- 관리자 권한 판별 기준: `admin.user-ids`
+- 인증된 사용자는 기본 `ROLE_USER`, 관리자 대상은 `ROLE_ADMIN` 권한을 가진다.
+- 클라이언트는 `ROLE` 값을 요청에 따로 보내지 않으며 `Authorization: Bearer {accessToken}`만 전달한다.
+- 관리자 여부 최종 판별은 항상 서버가 수행한다.
+- 관리자 페이지 버튼 노출 여부는 프론트 UX 정책이고, 실제 관리자 액션 보호는 서버 `403 FORBIDDEN` 응답으로 처리한다.
+- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
 
 ## 5.6 공지사항 API
 
@@ -959,8 +936,8 @@ Response data:
 
 - 현재 서버는 조회 API(`GET /api/v1/notices`, `GET /api/v1/notices/{id}`)와 운영 API(`POST/PUT/DELETE /api/v1/notices`)를 지원한다.
 - 앱 범위에서는 계속 조회 API만 사용한다.
-- 운영자는 Apidog에서 `X-Crawler-Admin-Key` 헤더로 공지사항 작성/수정/삭제를 수행한다.
-- 운영 인증 키는 대회 크롤링 운영 호출과 같은 `tournament.crawler.admin-key` 설정값을 재사용한다.
+- 운영자는 Apidog 또는 관리자 페이지에서 `Authorization: Bearer {accessToken}`으로 공지사항 작성/수정/삭제를 수행한다.
+- 공지사항 운영 API는 `ROLE_ADMIN` accessToken이 필요하며, 관리자는 `admin.user-ids` 설정으로 판별한다.
 
 ### 5.6.1 공지사항 목록 조회
 
@@ -1002,7 +979,7 @@ Response: 페이징된 `NoticeModel`
 
 `POST /api/v1/notices`
 
-- 인증: 운영 `X-Crawler-Admin-Key` 필요
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
 
 Request body:
 
@@ -1018,13 +995,13 @@ Response: `NoticeModel`
 현재 구현 메모:
 
 - `createdBy`가 없으면 `authorName` 값을 그대로 저장한다.
-- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
 
 ### 5.6.4 공지사항 수정
 
 `PUT /api/v1/notices/{id}`
 
-- 인증: 운영 `X-Crawler-Admin-Key` 필요
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
 
 Request body:
 
@@ -1041,7 +1018,7 @@ Response: `NoticeModel`
 
 - 최소 1개 필드는 전달해야 한다.
 - 전달하지 않은 필드는 기존 값을 유지한다.
-- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
 
 에러:
 
@@ -1052,13 +1029,13 @@ Response: `NoticeModel`
 
 `DELETE /api/v1/notices/{id}`
 
-- 인증: 운영 `X-Crawler-Admin-Key` 필요
+- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
 - Response data: `null`
 
 현재 구현 메모:
 
 - 삭제는 soft delete가 아니라 `hard delete`다.
-- 임시 운영 정책으로는 `Bearer accessToken`만으로 호출할 수 없고 `X-Crawler-Admin-Key`가 반드시 필요하다.
+- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
 
 에러:
 
@@ -1073,5 +1050,20 @@ Response: `NoticeModel`
 
 ## 7. 변경 이력
 
+- 2026-03-19: 다음 백엔드 개발 범위를 문서에 추가. 오픈매트 상세 생성자 닉네임 노출 점검, 내가 개최한 오픈매트 조회, 삭제된 오픈매트 정보 조회, 관리자 페이지용 운영 API 정리를 `미착수 계획`으로 반영.
 - 2026-03-18: `B-16` 반영. `POST /api/v1/users/me/fcm`에 `platform`, `deviceId`, `appVersion` 계약 추가, `DELETE /api/v1/users/me/fcm` 추가, `POST /api/v1/auth/logout`에 선택적 `fcmToken` 요청 본문 계약 추가, `withdrawalPending=true` 사용자는 FCM 발송 대상에서 제외하도록 정책 명시.
 - 2026-03-18: `B-17` 진행. `FirebaseApp` 초기화 스모크 테스트 추가, FCM 실패 로그에 `errorCode`/`retryPolicy`/토큰 정리 여부를 남기도록 보강, 자동 재시도 안 함 정책과 payload 계약 회귀 테스트 기준 문서화.
+
+
+
+
+
+
+
+
+
+
+
+
+
+

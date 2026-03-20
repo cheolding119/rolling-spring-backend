@@ -32,4 +32,7 @@ public class AuthResponse {
 
     @Schema(description = "사용자 이름", example = "홍길동")
     private String name;
+
+    @Schema(description = "관리자 여부", example = "false")
+    private Boolean isAdmin;
 }

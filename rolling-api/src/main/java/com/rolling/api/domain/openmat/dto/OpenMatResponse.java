@@ -27,6 +27,8 @@ public class OpenMatResponse {
     private Long hostId;
     private String hostNickname;
     private String hostInstagramId;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
     private LocalDateTime createdAt;
 
     public static OpenMatResponse from(OpenMat openMat) {
@@ -46,7 +48,10 @@ public class OpenMatResponse {
                 .hostId(openMat.getHost().getId())
                 .hostNickname(openMat.getHost().getNickname())
                 .hostInstagramId(openMat.getHostInstagramId())
+                .deleted(Boolean.TRUE.equals(openMat.getIsHidden()))
+                .deletedAt(openMat.getDeletedAt())
                 .createdAt(openMat.getCreatedAt())
                 .build();
     }
 }
+

@@ -66,6 +66,8 @@ public class OpenMat extends BaseTimeEntity {
     @Column(nullable = false)
     private Boolean isHidden = false;
 
+    private LocalDateTime deletedAt;
+
     private String hostInstagramId;
 
     @Builder
@@ -143,8 +145,9 @@ public class OpenMat extends BaseTimeEntity {
         participantUids.remove(userId);
     }
 
-    public void hide() {
+    public void hide(LocalDateTime deletedAt) {
         this.isHidden = true;
+        this.deletedAt = deletedAt;
     }
 
     public void synchronizeStatus(LocalDateTime now) {
@@ -169,3 +172,4 @@ public class OpenMat extends BaseTimeEntity {
         this.reportCount++;
     }
 }
+

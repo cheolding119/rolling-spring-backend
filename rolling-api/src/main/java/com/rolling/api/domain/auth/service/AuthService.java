@@ -14,6 +14,7 @@ import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
@@ -49,6 +50,7 @@ public class AuthService {
     private final UserDeviceRepository userDeviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AdminAccessConfig adminAccessConfig;
 
     @Value("${jwt.access-token-expiry}")
     private Long accessTokenExpiry;
@@ -90,7 +92,6 @@ public class AuthService {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-        // 기존 RefreshToken 삭제 후 새로 저장 (한 계정 = 하나의 RefreshToken)
         refreshTokenRepository.deleteByUserId(user.getId());
         LocalDateTime expiryDate = LocalDateTime.now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
         refreshTokenRepository.save(RefreshToken.builder()
@@ -110,6 +111,7 @@ public class AuthService {
                 .userId(user.getId())
                 .email(user.getEmail())
                 .name(user.getNickname())
+                .isAdmin(adminAccessConfig.isAdmin(user.getId()))
                 .build();
     }
 
@@ -132,7 +134,6 @@ public class AuthService {
 
         Long userId = savedToken.getUserId();
 
-        // Refresh Token Rotation: 새 토큰 발급 후 기존 토큰 교체
         String newAccessToken = jwtTokenProvider.createAccessToken(userId);
         String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
 
@@ -151,6 +152,7 @@ public class AuthService {
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(accessTokenExpiry / 1000)
+                .isAdmin(adminAccessConfig.isAdmin(userId))
                 .build();
     }
 
@@ -276,7 +278,6 @@ public class AuthService {
     }
 
     private User findOrCreateUser(String socialId, SocialProvider provider, String nickname, String email, boolean[] isNewUser) {
-        // 정책: 탈퇴한 계정은 로그인 조회 대상에서 제외하고, 동일 소셜 계정은 신규 가입으로 처리한다.
         return userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse(socialId, provider)
                 .map(existingUser -> {
                     existingUser.updateNickname(nickname);

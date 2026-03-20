@@ -1,6 +1,7 @@
 package com.rolling.api.domain.openmat.service;
 
-import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
+import com.rolling.api.domain.notification.model.PushNotificationType;
+import com.rolling.api.domain.notification.repository.NotificationRepository;
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
@@ -38,11 +39,11 @@ import java.util.Objects;
 public class OpenMatService {
 
     private final OpenMatRepository openMatRepository;
+    private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final ReportService reportService;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
-    private final OpenMatTestingAccessConfig openMatTestingAccessConfig;
 
     @Transactional
     public OpenMatResponse create(Long hostId, OpenMatCreateRequest request) {
@@ -93,9 +94,22 @@ public class OpenMatService {
 
     @Transactional
     public OpenMatResponse findById(Long id) {
+        return findById(id, null, false);
+    }
+
+    @Transactional
+    public OpenMatResponse findById(Long id, Long requesterUserId, boolean requesterIsAdmin) {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(id)
-                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
-        openMat.synchronizeStatus(now());
+                .orElseGet(() -> openMatRepository.findById(id)
+                        .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다")));
+
+        if (Boolean.TRUE.equals(openMat.getIsHidden()) && !canViewDeletedOpenMat(openMat, requesterUserId, requesterIsAdmin)) {
+            throw BusinessException.notFound("오픈매트를 찾을 수 없습니다");
+        }
+
+        if (!Boolean.TRUE.equals(openMat.getIsHidden())) {
+            openMat.synchronizeStatus(now());
+        }
         return OpenMatResponse.from(openMat);
     }
 
@@ -104,11 +118,7 @@ public class OpenMatService {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
 
-        if (shouldBypassUnauthenticatedUpdate(userId)) {
-            log.warn("Allowing unauthenticated open mat update for testing - openMatId: {}", openMatId);
-        } else {
-            validateHost(openMat, userId);
-        }
+        validateHost(openMat, userId);
         boolean startDateTimeChanged = isChanged(openMat.getStartDateTime(), request.getStartDateTime());
         boolean endDateTimeChanged = isChanged(openMat.getEndDateTime(), request.getEndDateTime());
         boolean locationNameChanged = isChanged(openMat.getLocationName(), request.getLocationName());
@@ -165,22 +175,14 @@ public class OpenMatService {
     }
 
     @Transactional
-    public void delete(Long userId, Long openMatId, boolean force) {
+    public void delete(Long userId, Long openMatId) {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
 
-        if (shouldBypassUnauthenticatedDelete(userId)) {
-            log.warn("Allowing unauthenticated open mat delete for testing - openMatId: {}", openMatId);
-        } else {
-            validateHost(openMat, userId);
-        }
+        validateHost(openMat, userId);
         List<Long> participantUserIds = List.copyOf(openMat.getParticipantUids());
 
-        if (openMat.hasParticipants() && !force) {
-            throw BusinessException.badRequest("신청자가 있는 오픈매트는 force=true 파라미터가 필요합니다");
-        }
-
-        openMat.hide();
+        openMat.hide(now());
 
         if (!participantUserIds.isEmpty()) {
             eventPublisher.publishEvent(new OpenMatDeletedEvent(openMat.getId(), openMat.getTitle(), participantUserIds));
@@ -263,6 +265,20 @@ public class OpenMatService {
     }
 
     @Transactional
+    public Page<OpenMatResponse> findMyHostedOpenMats(Long userId, Pageable pageable) {
+        syncExpiredOpenMats();
+
+        Pageable pageableWithSort = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
+
+        Page<OpenMat> page = openMatRepository.findByHost_IdAndIsHiddenFalse(userId, pageableWithSort);
+        LocalDateTime now = now();
+        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
+        return page.map(OpenMatResponse::from);
+    }
+
+    @Transactional
     public int syncExpiredOpenMats() {
         LocalDateTime now = now();
         List<OpenMat> expiredOpenMats = openMatRepository
@@ -276,18 +292,30 @@ public class OpenMatService {
         return expiredOpenMats.size();
     }
 
+    private boolean canViewDeletedOpenMat(OpenMat openMat, Long requesterUserId, boolean requesterIsAdmin) {
+        if (requesterIsAdmin) {
+            return true;
+        }
+        if (requesterUserId == null) {
+            return false;
+        }
+        if (Objects.equals(openMat.getHost().getId(), requesterUserId)) {
+            return true;
+        }
+        if (openMat.isParticipant(requesterUserId)) {
+            return true;
+        }
+        return notificationRepository.existsByUser_IdAndTypeAndTargetId(
+                requesterUserId,
+                PushNotificationType.OPEN_MAT_DELETED,
+                openMat.getId()
+        );
+    }
+
     private void validateHost(OpenMat openMat, Long userId) {
         if (!openMat.getHost().getId().equals(userId)) {
             throw BusinessException.forbidden("작성자만 수정/삭제할 수 있습니다");
         }
-    }
-
-    private boolean shouldBypassUnauthenticatedUpdate(Long userId) {
-        return userId == null && openMatTestingAccessConfig.isAllowUnauthenticatedUpdate();
-    }
-
-    private boolean shouldBypassUnauthenticatedDelete(Long userId) {
-        return userId == null && openMatTestingAccessConfig.isAllowUnauthenticatedUpdate();
     }
 
     private void validateDateRange(LocalDateTime startDateTime, LocalDateTime endDateTime) {
@@ -346,4 +374,8 @@ public class OpenMatService {
         return normalized.isEmpty() ? null : normalized;
     }
 }
+
+
+
+
 

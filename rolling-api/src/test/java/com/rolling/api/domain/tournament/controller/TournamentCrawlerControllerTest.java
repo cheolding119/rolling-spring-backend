@@ -1,6 +1,5 @@
 package com.rolling.api.domain.tournament.controller;
 
-import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.service.TournamentManagerService;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -67,8 +66,8 @@ class TournamentCrawlerControllerTest {
     }
 
     @Test
-    @DisplayName("대회 크롤링 실행은 admin key가 있으면 성공한다")
-    void crawl_withAdminKey_returnsOk() throws Exception {
+    @DisplayName("대회 크롤링 실행은 admin accessToken이 있으면 성공한다")
+    void crawl_withAdminToken_returnsOk() throws Exception {
         TournamentCrawlResult result = TournamentCrawlResult.builder()
                 .crawledCount(10)
                 .createdCount(3)
@@ -76,11 +75,14 @@ class TournamentCrawlerControllerTest {
                 .skippedCount(2)
                 .build();
 
-        given(adminAccessConfig.matchesAdminApiKey("crawler-secret")).willReturn(true);
+        given(jwtTokenProvider.validateToken("admin-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("admin-token")).willReturn(1L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(1L)).willReturn(true);
         given(tournamentManagerService.crawlAndSaveAll()).willReturn(result);
 
         mockMvc.perform(post("/api/v1/tournaments/crawl")
-                        .header("X-Crawler-Admin-Key", "crawler-secret"))
+                        .header("Authorization", "Bearer admin-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.crawledCount").value(10))
@@ -88,15 +90,24 @@ class TournamentCrawlerControllerTest {
     }
 
     @Test
-    @DisplayName("대회 크롤링 실행은 admin accessToken만으로는 통과할 수 없다")
-    void crawl_withBearerAdminTokenOnly_returnsForbidden() throws Exception {
-        given(jwtTokenProvider.validateToken("admin-token")).willReturn(true);
-        given(jwtTokenProvider.getUserIdFromToken("admin-token")).willReturn(1L);
-        given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
-        given(adminAccessConfig.isAdmin(1L)).willReturn(true);
+    @DisplayName("대회 크롤링 실행은 accessToken이 없으면 401을 반환한다")
+    void crawl_withoutAccessToken_returnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/tournaments/crawl"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("대회 크롤링 실행은 일반 사용자 accessToken이면 403을 반환한다")
+    void crawl_withUserToken_returnsForbidden() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
 
         mockMvc.perform(post("/api/v1/tournaments/crawl")
-                        .header("Authorization", "Bearer admin-token"))
+                        .header("Authorization", "Bearer user-token"))
                 .andExpect(status().isForbidden());
     }
 
@@ -123,11 +134,6 @@ class TournamentCrawlerControllerTest {
         @Bean
         AdminAccessConfig adminAccessConfig() {
             return mock(AdminAccessConfig.class);
-        }
-
-        @Bean
-        OpenMatTestingAccessConfig openMatTestingAccessConfig() {
-            return mock(OpenMatTestingAccessConfig.class);
         }
     }
 }

@@ -6,9 +6,8 @@ import com.rolling.api.domain.notice.dto.NoticeUpdateRequest;
 import com.rolling.api.domain.notice.service.NoticeService;
 import com.rolling.api.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +28,13 @@ public class NoticeAdminController {
 
     private final NoticeService noticeService;
 
-    @Operation(summary = "공지사항 생성", description = "운영자가 공지사항을 생성합니다.")
-    @Parameter(name = "X-Crawler-Admin-Key", in = ParameterIn.HEADER, required = true, description = "운영 API 인증 키")
+    @Operation(summary = "공지사항 생성", description = "ADMIN 권한 사용자가 accessToken으로 공지사항을 생성합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "생성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음")
     })
     @PostMapping
     public ResponseEntity<ApiResponse<NoticeResponse>> create(@Valid @RequestBody NoticeCreateRequest request) {
@@ -42,12 +42,13 @@ public class NoticeAdminController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "공지사항 수정", description = "운영자가 공지사항을 수정합니다.")
-    @Parameter(name = "X-Crawler-Admin-Key", in = ParameterIn.HEADER, required = true, description = "운영 API 인증 키")
+    @Operation(summary = "공지사항 수정", description = "ADMIN 권한 사용자가 accessToken으로 공지사항을 수정합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항 없음")
     })
     @PutMapping("/{id}")
@@ -56,11 +57,12 @@ public class NoticeAdminController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "공지사항 삭제", description = "운영자가 공지사항을 hard delete 합니다.")
-    @Parameter(name = "X-Crawler-Admin-Key", in = ParameterIn.HEADER, required = true, description = "운영 API 인증 키")
+    @Operation(summary = "공지사항 삭제", description = "ADMIN 권한 사용자가 accessToken으로 공지사항을 hard delete 합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항 없음")
     })
     @DeleteMapping("/{id}")

@@ -39,7 +39,10 @@ public class UserResponse {
     @Schema(description = "회원 탈퇴 예정 시각 (예약된 경우)", example = "2026-03-02T21:00:00")
     private LocalDateTime withdrawalScheduledAt;
 
-    public static UserResponse from(User user) {
+    @Schema(description = "관리자 여부", example = "false")
+    private Boolean isAdmin;
+
+    public static UserResponse from(User user, boolean isAdmin) {
         return UserResponse.builder()
                 .id(user.getId())
                 .nickname(user.getNickname())
@@ -50,6 +53,7 @@ public class UserResponse {
                 .createdAt(user.getCreatedAt())
                 .withdrawalPending(user.getWithdrawalPending())
                 .withdrawalScheduledAt(user.getWithdrawalScheduledAt())
+                .isAdmin(isAdmin)
                 .build();
     }
 }

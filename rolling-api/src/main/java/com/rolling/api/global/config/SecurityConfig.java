@@ -1,6 +1,5 @@
 package com.rolling.api.global.config;
 
-import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
@@ -31,7 +30,6 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
-    private final OpenMatTestingAccessConfig openMatTestingAccessConfig;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -52,24 +50,20 @@ public class SecurityConfig {
                     ).permitAll();
 
                     // 수동 대회 크롤링은 관리자만 실행 가능
-                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("INTERNAL_API");
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
 
-                    // 내 신청 목록은 인증 필요 (/{id} 공개 조회 규칙과 충돌 방지)
-                    auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my").authenticated();
+                    // 내 신청/개최 목록은 인증 필요 (/{id} 공개 조회 규칙과 충돌 방지)
+                    auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my", "/api/v1/open-mats/my-hosting").authenticated();
                     // 오픈매트 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}").permitAll();
-                    if (openMatTestingAccessConfig.isAllowUnauthenticatedUpdate()) {
-                        auth.requestMatchers(HttpMethod.PUT, "/api/v1/open-mats/{id}").permitAll();
-                        auth.requestMatchers(HttpMethod.DELETE, "/api/v1/open-mats/{id}").permitAll();
-                    }
                     // 대회 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments", "/api/v1/tournaments/{id}").permitAll();
                     // 공지사항 조회는 비로그인 허용
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/notices", "/api/v1/notices/{id}").permitAll();
                     // 공지사항 운영 API는 관리자만 실행 가능
-                    auth.requestMatchers(HttpMethod.POST, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
-                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
-                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/notices", "/api/v1/notices/**").hasRole("INTERNAL_API");
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
+                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");
                     // 나머지는 모두 인증 필요
                     auth.anyRequest().authenticated();
                 })
@@ -103,3 +97,5 @@ public class SecurityConfig {
         return source;
     }
 }
+
+

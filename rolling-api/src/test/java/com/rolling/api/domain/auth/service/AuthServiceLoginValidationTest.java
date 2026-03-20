@@ -2,8 +2,10 @@ package com.rolling.api.domain.auth.service;
 
 import com.rolling.api.domain.auth.dto.SocialLoginRequest;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
+import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
+import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
@@ -35,10 +37,16 @@ class AuthServiceLoginValidationTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserDeviceRepository userDeviceRepository;
+
+    @Mock
     private JwtTokenProvider jwtTokenProvider;
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private AdminAccessConfig adminAccessConfig;
 
     @InjectMocks
     private AuthService authService;

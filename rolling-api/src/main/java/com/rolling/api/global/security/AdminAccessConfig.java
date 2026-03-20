@@ -1,7 +1,6 @@
 package com.rolling.api.global.security;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -12,28 +11,13 @@ import java.util.stream.Collectors;
 public class AdminAccessConfig {
 
     private final Set<Long> adminUserIds;
-    private final String adminApiKey;
 
-    public AdminAccessConfig(String adminUserIdsProperty) {
-        this(adminUserIdsProperty, "");
-    }
-
-    @Autowired
-    public AdminAccessConfig(
-            @Value("${admin.user-ids:}") String adminUserIdsProperty,
-            @Value("${tournament.crawler.admin-key:}") String adminApiKey
-    ) {
+    public AdminAccessConfig(@Value("${admin.user-ids:}") String adminUserIdsProperty) {
         this.adminUserIds = parseAdminUserIds(adminUserIdsProperty);
-        this.adminApiKey = normalizeSecret(adminApiKey);
     }
 
     public boolean isAdmin(Long userId) {
         return userId != null && adminUserIds.contains(userId);
-    }
-
-    public boolean matchesAdminApiKey(String value) {
-        String normalized = normalizeSecret(value);
-        return adminApiKey != null && adminApiKey.equals(normalized);
     }
 
     private Set<Long> parseAdminUserIds(String adminUserIdsProperty) {
@@ -50,13 +34,5 @@ public class AdminAccessConfig {
         } catch (NumberFormatException e) {
             throw new IllegalStateException("admin.user-ids must be a comma-separated list of numeric user IDs", e);
         }
-    }
-
-    private String normalizeSecret(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

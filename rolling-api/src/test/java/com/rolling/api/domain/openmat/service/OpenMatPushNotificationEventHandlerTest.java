@@ -73,7 +73,7 @@ class OpenMatPushNotificationEventHandlerTest {
         assertThat(command.title()).isEqualTo("오픈매트가 취소되었습니다");
         assertThat(command.body()).isEqualTo("평일 오픈매트 오픈매트가 삭제되었습니다.");
         assertThat(command.data())
-                .containsEntry("route", "/openmat")
+                .containsEntry("route", "/openmat/detail")
                 .doesNotContainKey("openMatId");
     }
 
@@ -89,3 +89,4 @@ class OpenMatPushNotificationEventHandlerTest {
         verify(pushNotificationService, never()).sendToUsers(eq(List.of(2L)), any(PushNotificationCommand.class));
     }
 }
+

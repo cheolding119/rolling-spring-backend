@@ -1,13 +1,21 @@
-# Rolling 백엔드 Remaining Plan (Unit) - 2026-03-18
+### Phase 4. 관리자 페이지 준비
+- [x] 보안 role 모델 추가 (`USER`, `ADMIN`) 및 관리자 권한 기준 정리
+- [x] 관리자 인증/권한 정책을 `admin.user-ids` + JWT 기준으로 확정 (`X-Crawler-Admin-Key` 제거)
+- [x] 관리자 페이지에서 사용할 백엔드 API 목록 확정
+- [x] 대회단체 크롤링 API는 기존 `POST /api/v1/tournaments/crawl`를 `ROLE_ADMIN` 기준으로 사용
+- [x] 공지사항 작성/수정/삭제는 기존 `POST /api/v1/notices`, `PUT /api/v1/notices/{id}`, `DELETE /api/v1/notices/{id}`를 `ROLE_ADMIN` 기준으로 사용
+- [~] 남은 범위는 관리자 페이지 프론트 구현(라우팅, 진입 가드, ADMIN API 연결)
 
-기준:
-- 요구사항/명세 기준: `docs/AGENTS.md`
-- 목표: 남은 작업을 바로 실행 가능한 `Unit` 단위로 분할
+결과 메모:
+- 현재 필요한 관리자 백엔드 API는 이미 존재한다: `POST /api/v1/tournaments/crawl`, `POST /api/v1/notices`, `PUT /api/v1/notices/{id}`, `DELETE /api/v1/notices/{id}`.
+- 위 API는 모두 `Authorization: Bearer {accessToken}` + `ROLE_ADMIN` 기준으로 동작한다.
+- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 인증은 제거됐다.
+- 오픈매트 수정/삭제 accessToken 필수화는 함께 정리된 보안 선행 작업이다.
+- 현재 Phase 4의 실질적 남은 작업은 신규 백엔드 개발보다 관리자 페이지 프론트 구현이다.
 
-진행 표기:
-- `[ ]` 미착수
-- `[~]` 진행중
-- `[x]` 완료
+완료 기준:
+- 관리자 페이지에서 필요한 백엔드 API와 인증 방식이 문서로 확정됨
+- 남은 작업이 관리자 페이지 프론트 구현이라는 점이 명확해짐
 
 ## Unit B-01. Auth 회원 탈퇴
 - [x] `DELETE /api/v1/auth/withdraw` 컨트롤러/서비스 구현
@@ -130,23 +138,23 @@
 - 상세 조회 시 존재하지 않는 ID는 `NOT_FOUND`를 반환한다.
 
 ## Unit B-15. Notice 운영 API (후속)
-- [x] 운영 전용 인증 정책 확정 (`X-Crawler-Admin-Key` 재사용, `tournament.crawler.admin-key` 설정값 재사용)
-- [x] 현재 `JwtAuthenticationFilter`의 대회 크롤링 전용 admin-key 인증 범위를 공지사항 운영 API까지 확장하거나 공통화
+- [x] 운영 전용 인증 정책을 `ROLE_ADMIN` accessToken 기준으로 확정 (`admin.user-ids` 사용, admin key 제거)
+- [x] `JwtAuthenticationFilter`와 `UserPrincipal`을 `USER`/`ADMIN` role 기반으로 정리하고 공지사항 운영 API에도 공통 적용
 - [x] `POST /api/v1/notices` 운영 생성 API 구현
 - [x] `PUT /api/v1/notices/{id}` 운영 수정 API 구현
 - [x] `DELETE /api/v1/notices/{id}` 운영 삭제 정책 확정 및 구현 (`hard delete`)
 - [x] `createdBy`와 `authorName` 저장 규칙 확정 (운영자 식별자와 노출용 이름의 매핑 방식 포함)
 - [x] 운영 API Swagger/Apidog 계약 정리
-- [x] 운영 API 테스트 작성 (`X-Crawler-Admin-Key`, 권한 실패, CRUD 기본 흐름)
+- [x] 운영 API 테스트 작성 (`ROLE_ADMIN`/일반 사용자/미인증, CRUD 기본 흐름)
 
 범위 메모:
 - 일반 사용자 앱은 계속 `조회 전용`으로 사용한다.
-- 운영 API는 사용자 JWT 인증 플로우와 분리한다.
+- 운영 API도 같은 JWT 인증 플로우를 사용하되 `ROLE_ADMIN`으로 제한한다.
 - 운영 생성 시 `createdBy`가 없으면 `authorName`으로 저장한다.
 - 삭제는 DB에서 바로 제거하는 `hard delete`로 구현한다.
 
 완료 기준:
-- 운영자는 Apidog 또는 운영 도구에서 공지사항 생성/수정/삭제를 수행할 수 있다.
+- 운영자는 Apidog, 관리자 페이지, 운영 도구에서 ADMIN accessToken으로 공지사항 생성/수정/삭제를 수행할 수 있다.
 - 일반 사용자 조회 API와 운영 API의 권한 경계가 분리된다.
 
 ## Unit B-13. FCM MVP 푸시 연동
@@ -162,8 +170,8 @@
 - [x] OpenMat/FCM 푸시 관련 테스트 작성
 - [x] 실제 Android 디바이스 대상 수정/삭제 푸시 수신 검증
 - [ ] 실제 iOS 디바이스 대상 수정/삭제 푸시 수신 검증
-- [ ] 포그라운드/백그라운드/종료 상태별 푸시 수신 및 탭 라우팅 검증 기록 정리
-- [ ] 테스트용 사용자 2명 이상 또는 디바이스 2대 이상 기준 멀티 디바이스 수신 검증
+- [x] 포그라운드/백그라운드/종료 상태별 푸시 수신 및 탭 라우팅 검증 기록 정리
+- [x] 테스트용 사용자 2명 이상 또는 디바이스 2대 이상 기준 멀티 디바이스 수신 검증
 
 완료 기준:
 - 서버가 `UserDevice` 기준으로 특정 사용자의 모든 디바이스에 FCM을 발송할 수 있음
@@ -253,3 +261,13 @@
 16. B-11
 17. B-18
 18. B-12
+
+
+
+
+
+
+
+
+
+

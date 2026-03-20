@@ -1,9 +1,7 @@
 package com.rolling.api.domain.notice.controller;
 
 import com.rolling.api.domain.notice.dto.NoticeListItemResponse;
-import com.rolling.api.domain.notice.dto.NoticeResponse;
 import com.rolling.api.domain.notice.service.NoticeService;
-import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
 import com.rolling.api.global.exception.BusinessException;
@@ -14,10 +12,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -35,17 +33,15 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 class NoticeControllerTest {
 
     private MockMvc mockMvc;
-
     private NoticeService noticeService;
-
     private AnnotationConfigWebApplicationContext context;
 
     @BeforeEach
@@ -140,11 +136,6 @@ class NoticeControllerTest {
         @Bean
         AdminAccessConfig adminAccessConfig() {
             return mock(AdminAccessConfig.class);
-        }
-
-        @Bean
-        OpenMatTestingAccessConfig openMatTestingAccessConfig() {
-            return mock(OpenMatTestingAccessConfig.class);
         }
     }
 }

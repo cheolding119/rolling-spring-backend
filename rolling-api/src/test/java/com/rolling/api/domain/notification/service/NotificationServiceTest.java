@@ -114,7 +114,7 @@ class NotificationServiceTest {
                 .user(user)
                 .type(PushNotificationType.OPEN_MAT_DELETED)
                 .targetId(99L)
-                .route("/openmat")
+                .route("/openmat/detail")
                 .title("오픈매트가 취소되었습니다")
                 .body("평일 오픈매트 오픈매트가 삭제되었습니다.")
                 .build();
@@ -134,7 +134,7 @@ class NotificationServiceTest {
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).getType()).isEqualTo("OPEN_MAT_DELETED");
-        assertThat(response.getContent().get(0).getRoute()).isEqualTo("/openmat");
+        assertThat(response.getContent().get(0).getRoute()).isEqualTo("/openmat/detail");
     }
 
     @Test
@@ -212,6 +212,7 @@ class NotificationServiceTest {
         return user;
     }
 }
+
 
 
 
