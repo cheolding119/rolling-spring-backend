@@ -20,6 +20,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(
         name = "reports",
@@ -27,7 +29,8 @@ import lombok.NoArgsConstructor;
                 @UniqueConstraint(columnNames = {"reporter_id", "target_type", "target_id"})
         },
         indexes = {
-                @Index(name = "idx_reports_target", columnList = "target_type,target_id")
+                @Index(name = "idx_reports_target", columnList = "target_type,target_id"),
+                @Index(name = "idx_reports_status_created_at", columnList = "status,created_at")
         }
 )
 @Getter
@@ -56,16 +59,54 @@ public class Report extends BaseTimeEntity {
     @Column(length = 500)
     private String customReason;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private ReportStatus status;
+
+    @Column(name = "processed_by_user_id")
+    private Long processedByUserId;
+
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+
+    @Column(name = "processing_memo", length = 1000)
+    private String processingMemo;
+
+    @Column(name = "final_action", length = 100)
+    private String finalAction;
+
     @Builder
     public Report(User reporter,
                   ReportTargetType targetType,
                   Long targetId,
                   ReportReason reason,
-                  String customReason) {
+                  String customReason,
+                  ReportStatus status,
+                  Long processedByUserId,
+                  LocalDateTime processedAt,
+                  String processingMemo,
+                  String finalAction) {
         this.reporter = reporter;
         this.targetType = targetType;
         this.targetId = targetId;
         this.reason = reason;
         this.customReason = customReason;
+        this.status = status;
+        this.processedByUserId = processedByUserId;
+        this.processedAt = processedAt;
+        this.processingMemo = processingMemo;
+        this.finalAction = finalAction;
+    }
+
+    public void updateStatus(ReportStatus status,
+                             Long processedByUserId,
+                             LocalDateTime processedAt,
+                             String processingMemo,
+                             String finalAction) {
+        this.status = status;
+        this.processedByUserId = processedByUserId;
+        this.processedAt = processedAt;
+        this.processingMemo = processingMemo;
+        this.finalAction = finalAction;
     }
 }
