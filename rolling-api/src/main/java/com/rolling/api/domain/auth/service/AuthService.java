@@ -14,6 +14,8 @@ import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.monitoring.MonitoringTaskNames;
+import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
@@ -51,6 +53,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AdminAccessConfig adminAccessConfig;
+    private final ScheduledTaskTracker scheduledTaskTracker;
 
     @Value("${jwt.access-token-expiry}")
     private Long accessTokenExpiry;
@@ -209,21 +212,36 @@ public class AuthService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(
+            cron = "${auth.withdraw.schedule.cron:0 * * * * *}",
+            zone = "${auth.withdraw.schedule.zone:Asia/Seoul}"
+    )
     public void processScheduledWithdrawals() {
-        LocalDateTime now = nowInWithdrawZone();
-        List<User> targets = userRepository
-                .findAllByIsWithdrawnFalseAndWithdrawalPendingTrueAndWithdrawalScheduledAtLessThanEqual(now);
+        scheduledTaskTracker.recordStart(MonitoringTaskNames.WITHDRAWAL_PROCESSOR);
+        try {
+            LocalDateTime now = nowInWithdrawZone();
+            List<User> targets = userRepository
+                    .findAllByIsWithdrawnFalseAndWithdrawalPendingTrueAndWithdrawalScheduledAtLessThanEqual(now);
 
-        if (targets.isEmpty()) {
-            return;
-        }
+            if (targets.isEmpty()) {
+                scheduledTaskTracker.recordSuccess(MonitoringTaskNames.WITHDRAWAL_PROCESSOR, "processed=0");
+                return;
+            }
 
-        for (User user : targets) {
-            refreshTokenRepository.deleteByUserId(user.getId());
-            userDeviceRepository.deleteAllByUser_Id(user.getId());
-            user.withdraw();
-            log.info("Withdraw executed - userId: {}", user.getId());
+            for (User user : targets) {
+                refreshTokenRepository.deleteByUserId(user.getId());
+                userDeviceRepository.deleteAllByUser_Id(user.getId());
+                user.withdraw();
+                log.info("Withdraw executed - userId: {}", user.getId());
+            }
+
+            scheduledTaskTracker.recordSuccess(
+                    MonitoringTaskNames.WITHDRAWAL_PROCESSOR,
+                    "processed=" + targets.size()
+            );
+        } catch (Exception e) {
+            scheduledTaskTracker.recordFailure(MonitoringTaskNames.WITHDRAWAL_PROCESSOR, e);
+            throw e;
         }
     }
 

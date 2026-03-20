@@ -1,6 +1,7 @@
 package com.rolling.api.global.security.jwt;
 
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.logging.LogMdcKeys;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.UserPrincipal;
 import jakarta.servlet.FilterChain;
@@ -9,7 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpMethod;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
@@ -38,9 +39,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken auth =
                         new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                log.debug("JWT 인증 성공 - userId: {}", userId);
+                MDC.put(LogMdcKeys.USER_ID, userId.toString());
+                log.debug("JWT authentication succeeded. userId={}", userId);
             } else {
-                log.debug("JWT 인증 실패(탈퇴/미존재 사용자) - userId: {}", userId);
+                log.debug("JWT authentication rejected for missing or withdrawn user. userId={}", userId);
             }
         }
 
@@ -55,5 +57,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 }
-
-
