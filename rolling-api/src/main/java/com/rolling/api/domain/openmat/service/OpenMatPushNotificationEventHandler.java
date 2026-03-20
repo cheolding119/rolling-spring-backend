@@ -20,7 +20,6 @@ import java.util.Map;
 public class OpenMatPushNotificationEventHandler {
 
     private static final String OPEN_MAT_DETAIL_ROUTE = "/openmat/detail";
-    private static final String OPEN_MAT_LIST_ROUTE = "/openmat";
 
     private final NotificationService notificationService;
     private final PushNotificationService pushNotificationService;
@@ -54,7 +53,7 @@ public class OpenMatPushNotificationEventHandler {
                         title,
                         body,
                         event.openMatId(),
-                        Map.of("route", OPEN_MAT_LIST_ROUTE)
+                        Map.of("route", OPEN_MAT_DETAIL_ROUTE)
                 ),
                 event.openMatId(),
                 PushNotificationType.OPEN_MAT_DELETED
@@ -90,3 +89,5 @@ public class OpenMatPushNotificationEventHandler {
         }
     }
 }
+
+

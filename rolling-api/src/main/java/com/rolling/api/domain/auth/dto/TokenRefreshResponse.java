@@ -20,4 +20,7 @@ public class TokenRefreshResponse {
 
     @Schema(description = "Access Token 만료 시간 (초)", example = "1800")
     private Long expiresIn;
+
+    @Schema(description = "관리자 여부", example = "false")
+    private Boolean isAdmin;
 }

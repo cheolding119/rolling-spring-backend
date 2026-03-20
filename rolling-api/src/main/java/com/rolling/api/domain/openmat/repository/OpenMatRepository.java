@@ -25,6 +25,8 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
 
     Page<OpenMat> findByIsHiddenFalseAndRegionAndStatus(Region region, OpenMatStatus status, Pageable pageable);
 
+    Page<OpenMat> findByHost_IdAndIsHiddenFalse(Long hostId, Pageable pageable);
+
     @Query(
             value = """
                     SELECT o FROM OpenMat o
@@ -75,3 +77,4 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
     )
     Page<OpenMat> findByParticipantUidsContaining(@Param("userId") Long userId, Pageable pageable);
 }
+

@@ -6,8 +6,8 @@ import com.rolling.api.domain.tournament.service.TournamentManagerService;
 import com.rolling.api.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +24,13 @@ public class TournamentCrawlerController {
 
     private final TournamentManagerService tournamentManagerService;
 
-    @Operation(summary = "대회 크롤링 수동 실행", description = "source를 지정하면 해당 출처 크롤러만, 생략하면 전체 크롤러를 실행하고 결과를 DB에 upsert 저장합니다.")
-    @Parameter(name = "X-Crawler-Admin-Key", in = ParameterIn.HEADER, required = true, description = "운영 API 인증 키")
+    @Operation(summary = "대회 크롤링 수동 실행", description = "ADMIN 권한 사용자가 accessToken으로 호출하면 source를 지정한 출처만, 생략하면 전체 크롤러를 실행하고 결과를 DB에 upsert 저장합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "실행 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 크롤러 또는 잘못된 source"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음")
     })
     @PostMapping("/crawl")
     public ResponseEntity<ApiResponse<TournamentCrawlResult>> crawlAndSave(

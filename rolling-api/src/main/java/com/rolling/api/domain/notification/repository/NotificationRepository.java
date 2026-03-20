@@ -12,4 +12,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     Page<Notification> findAllByUser_Id(Long userId, Pageable pageable);
 
     Optional<Notification> findByIdAndUser_Id(Long notificationId, Long userId);
+
+    boolean existsByUser_IdAndTypeAndTargetId(Long userId, com.rolling.api.domain.notification.model.PushNotificationType type, Long targetId);
 }
+

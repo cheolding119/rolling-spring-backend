@@ -21,8 +21,6 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String ADMIN_KEY_HEADER = "X-Crawler-Admin-Key";
-
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
@@ -31,11 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        if (authenticateByAdminKey(request)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
@@ -54,45 +47,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean authenticateByAdminKey(HttpServletRequest request) {
-        if (!isAdminKeyRequest(request)) {
-            return false;
-        }
-
-        String adminKey = request.getHeader(ADMIN_KEY_HEADER);
-        if (!adminAccessConfig.matchesAdminApiKey(adminKey)) {
-            return false;
-        }
-
-        UserPrincipal principal = UserPrincipal.systemAdmin();
-        UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        log.debug("Admin key 인증 성공");
-        return true;
-    }
-
-    private boolean isAdminKeyRequest(HttpServletRequest request) {
-        if (request.getRequestURI() == null) {
-            return false;
-        }
-
-        return isTournamentCrawlerRequest(request) || isNoticeAdminRequest(request);
-    }
-
-    private boolean isTournamentCrawlerRequest(HttpServletRequest request) {
-        return HttpMethod.POST.matches(request.getMethod())
-                && request.getRequestURI().startsWith("/api/v1/tournaments/crawl");
-    }
-
-    private boolean isNoticeAdminRequest(HttpServletRequest request) {
-        String method = request.getMethod();
-        return (HttpMethod.POST.matches(method)
-                || HttpMethod.PUT.matches(method)
-                || HttpMethod.DELETE.matches(method))
-                && request.getRequestURI().startsWith("/api/v1/notices");
-    }
-
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
@@ -101,3 +55,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 }
+
+

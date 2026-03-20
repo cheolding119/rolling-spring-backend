@@ -69,6 +69,20 @@ public class OpenMatController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "내가 개최한 오픈매트 목록", description = "내가 개최한 오픈매트 목록을 조회합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/my-hosting")
+    public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> myHostedOpenMats(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PageableDefault(size = 10, sort = "startDateTime") Pageable pageable) {
+        Page<OpenMatResponse> response = openMatService.findMyHostedOpenMats(requireUserId(principal), pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "오픈매트 목록 조회", description = "오픈매트 목록을 페이징으로 조회합니다. 지역, 상태, 검색어 필터링을 지원합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
@@ -90,8 +104,11 @@ public class OpenMatController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<OpenMatResponse>> findById(
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
-        OpenMatResponse response = openMatService.findById(id);
+        Long userId = principal != null ? principal.getUserId() : null;
+        boolean isAdmin = principal != null && principal.isAdmin();
+        OpenMatResponse response = openMatService.findById(id, userId, isAdmin);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -164,21 +181,19 @@ public class OpenMatController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
-    @Operation(summary = "오픈매트 삭제", description = "오픈매트를 삭제합니다. 작성자 본인만 가능하며, 신청자가 있는 경우 force=true가 필요합니다.")
+    @Operation(summary = "오픈매트 삭제", description = "오픈매트를 삭제합니다. 작성자 본인만 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "삭제 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "신청자가 있어 force 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Parameter(description = "오픈매트 ID") @PathVariable Long id,
-            @Parameter(description = "신청자가 있을 때 강제 삭제 여부") @RequestParam(defaultValue = "false") boolean force) {
+            @Parameter(description = "오픈매트 ID") @PathVariable Long id) {
         Long userId = principal != null ? principal.getUserId() : null;
-        openMatService.delete(userId, id, force);
+        openMatService.delete(userId, id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -189,4 +204,6 @@ public class OpenMatController {
         return principal.getUserId();
     }
 }
+
+
 

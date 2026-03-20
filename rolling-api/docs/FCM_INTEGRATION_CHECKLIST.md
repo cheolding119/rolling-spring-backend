@@ -172,7 +172,7 @@
 - [x] `targetId`: 오픈매트 ID
 - [x] `title`: 사용자 노출 제목
 - [x] `body`: 사용자 노출 내용
-- [x] `route`: 앱 진입 경로 (`/openmat/detail`, `/openmat`)
+- [x] `route`: 앱 진입 경로 (`/openmat/detail`)
 
 ### 현재 payload 예시
 
@@ -205,7 +205,7 @@
   "data": {
     "type": "OPEN_MAT_DELETED",
     "targetId": "123",
-    "route": "/openmat",
+    "route": "/openmat/detail",
     "title": "오픈매트가 취소되었습니다",
     "body": "주말 오픈매트 오픈매트가 삭제되었습니다."
   }
@@ -254,4 +254,5 @@
 - 서버는 `FIREBASE_ENABLED`, `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` 또는 ADC(`GOOGLE_APPLICATION_CREDENTIALS`)로 Firebase 인증을 구성한다.
 - iOS 쪽은 Windows에서 FlutterFire 설정만으로 완결되지 않으므로 macOS에서 최종 반영이 필요하다.
 - FCM은 전달 채널이고, 사용자용 알림함은 `Notification` 저장 구조로 별도 관리된다.
+
 

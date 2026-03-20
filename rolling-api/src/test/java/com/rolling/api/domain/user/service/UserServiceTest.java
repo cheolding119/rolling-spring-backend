@@ -9,6 +9,7 @@ import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.security.AdminAccessConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,8 +35,32 @@ class UserServiceTest {
     @Mock
     private UserDeviceRepository userDeviceRepository;
 
+    @Mock
+    private AdminAccessConfig adminAccessConfig;
+
     @InjectMocks
     private UserService userService;
+
+    @Test
+    @DisplayName("내 정보 조회 응답에 관리자 여부를 포함한다")
+    void getMe_includesIsAdmin() {
+        User user = User.builder()
+                .socialId("social-me")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("admin-user")
+                .email("admin@test.com")
+                .beltColor(BeltColor.BLACK)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 11L);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(11L)).thenReturn(Optional.of(user));
+        when(adminAccessConfig.isAdmin(11L)).thenReturn(true);
+
+        UserResponse response = userService.getMe(11L);
+
+        assertThat(response.getIsAdmin()).isTrue();
+        assertThat(response.getNickname()).isEqualTo("admin-user");
+    }
 
     @Test
     @DisplayName("내 정보 수정 시 nickname, beltColor를 반영한다")
@@ -295,3 +320,8 @@ class UserServiceTest {
         return request;
     }
 }
+
+
+
+
+

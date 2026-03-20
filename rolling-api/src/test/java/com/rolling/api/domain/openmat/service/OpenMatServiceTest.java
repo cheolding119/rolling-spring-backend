@@ -1,11 +1,11 @@
 package com.rolling.api.domain.openmat.service;
 
-import com.rolling.api.domain.openmat.config.OpenMatTestingAccessConfig;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.notification.repository.NotificationRepository;
 import com.rolling.api.domain.openmat.event.OpenMatDeletedEvent;
 import com.rolling.api.domain.openmat.event.OpenMatUpdatedEvent;
 import com.rolling.api.domain.openmat.repository.OpenMatRepository;
@@ -57,6 +57,9 @@ class OpenMatServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
     private ReportService reportService;
 
     @Mock
@@ -70,12 +73,11 @@ class OpenMatServiceTest {
         fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), SEOUL_ZONE);
         openMatService = new OpenMatService(
                 openMatRepository,
+                notificationRepository,
                 userRepository,
                 reportService,
                 fixedClock,
-                applicationEventPublisher,
-                new OpenMatTestingAccessConfig(false)
-        );
+                applicationEventPublisher);
     }
 
     @Test
@@ -148,6 +150,27 @@ class OpenMatServiceTest {
     }
 
     @Test
+    @DisplayName("오픈매트 상세 조회 응답에는 호스트 닉네임이 포함된다")
+    void findById_returnsHostNickname() {
+        User host = createUser(1L, "host-detail", "rolling-host");
+        OpenMat openMat = createOpenMat(
+                31L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(31L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.findById(31L);
+
+        assertThat(response.getHostId()).isEqualTo(1L);
+        assertThat(response.getHostNickname()).isEqualTo("rolling-host");
+    }
+    @Test
     @DisplayName("상세 조회 시 종료 시간이 지난 오픈매트는 FINISHED로 보정된다")
     void findById_whenExpired_returnsFinishedStatus() {
         User host = createUser(1L, "host-4", "host");
@@ -167,6 +190,61 @@ class OpenMatServiceTest {
 
         assertThat(response.getStatus()).isEqualTo(OpenMatStatus.FINISHED);
         assertThat(openMat.getStatus()).isEqualTo(OpenMatStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("삭제된 오픈매트는 삭제 알림 수신자에게 상세 정보를 반환한다")
+    void findById_whenDeletedAndNotificationOwner_returnsDeletedResponse() {
+        User host = createUser(1L, "host-deleted", "host");
+        OpenMat openMat = createOpenMat(
+                33L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        LocalDateTime deletedAt = LocalDateTime.of(2026, 3, 10, 21, 0);
+        openMat.hide(deletedAt);
+
+        when(openMatRepository.findById(33L)).thenReturn(java.util.Optional.of(openMat));
+        when(notificationRepository.existsByUser_IdAndTypeAndTargetId(
+                7L,
+                com.rolling.api.domain.notification.model.PushNotificationType.OPEN_MAT_DELETED,
+                33L
+        )).thenReturn(true);
+
+        OpenMatResponse response = openMatService.findById(33L, 7L, false);
+
+        assertThat(response.getDeleted()).isTrue();
+        assertThat(response.getDeletedAt()).isEqualTo(deletedAt);
+        assertThat(response.getTitle()).isEqualTo(openMat.getTitle());
+    }
+
+    @Test
+    @DisplayName("삭제된 오픈매트는 관련 없는 사용자가 상세 조회할 수 없다")
+    void findById_whenDeletedAndUnauthorized_throwsNotFound() {
+        User host = createUser(1L, "host-deleted-block", "host");
+        OpenMat openMat = createOpenMat(
+                34L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        openMat.hide(LocalDateTime.of(2026, 3, 10, 21, 0));
+
+        when(openMatRepository.findById(34L)).thenReturn(java.util.Optional.of(openMat));
+        when(notificationRepository.existsByUser_IdAndTypeAndTargetId(
+                8L,
+                com.rolling.api.domain.notification.model.PushNotificationType.OPEN_MAT_DELETED,
+                34L
+        )).thenReturn(false);
+
+        assertThatThrownBy(() -> openMatService.findById(34L, 8L, false))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("오픈매트를 찾을 수 없습니다");
     }
 
     @Test
@@ -235,6 +313,38 @@ class OpenMatServiceTest {
         verify(openMatRepository).searchVisible(
                 eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("내가 개최한 오픈매트 목록 조회는 호스트 기준으로 페이징 조회하고 기본 정렬을 시작 시간 오름차순으로 맞춘다")
+    void findMyHostedOpenMats_returnsHostedOpenMats() {
+        User host = createUser(1L, "host-hosted", "host");
+        OpenMat openMat = createOpenMat(
+                32L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
+                eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(openMatRepository.findByHost_IdAndIsHiddenFalse(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(openMat)));
+
+        Page<OpenMatResponse> page = openMatService.findMyHostedOpenMats(1L, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getId()).isEqualTo(32L);
+        assertThat(page.getContent().get(0).getHostId()).isEqualTo(1L);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(openMatRepository).findByHost_IdAndIsHiddenFalse(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime").isAscending()).isTrue();
     }
 
     @Test
@@ -335,40 +445,9 @@ class OpenMatServiceTest {
         verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
-    @Test
-    @DisplayName("테스트 플래그가 켜져 있으면 인증 없이 오픈매트를 수정할 수 있다")
-    void update_whenUnauthenticatedUpdateAllowed_updatesWithoutHostValidation() {
-        OpenMatService unauthenticatedUpdateService = new OpenMatService(
-                openMatRepository,
-                userRepository,
-                reportService,
-                fixedClock,
-                applicationEventPublisher,
-                new OpenMatTestingAccessConfig(true)
-        );
-        User host = createUser(1L, "host-update-test", "host");
-        OpenMat openMat = createOpenMat(
-                30L,
-                host,
-                LocalDateTime.of(2026, 3, 12, 19, 0),
-                LocalDateTime.of(2026, 3, 12, 21, 0),
-                10,
-                OpenMatStatus.RECRUITING,
-                2L
-        );
-        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
-        ReflectionTestUtils.setField(request, "locationName", "롤링짐 신촌 2관");
-
-        when(openMatRepository.findByIdAndIsHiddenFalse(30L)).thenReturn(java.util.Optional.of(openMat));
-
-        unauthenticatedUpdateService.update(null, 30L, request);
-
-        assertThat(openMat.getLocationName()).isEqualTo("롤링짐 신촌 2관");
-        verify(applicationEventPublisher).publishEvent(any(OpenMatUpdatedEvent.class));
-    }
 
     @Test
-    @DisplayName("참가자가 있는 오픈매트를 강제 삭제하면 삭제 알림 이벤트를 발행한다")
+    @DisplayName("참가자가 있는 오픈매트를 삭제하면 삭제 알림 이벤트를 발행한다")
     void delete_whenParticipantsExist_publishesDeletedEvent() {
         User host = createUser(1L, "host-delete-notify", "host");
         OpenMat openMat = createOpenMat(
@@ -384,7 +463,7 @@ class OpenMatServiceTest {
 
         when(openMatRepository.findByIdAndIsHiddenFalse(21L)).thenReturn(java.util.Optional.of(openMat));
 
-        openMatService.delete(1L, 21L, true);
+        openMatService.delete(1L, 21L);
 
         ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
@@ -459,5 +538,10 @@ class OpenMatServiceTest {
         return openMat;
     }
 }
+
+
+
+
+
 
 

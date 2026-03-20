@@ -7,44 +7,37 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Getter
 public class UserPrincipal implements UserDetails {
 
     private final Long userId;
-    private final boolean admin;
-    private final boolean internalApi;
-
-    public static UserPrincipal systemAdmin() {
-        return new UserPrincipal(-1L, false, true);
-    }
+    private final UserRole role;
 
     public UserPrincipal(Long userId) {
-        this(userId, false, false);
+        this(userId, UserRole.USER);
     }
 
     public UserPrincipal(Long userId, boolean admin) {
-        this(userId, admin, false);
+        this(userId, admin ? UserRole.ADMIN : UserRole.USER);
     }
 
-    public UserPrincipal(Long userId, boolean admin, boolean internalApi) {
+    public UserPrincipal(Long userId, UserRole role) {
         this.userId = userId;
-        this.admin = admin;
-        this.internalApi = internalApi;
+        this.role = role == null ? UserRole.USER : role;
+    }
+
+    public boolean isAdmin() {
+        return role == UserRole.ADMIN;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (internalApi) {
-            return List.of(new SimpleGrantedAuthority("ROLE_INTERNAL_API"));
-        }
-        if (admin) {
-            return List.of(
-                    new SimpleGrantedAuthority("ROLE_USER"),
-                    new SimpleGrantedAuthority("ROLE_ADMIN")
-            );
-        }
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return Stream.of(UserRole.USER, role == UserRole.ADMIN ? UserRole.ADMIN : null)
+                .filter(java.util.Objects::nonNull)
+                .map(value -> new SimpleGrantedAuthority("ROLE_" + value.name()))
+                .toList();
     }
 
     @Override
