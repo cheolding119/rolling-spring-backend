@@ -2,6 +2,8 @@ package com.rolling.api.domain.openmat.service;
 
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatHostStatusUpdateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatParticipantResponse;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
@@ -345,6 +347,186 @@ class OpenMatServiceTest {
         verify(openMatRepository).findByHost_IdAndIsHiddenFalse(eq(1L), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime").isAscending()).isTrue();
+    }
+
+    @Test
+    @DisplayName("작성자는 오픈매트 참가자 목록을 신청 순서대로 조회할 수 있다")
+    void findParticipants_byHost_returnsOrderedParticipants() {
+        User host = createUser(1L, "host-participants", "host");
+        User participant1 = createUser(2L, "participant-1", "alpha");
+        ReflectionTestUtils.setField(participant1, "phone", "010-0000-0001");
+        ReflectionTestUtils.setField(participant1, "beltColor", BeltColor.BLUE);
+        User participant2 = createUser(3L, "participant-2", "beta");
+        ReflectionTestUtils.setField(participant2, "phone", "010-0000-0002");
+        ReflectionTestUtils.setField(participant2, "beltColor", BeltColor.PURPLE);
+
+        OpenMat openMat = createOpenMat(
+                35L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                3L,
+                2L
+        );
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(35L)).thenReturn(java.util.Optional.of(openMat));
+        when(userRepository.findAllByIdInAndIsWithdrawnFalse(List.of(3L, 2L)))
+                .thenReturn(List.of(participant1, participant2));
+
+        List<OpenMatParticipantResponse> response = openMatService.findParticipants(1L, 35L);
+
+        assertThat(response).hasSize(2);
+        assertThat(response).extracting(OpenMatParticipantResponse::getUserId).containsExactly(3L, 2L);
+        assertThat(response).extracting(OpenMatParticipantResponse::getNickname).containsExactly("beta", "alpha");
+    }
+
+    @Test
+    @DisplayName("작성자가 아닌 사용자는 참가자 목록을 조회할 수 없다")
+    void findParticipants_forbiddenWhenNotHost() {
+        User host = createUser(1L, "host-participants-block", "host");
+        OpenMat openMat = createOpenMat(
+                36L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(36L)).thenReturn(java.util.Optional.of(openMat));
+
+        assertThatThrownBy(() -> openMatService.findParticipants(99L, 36L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("작성자만 참가자/모집 상태를 관리할 수 있습니다");
+    }
+
+    @Test
+    @DisplayName("작성자는 참가자를 강제 취소할 수 있고 정원 여유가 생기면 RECRUITING으로 복귀한다")
+    void removeParticipant_byHost_reopensRecruitingWhenCapacityAvailable() {
+        User host = createUser(1L, "host-remove-participant", "host");
+        OpenMat openMat = createOpenMat(
+                37L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                2,
+                OpenMatStatus.CLOSED,
+                2L,
+                3L
+        );
+
+        when(openMatRepository.findByIdForUpdate(37L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.removeParticipant(1L, 37L, 3L);
+
+        assertThat(openMat.getParticipantUids()).containsExactly(2L);
+        assertThat(openMat.getStatus()).isEqualTo(OpenMatStatus.RECRUITING);
+    }
+
+    @Test
+    @DisplayName("참가자가 없는 사용자를 강제 취소하면 NOT_FOUND를 반환한다")
+    void removeParticipant_whenParticipantMissing_throwsNotFound() {
+        User host = createUser(1L, "host-remove-missing", "host");
+        OpenMat openMat = createOpenMat(
+                38L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findByIdForUpdate(38L)).thenReturn(java.util.Optional.of(openMat));
+
+        assertThatThrownBy(() -> openMatService.removeParticipant(1L, 38L, 99L))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("PARTICIPANT_NOT_FOUND");
+                    assertThat(exception).hasMessage("해당 참가자를 찾을 수 없습니다");
+                });
+    }
+
+    @Test
+    @DisplayName("호스트가 모집을 수동 마감하면 참가 취소 후에도 CLOSED를 유지한다")
+    void updateHostingStatus_manualClose_keepsClosedAfterCancelApply() {
+        User host = createUser(1L, "host-manual-close", "host");
+        OpenMat openMat = createOpenMat(
+                39L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                5,
+                OpenMatStatus.RECRUITING,
+                2L,
+                3L
+        );
+        OpenMatHostStatusUpdateRequest request = new OpenMatHostStatusUpdateRequest();
+        ReflectionTestUtils.setField(request, "status", OpenMatStatus.CLOSED);
+
+        when(openMatRepository.findByIdForUpdate(39L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.updateHostingStatus(1L, 39L, request);
+        openMatService.cancelApply(2L, 39L);
+
+        assertThat(openMat.getManualClosed()).isTrue();
+        assertThat(openMat.getStatus()).isEqualTo(OpenMatStatus.CLOSED);
+        assertThat(openMat.getParticipantUids()).containsExactly(3L);
+    }
+
+    @Test
+    @DisplayName("호스트는 수동 마감한 모집을 다시 RECRUITING으로 열 수 있다")
+    void updateHostingStatus_reopenManualClose_setsRecruiting() {
+        User host = createUser(1L, "host-manual-reopen", "host");
+        OpenMat openMat = createOpenMat(
+                40L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                5,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+        OpenMatHostStatusUpdateRequest closeRequest = new OpenMatHostStatusUpdateRequest();
+        ReflectionTestUtils.setField(closeRequest, "status", OpenMatStatus.CLOSED);
+        OpenMatHostStatusUpdateRequest reopenRequest = new OpenMatHostStatusUpdateRequest();
+        ReflectionTestUtils.setField(reopenRequest, "status", OpenMatStatus.RECRUITING);
+
+        when(openMatRepository.findByIdForUpdate(40L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.updateHostingStatus(1L, 40L, closeRequest);
+        OpenMatResponse response = openMatService.updateHostingStatus(1L, 40L, reopenRequest);
+
+        assertThat(openMat.getManualClosed()).isFalse();
+        assertThat(response.getStatus()).isEqualTo(OpenMatStatus.RECRUITING);
+    }
+
+    @Test
+    @DisplayName("정원이 가득 찬 오픈매트는 수동으로 RECRUITING으로 열 수 없다")
+    void updateHostingStatus_whenCapacityFull_cannotReopenRecruiting() {
+        User host = createUser(1L, "host-full-reopen", "host");
+        OpenMat openMat = createOpenMat(
+                41L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                2,
+                OpenMatStatus.CLOSED,
+                2L,
+                3L
+        );
+        OpenMatHostStatusUpdateRequest request = new OpenMatHostStatusUpdateRequest();
+        ReflectionTestUtils.setField(request, "status", OpenMatStatus.RECRUITING);
+
+        when(openMatRepository.findByIdForUpdate(41L)).thenReturn(java.util.Optional.of(openMat));
+
+        assertThatThrownBy(() -> openMatService.updateHostingStatus(1L, 41L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("CAPACITY_FULL");
+                    assertThat(exception).hasMessage("정원이 가득 찬 오픈매트는 모집중으로 변경할 수 없습니다");
+                });
     }
 
     @Test

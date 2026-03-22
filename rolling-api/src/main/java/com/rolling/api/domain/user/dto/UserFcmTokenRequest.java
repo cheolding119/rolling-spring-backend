@@ -9,7 +9,7 @@ import lombok.Getter;
 public class UserFcmTokenRequest {
 
     @NotBlank(message = "fcmToken은 비어 있을 수 없습니다")
-    @Schema(description = "FCM 토큰", example = "dK1x...")
+    @Schema(description = "등록 또는 갱신할 FCM 토큰", example = "dK1x...")
     private String fcmToken;
 
     @Schema(description = "디바이스 플랫폼", example = "ANDROID")

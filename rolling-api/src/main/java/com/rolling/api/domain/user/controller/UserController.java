@@ -1,5 +1,6 @@
 package com.rolling.api.domain.user.controller;
 
+import com.rolling.api.domain.user.dto.UserFcmTokenDeleteRequest;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
@@ -66,7 +67,7 @@ public class UserController {
 
     @Operation(
             summary = "FCM 토큰 등록",
-            description = "현재 로그인한 사용자 FCM 토큰을 등록/갱신합니다."
+            description = "현재 로그인한 사용자 FCM 토큰을 등록/갱신합니다. 동일 토큰이 이미 다른 사용자에게 연결돼 있으면 현재 사용자에게 재연결하고 디바이스 메타데이터를 최신값으로 갱신합니다."
     )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -84,7 +85,7 @@ public class UserController {
 
     @Operation(
             summary = "FCM 토큰 삭제",
-            description = "현재 로그인한 사용자에게 연결된 현재 디바이스 FCM 토큰을 제거합니다."
+            description = "현재 로그인한 사용자에게 연결된 현재 디바이스 FCM 토큰을 명시적으로 제거합니다. 토큰이 없어도 성공으로 처리합니다."
     )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -95,7 +96,7 @@ public class UserController {
     @DeleteMapping("/me/fcm")
     public ResponseEntity<ApiResponse<Void>> unregisterFcmToken(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @RequestBody UserFcmTokenRequest request) {
+            @Valid @RequestBody UserFcmTokenDeleteRequest request) {
         userService.unregisterFcmToken(requireUserId(principal), request.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }

@@ -8,12 +8,13 @@ import com.rolling.api.domain.report.repository.ReportRepository;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.page.PageableUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,21 @@ import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
 import com.rolling.api.domain.report.dto.ReportTargetSummary;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class ReportService {
+
+    private static final long ADMIN_VISIBLE_TARGET_REPORT_THRESHOLD = 3L;
+    private static final Sort DEFAULT_ADMIN_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
+    private static final Set<String> ALLOWED_ADMIN_SORTS = Set.of("createdAt", "updatedAt", "status", "processedAt", "targetType");
 
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
@@ -74,8 +83,23 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ReportResponse> findAllForAdmin(Pageable pageable) {
-        Page<Report> reports = reportRepository.findAll(withDefaultSort(pageable));
+    public Page<ReportResponse> findAllForAdmin(
+            ReportStatus status,
+            ReportTargetType targetType,
+            LocalDate createdFrom,
+            LocalDate createdTo,
+            Pageable pageable
+    ) {
+        validateDateRange(createdFrom, createdTo);
+        Page<Report> reports = reportRepository.findAll(
+                buildAdminSpecification(
+                        status,
+                        targetType,
+                        toStartOfDay(createdFrom),
+                        toExclusiveEndOfDay(createdTo)
+                ),
+                normalizeAdminPageable(pageable)
+        );
         Map<String, ReportTargetSummary> summaryCache = new HashMap<>();
         return reports.map(report -> ReportResponse.from(report, getTargetSummary(report, summaryCache)));
     }
@@ -125,7 +149,7 @@ public class ReportService {
     }
 
     private Report getReport(Long reportId) {
-        return reportRepository.findById(reportId)
+        return reportRepository.findVisibleByIdForAdmin(reportId, ADMIN_VISIBLE_TARGET_REPORT_THRESHOLD)
                 .orElseThrow(() -> BusinessException.notFound("신고를 찾을 수 없습니다"));
     }
 
@@ -136,10 +160,60 @@ public class ReportService {
         return status;
     }
 
-    private Pageable withDefaultSort(Pageable pageable) {
-        return pageable.getSort().isSorted()
-                ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("createdAt").descending());
+    private void validateDateRange(LocalDate createdFrom, LocalDate createdTo) {
+        if (createdFrom != null && createdTo != null && createdFrom.isAfter(createdTo)) {
+            throw BusinessException.badRequest("createdFrom은 createdTo보다 이후일 수 없습니다");
+        }
+    }
+
+    private LocalDateTime toStartOfDay(LocalDate date) {
+        return date == null ? null : date.atStartOfDay();
+    }
+
+    private LocalDateTime toExclusiveEndOfDay(LocalDate date) {
+        return date == null ? null : date.plusDays(1).atStartOfDay();
+    }
+
+    private Pageable normalizeAdminPageable(Pageable pageable) {
+        return PageableUtils.normalize(pageable, DEFAULT_ADMIN_SORT, ALLOWED_ADMIN_SORTS, 20, 100);
+    }
+
+    private Specification<Report> buildAdminSpecification(
+            ReportStatus status,
+            ReportTargetType targetType,
+            LocalDateTime createdFrom,
+            LocalDateTime createdToExclusive
+    ) {
+        return (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            var visibleTargets = query.subquery(Long.class);
+            var grouped = visibleTargets.from(Report.class);
+            visibleTargets.select(grouped.get("targetId"))
+                    .where(
+                            cb.equal(grouped.get("targetType"), root.get("targetType")),
+                            cb.equal(grouped.get("targetId"), root.get("targetId"))
+                    )
+                    .groupBy(grouped.get("targetType"), grouped.get("targetId"))
+                    .having(cb.ge(cb.count(grouped.get("id")), ADMIN_VISIBLE_TARGET_REPORT_THRESHOLD));
+
+            predicates.add(cb.exists(visibleTargets));
+
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (targetType != null) {
+                predicates.add(cb.equal(root.get("targetType"), targetType));
+            }
+            if (createdFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), createdFrom));
+            }
+            if (createdToExclusive != null) {
+                predicates.add(cb.lessThan(root.get("createdAt"), createdToExclusive));
+            }
+
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
     }
 
     private String normalizeOptionalText(String value) {

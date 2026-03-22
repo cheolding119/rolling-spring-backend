@@ -1,12 +1,12 @@
 package com.rolling.api.domain.auth.controller;
 
 import com.rolling.api.domain.auth.dto.AuthResponse;
+import com.rolling.api.domain.auth.dto.LogoutRequest;
 import com.rolling.api.domain.auth.dto.SocialLoginRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
 import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.service.AuthService;
-import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
@@ -63,7 +63,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "로그아웃", description = "Refresh Token을 무효화합니다. 요청 본문에 현재 디바이스 FCM 토큰을 함께 보내면 해당 토큰도 제거합니다. Authorization 헤더에 Bearer Access Token이 필요합니다.")
+    @Operation(summary = "로그아웃", description = "현재 사용자 Refresh Token을 무효화합니다. 요청 본문에 현재 디바이스 FCM 토큰을 함께 보내면 해당 토큰도 제거합니다. body 없이 호출하거나 fcmToken을 생략하면 Refresh Token만 무효화합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공"),
@@ -73,7 +73,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @RequestBody(required = false) UserFcmTokenRequest request) {
+            @Valid @RequestBody(required = false) LogoutRequest request) {
         authService.logout(requireUserId(principal), request == null ? null : request.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }

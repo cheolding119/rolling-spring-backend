@@ -2,12 +2,15 @@ package com.rolling.api.domain.report.controller;
 
 import com.rolling.api.domain.report.dto.ReportResponse;
 import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
+import com.rolling.api.domain.report.entity.ReportStatus;
+import com.rolling.api.domain.report.entity.ReportTargetType;
 import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,12 +22,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @Tag(name = "Report", description = "관리자 신고 운영 API")
 @RestController
@@ -34,7 +41,7 @@ public class ReportAdminController {
 
     private final ReportService reportService;
 
-    @Operation(summary = "신고 목록 조회", description = "ADMIN 권한 사용자가 신고 목록을 최신순으로 조회합니다.")
+    @Operation(summary = "신고 목록 조회", description = "ADMIN 권한 사용자가 동일 대상 기준 누적 신고 3건 이상인 신고만 최신순으로 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -44,19 +51,27 @@ public class ReportAdminController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ReportResponse>>> list(
             @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "신고 상태 필터 (RECEIVED, IN_REVIEW, RESOLVED, REJECTED)")
+            @RequestParam(required = false) ReportStatus status,
+            @Parameter(description = "신고 대상 타입 필터 (OPEN_MAT, TOURNAMENT)")
+            @RequestParam(required = false) ReportTargetType targetType,
+            @Parameter(description = "신고 생성일 시작(포함), 형식: yyyy-MM-dd")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
+            @Parameter(description = "신고 생성일 종료(포함), 형식: yyyy-MM-dd")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         requireAdmin(principal);
-        Page<ReportResponse> response = reportService.findAllForAdmin(pageable);
+        Page<ReportResponse> response = reportService.findAllForAdmin(status, targetType, createdFrom, createdTo, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "신고 상세 조회", description = "ADMIN 권한 사용자가 신고 상세와 동일 신고 대상 누적 현황을 조회합니다.")
+    @Operation(summary = "신고 상세 조회", description = "ADMIN 권한 사용자가 동일 대상 기준 누적 신고 3건 이상인 신고 상세와 누적 현황을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "신고 없음")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "신고 없음 또는 관리자 노출 기준 미달")
     })
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReportResponse>> findById(
@@ -74,7 +89,7 @@ public class ReportAdminController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "신고 없음")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "신고 없음 또는 관리자 노출 기준 미달")
     })
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<ReportResponse>> updateStatus(

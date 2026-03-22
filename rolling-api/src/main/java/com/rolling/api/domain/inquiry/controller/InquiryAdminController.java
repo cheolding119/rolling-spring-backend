@@ -3,11 +3,15 @@ package com.rolling.api.domain.inquiry.controller;
 import com.rolling.api.domain.inquiry.dto.InquiryAnswerRequest;
 import com.rolling.api.domain.inquiry.dto.InquiryResponse;
 import com.rolling.api.domain.inquiry.dto.InquiryStatusUpdateRequest;
+import com.rolling.api.domain.inquiry.entity.InquiryStatus;
+import com.rolling.api.domain.inquiry.entity.InquiryType;
 import com.rolling.api.domain.inquiry.service.InquiryService;
 import com.rolling.api.global.exception.AuthException;
+import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,12 +23,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @Tag(name = "Inquiry", description = "관리자 문의 운영 API")
 @RestController
@@ -43,8 +51,18 @@ public class InquiryAdminController {
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<InquiryResponse>>> list(
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<InquiryResponse> response = inquiryService.findAllForAdmin(pageable);
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "문의 상태 필터 (RECEIVED, IN_REVIEW, ANSWERED)")
+            @RequestParam(required = false) InquiryStatus status,
+            @Parameter(description = "문의 유형 필터 (ACCOUNT, OPEN_MAT, TOURNAMENT, NOTIFICATION, REPORT, OTHER)")
+            @RequestParam(required = false) InquiryType type,
+            @Parameter(description = "문의 생성일 시작(포함), 형식: yyyy-MM-dd")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
+            @Parameter(description = "문의 생성일 종료(포함), 형식: yyyy-MM-dd")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        requireAdmin(principal);
+        Page<InquiryResponse> response = inquiryService.findAllForAdmin(status, type, createdFrom, createdTo, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -57,7 +75,10 @@ public class InquiryAdminController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "문의 없음")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<InquiryResponse>> findById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<InquiryResponse>> findById(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        requireAdmin(principal);
         InquiryResponse response = inquiryService.findByIdForAdmin(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -76,7 +97,7 @@ public class InquiryAdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody InquiryAnswerRequest request) {
-        InquiryResponse response = inquiryService.answer(requireUserId(principal), id, request);
+        InquiryResponse response = inquiryService.answer(requireAdmin(principal), id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -91,15 +112,20 @@ public class InquiryAdminController {
     })
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<InquiryResponse>> updateStatus(
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody InquiryStatusUpdateRequest request) {
+        requireAdmin(principal);
         InquiryResponse response = inquiryService.updateStatus(id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    private Long requireUserId(UserPrincipal principal) {
+    private Long requireAdmin(UserPrincipal principal) {
         if (principal == null) {
             throw new AuthException("UNAUTHORIZED", "인증이 필요합니다");
+        }
+        if (!principal.isAdmin()) {
+            throw BusinessException.forbidden("관리자 권한이 필요합니다");
         }
         return principal.getUserId();
     }

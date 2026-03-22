@@ -2,6 +2,7 @@ package com.rolling.api.domain.inquiry.dto;
 
 import com.rolling.api.domain.inquiry.entity.Inquiry;
 import com.rolling.api.domain.inquiry.entity.InquiryStatus;
+import com.rolling.api.domain.inquiry.entity.InquiryType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -28,6 +29,9 @@ public class InquiryResponse {
     @Schema(description = "문의 본문")
     private String content;
 
+    @Schema(description = "문의 유형", example = "NOTIFICATION")
+    private InquiryType type;
+
     @Schema(description = "문의 상태", example = "RECEIVED")
     private InquiryStatus status;
 
@@ -53,6 +57,7 @@ public class InquiryResponse {
                 .userNickname(inquiry.getUser().getNickname())
                 .title(inquiry.getTitle())
                 .content(inquiry.getContent())
+                .type(inquiry.getType())
                 .status(inquiry.getStatus())
                 .answerContent(inquiry.getAnswerContent())
                 .answeredByUserId(inquiry.getAnsweredByUserId())

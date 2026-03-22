@@ -178,6 +178,82 @@ class FcmPushNotificationServiceTest {
         verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
     }
 
+    @Test
+    @DisplayName("토큰 단위 전송 실패가 INVALID_ARGUMENT면 무효 토큰으로 정리한다")
+    void sendToUsers_deletesInvalidArgumentTokens() throws Exception {
+        User user = createUser(3L, "user-3");
+        UserDevice device = UserDevice.builder()
+                .user(user)
+                .fcmToken("token-invalid")
+                .build();
+
+        when(userDeviceRepository.findPushTargetDevicesByUserIds(List.of(3L)))
+                .thenReturn(List.of(device));
+
+        BatchResponse batchResponse = mock(BatchResponse.class);
+        SendResponse failedResponse = mock(SendResponse.class);
+        FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+
+        when(failedResponse.isSuccessful()).thenReturn(false);
+        when(failedResponse.getException()).thenReturn(exception);
+        when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.INVALID_ARGUMENT);
+        when(batchResponse.getResponses()).thenReturn(List.of(failedResponse));
+        when(batchResponse.getSuccessCount()).thenReturn(0);
+        when(batchResponse.getFailureCount()).thenReturn(1);
+        when(firebaseMessaging.sendEachForMulticast(any(MulticastMessage.class))).thenReturn(batchResponse);
+
+        fcmPushNotificationService.sendToUsers(
+                List.of(3L),
+                new PushNotificationCommand(
+                        PushNotificationType.OPEN_MAT_UPDATED,
+                        "오픈매트 일정이 변경되었습니다",
+                        "테스트 알림입니다.",
+                        100L,
+                        Map.of("route", "/openmat/detail")
+                )
+        );
+
+        verify(userDeviceRepository).deleteAllByFcmTokenIn(java.util.Set.of("token-invalid"));
+    }
+
+    @Test
+    @DisplayName("토큰 단위 전송 실패가 기타 오류면 로그만 남기고 토큰은 유지한다")
+    void sendToUsers_keepsTokenOnNonCleanupFailure() throws Exception {
+        User user = createUser(4L, "user-4");
+        UserDevice device = UserDevice.builder()
+                .user(user)
+                .fcmToken("token-internal")
+                .build();
+
+        when(userDeviceRepository.findPushTargetDevicesByUserIds(List.of(4L)))
+                .thenReturn(List.of(device));
+
+        BatchResponse batchResponse = mock(BatchResponse.class);
+        SendResponse failedResponse = mock(SendResponse.class);
+        FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+
+        when(failedResponse.isSuccessful()).thenReturn(false);
+        when(failedResponse.getException()).thenReturn(exception);
+        when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.INTERNAL);
+        when(batchResponse.getResponses()).thenReturn(List.of(failedResponse));
+        when(batchResponse.getSuccessCount()).thenReturn(0);
+        when(batchResponse.getFailureCount()).thenReturn(1);
+        when(firebaseMessaging.sendEachForMulticast(any(MulticastMessage.class))).thenReturn(batchResponse);
+
+        fcmPushNotificationService.sendToUsers(
+                List.of(4L),
+                new PushNotificationCommand(
+                        PushNotificationType.OPEN_MAT_UPDATED,
+                        "오픈매트 일정이 변경되었습니다",
+                        "테스트 알림입니다.",
+                        101L,
+                        Map.of("route", "/openmat/detail")
+                )
+        );
+
+        verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
+    }
+
     private User createUser(Long id, String socialId) {
         User user = User.builder()
                 .socialId(socialId)
