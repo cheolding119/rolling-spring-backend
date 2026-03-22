@@ -1,6 +1,6 @@
 # Backend Operations Readiness Checklist (기준일: 2026-03-20)
 
-이 문서는 `docs/OPERATIONS_READINESS_20260320.md`를 바탕으로, Java Spring 백엔드 기준에서 바로 구현/점검 가능한 체크리스트로 다시 정리한 문서다.
+이 문서는 운영 준비 백로그를 Java Spring 백엔드 기준에서 바로 구현/점검 가능한 체크리스트로 다시 정리한 문서다.
 `docs/AGENTS.md`는 API 계약과 현재 구현 상태를 확인하는 참고 문서로만 사용하고, 이 문서는 운영 준비의 남은 백로그를 관리하는 용도로 사용한다.
 
 ## 현재 확보된 기반
@@ -80,16 +80,25 @@
 
 ## Unit OR-03. 운영 런북/장애 대응 절차
 
-- [ ] 로그인 장애 대응 런북 작성
+- [x] 로그인 장애 대응 런북 작성
   토큰 발급, 소셜 연동, JWT 검증, DB 연결 확인 순서 정리
-- [ ] 푸시 장애 대응 런북 작성
+- [x] 푸시 장애 대응 런북 작성
   `Notification` 저장 여부, `UserDevice` 상태, FCM 예외 로그 확인 순서 정리
-- [ ] 크롤링 장애 대응 런북 작성
+- [x] 크롤링 장애 대응 런북 작성
   관리자 실행 이력, 외부 소스 응답, 파서 예외, 저장 실패 확인 순서 정리
-- [ ] 공지 조회/운영 장애 대응 런북 작성
+- [x] 공지 조회/운영 장애 대응 런북 작성
   권한, DB 데이터, API 예외, 관리자 액션 이력 확인 순서 정리
-- [ ] 운영 연락 채널과 담당 범위 문서화
+- [x] 운영 연락 채널과 담당 범위 문서화
   문의 대응, 장애 대응, 스토어 심사 대응
+
+결과 메모:
+
+- `docs/BACKEND_OPERATIONS_RUNBOOK_20260321.md`를 추가해 로그인, 푸시, 크롤링, 공지 조회/운영 이슈별 1차 대응 절차를 코드 기준으로 정리했다.
+- 공통 대응 원칙에는 `requestId` 기반 로그 추적, `/actuator/health` 상세 확인, `scheduler`/`externalDependencies` 컴포넌트 확인 순서를 포함했다.
+- 푸시 런북에는 `Notification` 저장 여부와 `UserDevice` 연결 상태, `UNREGISTERED`/`INVALID_ARGUMENT` 토큰 정리 규칙, inbox-only 알림(`INQUIRY_ANSWERED`) 예외를 함께 명시했다.
+- 크롤링 런북에는 스케줄 health detail 확인, source별 재실행 기준, `200 OK`여도 내부 크롤러 실패로 `0건`이 나올 수 있는 현재 동작을 명시했다.
+- 공지 운영 런북에는 별도 감사 로그 테이블이 없는 대신 `requestId`, `userId`, `path`, `method`, `status` 구조화 로그를 관리자 액션 이력의 1차 근거로 사용하는 기준을 적었다.
+- 운영 연락 채널은 외부 메신저 연동이 아직 없다는 현재 상태를 전제로, 앱 내 문의/스토어 리뷰/로그/actuator 기준의 입력원과 역할별 담당 범위를 문서화했다.
 
 완료 기준:
 
@@ -114,6 +123,7 @@
 - `Report` 엔티티에 `status`, `processedByUserId`, `processedAt`, `processingMemo`, `finalAction` 필드를 추가해 신고를 접수 데이터에서 운영 처리 데이터로 확장했다.
 - 신고 생성 시 기본 상태는 `RECEIVED`다.
 - 관리자 API로 `GET /api/v1/admin/reports`, `GET /api/v1/admin/reports/{id}`, `PATCH /api/v1/admin/reports/{id}/status`를 추가했다.
+- 관리자 API는 동일 신고 대상 기준 누적 신고 3건 이상인 경우만 목록/상세/상태 변경 대상으로 노출한다.
 - 목록/상세 응답에는 동일 신고 대상 기준 누적 건수와 상태별 건수(`received`, `inReview`, `resolved`, `rejected`)를 함께 내려 운영 화면에서 바로 사용할 수 있게 했다.
 - 상태 변경 시 `processedByUserId`, `processedAt`, `processingMemo`, `finalAction`을 함께 기록한다.
 - `ReportServiceTest`, `ReportAdminControllerTest`로 신고 생성 규칙, 관리자 목록 조회, 상태 변경, 관리자 권한 보호를 검증했다.
@@ -151,29 +161,29 @@
 - 앱 내 1:1 문의 흐름을 백엔드 API만으로 구성할 수 있다.
 - 운영자가 문의를 보고 답변하고 상태를 변경할 수 있다.
 
-## Unit OR-08. 사용자 제재/차단 운영 모델
-
-- [ ] 현재 사용자 간 차단 API와 운영 제재 API를 개념적으로 분리할지 확정
-- [ ] 운영 제재용 상태 모델 정의
-  차단 사유, 시작 시각, 종료 시각, 해제 사유, 상태
-- [ ] 관리자용 사용자 제재 API 추가
-- [ ] 제재 이력 저장 모델 추가
-- [ ] 반복 신고/문의 악용/수동 제재 등 제재 사유 분류 기준 정리
-- [ ] 제재 해제 API 및 감사 로그 연동
-- [ ] Swagger 및 운영 문서 반영
 
 완료 기준:
 
 - 사용자 간 block 기능과 운영자 제재 기능의 책임이 분리된다.
 - 운영자가 제재 사유와 기간을 기준으로 일관되게 처리할 수 있다.
 
+
 ## Unit OR-09. 관리자 검색/필터 API
 
-- [ ] 신고 목록에 상태/기간/대상 타입 필터 추가
-- [ ] 문의 목록에 상태/기간/문의 유형 필터 추가
-- [ ] 공지 목록에 작성일/작성자 기준 조회 조건 추가 여부 결정
-- [ ] 관리자 목록 조회 API의 공통 페이징/정렬 규칙 정리
-- [ ] 관리자 화면에서 바로 쓰기 쉬운 응답 DTO 기준 정리
+- [x] 신고 목록에 상태/기간/대상 타입 필터 추가
+- [x] 문의 목록에 상태/기간/문의 유형 필터 추가
+- [x] 공지 목록에 작성일/작성자 기준 조회 조건 추가 여부 결정
+- [x] 관리자 목록 조회 API의 공통 페이징/정렬 규칙 정리
+- [x] 관리자 화면에서 바로 쓰기 쉬운 응답 DTO 기준 정리
+
+결과 메모:
+
+- 관리자 신고 목록 API `GET /api/v1/admin/reports`에 `status`, `targetType`, `createdFrom`, `createdTo` 필터를 추가했다.
+- 관리자 문의 목록 API `GET /api/v1/admin/inquiries`에 `status`, `type`, `createdFrom`, `createdTo` 필터를 추가했다.
+- `ReportService`는 `createdAt DESC`, 기본 size `20`, 최대 size `100` 기준을 유지하고, `InquiryService` 관리자 목록은 관리자 페이지 사용성을 위해 기본 size `10`, 최대 size `100` 기준으로 공통 페이징/정렬 규칙을 적용한다.
+- PostgreSQL에서 nullable 날짜 파라미터와 `:param is null` 패턴이 섞일 때 타입 추론 오류가 날 수 있어, 관리자 목록 조회는 정적 JPQL 대신 동적 조건 조합 방식으로 정리했다.
+- 관리자 화면에서 바로 사용하기 쉽게 신고 목록은 기존 `ReportResponse + targetSummary`, 문의 목록은 기존 `InquiryResponse`를 그대로 리스트 item DTO 기준으로 유지한다.
+- 공지사항은 현재 관리자 전용 목록 조회 API가 없고, 운영 핵심 범위가 `생성/수정/삭제`라서 작성일/작성자 기준 검색 조건은 이번 단위에서 추가하지 않기로 결정했다.
 
 완료 기준:
 
@@ -181,34 +191,24 @@
 
 ## Unit OR-10. FCM 토큰 정책 정합성
 
-- [ ] `POST /api/v1/auth/logout`의 `fcmToken` 처리와 `DELETE /api/v1/users/me/fcm` 역할을 문서 기준으로 통일
-- [ ] 로그아웃, 탈퇴 예약, 최종 탈퇴, 기기 변경 시 토큰 정리 규칙을 한 문서에 정리
-- [ ] 실제 구현과 Swagger와 운영 문서의 표현을 동일하게 맞춤
-- [ ] 무효 토큰 정리 정책과 운영 확인 포인트 문서화
-- [ ] 토큰 삭제/재연결 관련 회귀 테스트 보강
+- [x] `POST /api/v1/auth/logout`의 `fcmToken` 처리와 `DELETE /api/v1/users/me/fcm` 역할을 문서 기준으로 통일
+- [x] 로그아웃, 탈퇴 예약, 최종 탈퇴, 기기 변경 시 토큰 정리 규칙을 한 문서에 정리
+- [x] 실제 구현과 Swagger와 운영 문서의 표현을 동일하게 맞춤
+- [x] 무효 토큰 정리 정책과 운영 확인 포인트 문서화
+- [x] 토큰 삭제/재연결 관련 회귀 테스트 보강
+
+결과 메모:
+
+- `docs/FCM_TOKEN_LIFECYCLE_POLICY_20260322.md`를 추가해 로그아웃, 명시 삭제, 탈퇴 예약/최종 탈퇴, 기기 변경, 무효 토큰 정리 정책을 한 문서로 묶었다.
+- `POST /api/v1/auth/logout`는 Refresh Token 무효화가 기본이며 `fcmToken`은 현재 디바이스 토큰을 함께 제거하는 선택 옵션으로 정의했다.
+- `DELETE /api/v1/users/me/fcm`는 로그인 상태 유지 중 현재 디바이스 토큰만 명시적으로 제거하는 API로 역할을 고정했다.
+- Swagger 표현도 실제 동작과 맞추기 위해 로그아웃 요청 DTO와 FCM 삭제 요청 DTO를 분리했다.
+- 푸시 실패 정책은 `UNREGISTERED`, `INVALID_ARGUMENT`만 자동 정리 대상으로 보고, 그 외 토큰 단위 오류는 로그만 남기며, 배치 전송 자체 실패만 예외로 올리는 현재 구현 기준으로 문서를 맞췄다.
+- `AuthServiceLifecycleTest`, `UserServiceTest`, `FcmPushNotificationServiceTest`에 토큰 삭제/재연결/무효 토큰 정책 관련 회귀 케이스를 보강했다.
 
 완료 기준:
 
 - 토큰 라이프사이클 정책이 문서와 구현에서 다르게 해석되지 않는다.
-
-## Unit OR-11. FAQ/도움말 제공 방식 결정
-
-- [ ] FAQ를 정적 문서로 둘지, 별도 API/DB 관리로 갈지 결정
-- [ ] 운영 변경 빈도와 배포 필요 여부 기준으로 방식 선택
-- [ ] API로 갈 경우 최소 조회 모델과 관리자 수정 범위 정의
-
-완료 기준:
-
-- FAQ/도움말이 임시 메모가 아니라 운영 가능한 데이터 소스로 정의된다.
-
-## Unit OR-12. 운영 지표/권한 세분화
-
-- [ ] 운영 KPI 후보 확정
-  신고 수, 문의 수, 푸시 실패율, 공지 발행 수, 크롤링 실패율
-- [ ] 최소 일/주 단위 집계 방식 결정
-- [ ] 관리자 권한 세분화 필요 여부 결정
-  공지 운영, 제재 운영, 크롤링 운영
-- [ ] 권한 세분화가 필요하면 Spring Security role/authority 설계 초안 작성
 
 완료 기준:
 
@@ -241,7 +241,7 @@
 ## 참고 문서
 
 - `docs/AGENTS.md`
-- `docs/OPERATIONS_READINESS_20260320.md`
+- `docs/BACKEND_OPERATIONS_READINESS_20260320.md`
 - `docs/BACKEND_REMAINING.md`
-- `docs/FCM_INTEGRATION_CHECKLIST.md`
-
+- `docs/BACKEND_OPERATIONS_RUNBOOK_20260321.md`
+- `docs/FCM_TOKEN_LIFECYCLE_POLICY_20260322.md`

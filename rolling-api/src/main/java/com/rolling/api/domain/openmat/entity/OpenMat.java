@@ -68,6 +68,9 @@ public class OpenMat extends BaseTimeEntity {
 
     private LocalDateTime deletedAt;
 
+    @Column(nullable = false)
+    private Boolean manualClosed = false;
+
     private String hostInstagramId;
 
     @Builder
@@ -81,7 +84,8 @@ public class OpenMat extends BaseTimeEntity {
                    Region region,
                    Integer maxCapacity,
                    String hostInstagramId,
-                   OpenMatStatus status) {
+                   OpenMatStatus status,
+                   Boolean manualClosed) {
         this.host = host;
         this.title = title;
         this.description = description;
@@ -98,6 +102,9 @@ public class OpenMat extends BaseTimeEntity {
         }
         if (status != null) {
             this.status = status;
+        }
+        if (manualClosed != null) {
+            this.manualClosed = manualClosed;
         }
     }
 
@@ -150,6 +157,16 @@ public class OpenMat extends BaseTimeEntity {
         this.deletedAt = deletedAt;
     }
 
+    public void closeRecruitmentManually() {
+        this.manualClosed = true;
+        this.status = OpenMatStatus.CLOSED;
+    }
+
+    public void reopenRecruitmentManually() {
+        this.manualClosed = false;
+        this.status = OpenMatStatus.RECRUITING;
+    }
+
     public void synchronizeStatus(LocalDateTime now) {
         if (now == null) {
             return;
@@ -157,6 +174,11 @@ public class OpenMat extends BaseTimeEntity {
 
         if (!endDateTime.isAfter(now)) {
             this.status = OpenMatStatus.FINISHED;
+            return;
+        }
+
+        if (Boolean.TRUE.equals(manualClosed)) {
+            this.status = OpenMatStatus.CLOSED;
             return;
         }
 

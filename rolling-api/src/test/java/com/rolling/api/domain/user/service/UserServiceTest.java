@@ -274,6 +274,40 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("삭제했던 FCM 토큰도 다시 등록하면 현재 사용자 디바이스로 재연결된다")
+    void registerFcmToken_reconnectsTokenAfterExplicitRemoval() {
+        User user = User.builder()
+                .socialId("social-10")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("push-user")
+                .email("user10@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 10L);
+
+        UserDevice removedDevice = UserDevice.builder()
+                .user(user)
+                .fcmToken("reconnect-token")
+                .platform("ANDROID")
+                .deviceId("device-old")
+                .appVersion("1.0.0")
+                .build();
+        removedDevice.assignUser(null);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(10L)).thenReturn(Optional.of(user));
+        when(userDeviceRepository.findByFcmToken("reconnect-token")).thenReturn(Optional.of(removedDevice));
+        when(userDeviceRepository.save(any(UserDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.registerFcmToken(10L, createFcmRequest(" reconnect-token ", " IOS ", " device-new ", " 2.0.0 "));
+
+        assertThat(removedDevice.getUser()).isEqualTo(user);
+        assertThat(user.getDevices()).containsExactly(removedDevice);
+        assertThat(removedDevice.getPlatform()).isEqualTo("IOS");
+        assertThat(removedDevice.getDeviceId()).isEqualTo("device-new");
+        assertThat(removedDevice.getAppVersion()).isEqualTo("2.0.0");
+    }
+
+    @Test
     @DisplayName("사용자 차단과 차단 해제가 blockedUsers에 반영된다")
     void blockAndUnblockUser_updatesBlockedUsers() {
         User user = User.builder()

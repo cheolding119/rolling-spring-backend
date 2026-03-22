@@ -2,6 +2,7 @@ package com.rolling.api.domain.inquiry.controller;
 
 import com.rolling.api.domain.inquiry.dto.InquiryResponse;
 import com.rolling.api.domain.inquiry.entity.InquiryStatus;
+import com.rolling.api.domain.inquiry.entity.InquiryType;
 import com.rolling.api.domain.inquiry.service.InquiryService;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
@@ -29,8 +30,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -81,13 +84,27 @@ class InquiryAdminControllerTest {
         given(jwtTokenProvider.getUserIdFromToken("admin-token")).willReturn(1L);
         given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
         given(adminAccessConfig.isAdmin(1L)).willReturn(true);
-        given(inquiryService.findAllForAdmin(any())).willReturn(new PageImpl<>(List.of(answeredResponse(3L)), org.springframework.data.domain.PageRequest.of(0, 20), 1));
+        given(inquiryService.findAllForAdmin(any(), any(), any(), any(), any()))
+                .willReturn(new PageImpl<>(List.of(answeredResponse(3L)), org.springframework.data.domain.PageRequest.of(0, 10), 1));
 
         mockMvc.perform(get("/api/v1/admin/inquiries")
+                        .param("status", "ANSWERED")
+                        .param("type", "NOTIFICATION")
+                        .param("createdFrom", "2026-03-01")
+                        .param("createdTo", "2026-03-31")
                         .header("Authorization", "Bearer admin-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content[0].id").value(3));
+                .andExpect(jsonPath("$.data.content[0].id").value(3))
+                .andExpect(jsonPath("$.data.size").value(10));
+
+        verify(inquiryService).findAllForAdmin(
+                eq(InquiryStatus.ANSWERED),
+                eq(InquiryType.NOTIFICATION),
+                eq(java.time.LocalDate.of(2026, 3, 1)),
+                eq(java.time.LocalDate.of(2026, 3, 31)),
+                any()
+        );
     }
 
     @Test

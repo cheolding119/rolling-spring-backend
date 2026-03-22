@@ -71,11 +71,18 @@
 - [x] 신고 임계치 정책 3건 기준으로 정합성 확정
 
 ## Unit B-06. OpenMat 작성자 관리 API
-- [ ] 참가자 목록 조회 API
-- [ ] 참가자 강제 취소 API
-- [ ] 모집 상태 수동 변경 API (`RECRUITING`, `CLOSED`)
-- [ ] 작성자 권한 검증
-- [ ] Swagger/테스트/문서 반영
+- [x] 참가자 목록 조회 API
+- [x] 참가자 강제 취소 API
+- [x] 모집 상태 수동 변경 API (`RECRUITING`, `CLOSED`)
+- [x] 작성자 권한 검증
+- [x] Swagger/테스트/문서 반영
+
+결과 메모:
+- `GET /api/v1/open-mats/{id}/participants`로 작성자가 참가자 목록을 조회할 수 있다.
+- `DELETE /api/v1/open-mats/{id}/participants/{participantUserId}`로 작성자가 특정 참가자를 강제 취소할 수 있다.
+- `PATCH /api/v1/open-mats/{id}/status`로 작성자가 모집 상태를 `RECRUITING`, `CLOSED`로 수동 변경할 수 있다.
+- 수동 마감 상태는 내부 `manualClosed` 플래그로 유지되어, 참가 취소로 자리가 나도 작성자가 다시 열기 전까지 `CLOSED`를 유지한다.
+- 상태 변경/참가자 관리 API는 모두 작성자 권한을 검증하고, 서비스 테스트와 API 문서를 함께 반영했다.
 
 완료 기준:
 - 작성자 관리 기능 전체가 API로 노출되고 권한이 보장됨

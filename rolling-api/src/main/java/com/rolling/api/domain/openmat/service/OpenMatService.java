@@ -3,6 +3,8 @@ package com.rolling.api.domain.openmat.service;
 import com.rolling.api.domain.notification.model.PushNotificationType;
 import com.rolling.api.domain.notification.repository.NotificationRepository;
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatHostStatusUpdateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatParticipantResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.event.OpenMatDeletedEvent;
@@ -30,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
@@ -234,6 +238,77 @@ public class OpenMatService {
         openMat.synchronizeStatus(now);
     }
 
+    @Transactional(readOnly = true)
+    public List<OpenMatParticipantResponse> findParticipants(Long hostUserId, Long openMatId) {
+        OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
+                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+
+        validateHostManager(openMat, hostUserId);
+
+        if (openMat.getParticipantUids().isEmpty()) {
+            return List.of();
+        }
+
+        List<User> participants = userRepository.findAllByIdInAndIsWithdrawnFalse(openMat.getParticipantUids());
+        Map<Long, User> participantMap = new LinkedHashMap<>();
+        participants.forEach(user -> participantMap.put(user.getId(), user));
+
+        return openMat.getParticipantUids().stream()
+                .map(participantMap::get)
+                .filter(Objects::nonNull)
+                .map(OpenMatParticipantResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void removeParticipant(Long hostUserId, Long openMatId, Long participantUserId) {
+        OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
+                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+        validateHostManager(openMat, hostUserId);
+
+        LocalDateTime now = now();
+        openMat.synchronizeStatus(now);
+
+        if (openMat.getStatus() == OpenMatStatus.FINISHED) {
+            throw new BusinessException("OPEN_MAT_FINISHED", "이미 종료된 오픈매트입니다", HttpStatus.BAD_REQUEST);
+        }
+        if (!openMat.isParticipant(participantUserId)) {
+            throw new BusinessException("PARTICIPANT_NOT_FOUND", "해당 참가자를 찾을 수 없습니다", HttpStatus.NOT_FOUND);
+        }
+
+        openMat.removeParticipant(participantUserId);
+        openMat.synchronizeStatus(now);
+    }
+
+    @Transactional
+    public OpenMatResponse updateHostingStatus(Long hostUserId, Long openMatId, OpenMatHostStatusUpdateRequest request) {
+        OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
+                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+        validateHostManager(openMat, hostUserId);
+
+        LocalDateTime now = now();
+        openMat.synchronizeStatus(now);
+
+        if (openMat.getStatus() == OpenMatStatus.FINISHED) {
+            throw new BusinessException("OPEN_MAT_FINISHED", "이미 종료된 오픈매트입니다", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getStatus() == null || request.getStatus() == OpenMatStatus.FINISHED) {
+            throw BusinessException.badRequest("모집 상태는 RECRUITING 또는 CLOSED만 설정할 수 있습니다");
+        }
+
+        if (request.getStatus() == OpenMatStatus.CLOSED) {
+            openMat.closeRecruitmentManually();
+        } else {
+            if (openMat.isCapacityFull()) {
+                throw new BusinessException("CAPACITY_FULL", "정원이 가득 찬 오픈매트는 모집중으로 변경할 수 없습니다", HttpStatus.BAD_REQUEST);
+            }
+            openMat.reopenRecruitmentManually();
+            openMat.synchronizeStatus(now);
+        }
+
+        return OpenMatResponse.from(openMat);
+    }
+
     @Transactional
     public void report(Long userId, Long openMatId, ReportReason reason, String customReason) {
         OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
@@ -315,6 +390,12 @@ public class OpenMatService {
     private void validateHost(OpenMat openMat, Long userId) {
         if (!openMat.getHost().getId().equals(userId)) {
             throw BusinessException.forbidden("작성자만 수정/삭제할 수 있습니다");
+        }
+    }
+
+    private void validateHostManager(OpenMat openMat, Long userId) {
+        if (!openMat.getHost().getId().equals(userId)) {
+            throw BusinessException.forbidden("작성자만 참가자/모집 상태를 관리할 수 있습니다");
         }
     }
 

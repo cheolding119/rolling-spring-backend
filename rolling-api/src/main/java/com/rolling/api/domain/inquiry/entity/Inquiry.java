@@ -50,6 +50,10 @@ public class Inquiry extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
+    private InquiryType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
     private InquiryStatus status;
 
     @Column(name = "answer_content", columnDefinition = "TEXT")
@@ -65,6 +69,7 @@ public class Inquiry extends BaseTimeEntity {
     public Inquiry(User user,
                    String title,
                    String content,
+                   InquiryType type,
                    InquiryStatus status,
                    String answerContent,
                    Long answeredByUserId,
@@ -72,6 +77,7 @@ public class Inquiry extends BaseTimeEntity {
         this.user = user;
         this.title = title;
         this.content = content;
+        this.type = type;
         this.status = status;
         this.answerContent = answerContent;
         this.answeredByUserId = answeredByUserId;

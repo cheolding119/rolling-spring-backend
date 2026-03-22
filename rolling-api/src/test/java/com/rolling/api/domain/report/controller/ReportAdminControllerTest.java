@@ -32,8 +32,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -84,15 +86,27 @@ class ReportAdminControllerTest {
         given(jwtTokenProvider.getUserIdFromToken("admin-token")).willReturn(1L);
         given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
         given(adminAccessConfig.isAdmin(1L)).willReturn(true);
-        given(reportService.findAllForAdmin(any()))
+        given(reportService.findAllForAdmin(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(reportResponse(7L, ReportStatus.RECEIVED)), org.springframework.data.domain.PageRequest.of(0, 20), 1));
 
         mockMvc.perform(get("/api/v1/admin/reports")
+                        .param("status", "RECEIVED")
+                        .param("targetType", "OPEN_MAT")
+                        .param("createdFrom", "2026-03-01")
+                        .param("createdTo", "2026-03-31")
                         .header("Authorization", "Bearer admin-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].id").value(7))
                 .andExpect(jsonPath("$.data.content[0].targetSummary.totalReportCount").value(4));
+
+        verify(reportService).findAllForAdmin(
+                eq(ReportStatus.RECEIVED),
+                eq(ReportTargetType.OPEN_MAT),
+                eq(java.time.LocalDate.of(2026, 3, 1)),
+                eq(java.time.LocalDate.of(2026, 3, 31)),
+                any()
+        );
     }
 
     @Test

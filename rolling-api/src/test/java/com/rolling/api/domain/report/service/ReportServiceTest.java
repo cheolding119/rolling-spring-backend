@@ -23,10 +23,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -97,16 +99,23 @@ class ReportServiceTest {
     @DisplayName("관리자 신고 목록 조회는 createdAt 내림차순 기본 정렬과 누적 현황을 적용한다")
     void findAllForAdmin_appliesDefaultSortAndIncludesSummary() {
         Report report = createReportEntity(99L, createUser(1L, "reporter", "rolling-user"), ReportStatus.RECEIVED);
-        when(reportRepository.findAll(any(Pageable.class)))
+        when(reportRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(report)));
         mockSummaryCounts(ReportTargetType.OPEN_MAT, 10L, 4, 1, 1, 2, 0);
 
-        Page<ReportResponse> response = reportService.findAllForAdmin(PageRequest.of(0, 20));
+        Page<ReportResponse> response = reportService.findAllForAdmin(
+                ReportStatus.RECEIVED,
+                ReportTargetType.OPEN_MAT,
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 3, 31),
+                PageRequest.of(0, 200, org.springframework.data.domain.Sort.by("createdAt").ascending())
+        );
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(reportRepository).findAll(captor.capture());
+        verify(reportRepository).findAll(any(Specification.class), captor.capture());
         assertThat(captor.getValue().getSort().getOrderFor("createdAt")).isNotNull();
-        assertThat(captor.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        assertThat(captor.getValue().getSort().getOrderFor("createdAt").isAscending()).isTrue();
+        assertThat(captor.getValue().getPageSize()).isEqualTo(100);
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).getTargetSummary().getTotalReportCount()).isEqualTo(4);
         assertThat(response.getContent().get(0).getTargetSummary().getResolvedCount()).isEqualTo(2);
@@ -121,7 +130,7 @@ class ReportServiceTest {
         ReflectionTestUtils.setField(request, "processingMemo", "  반복 광고성 내용으로 확인되어 숨김 처리했습니다. ");
         ReflectionTestUtils.setField(request, "finalAction", "  CONTENT_HIDDEN  ");
 
-        when(reportRepository.findById(77L)).thenReturn(Optional.of(report));
+        when(reportRepository.findVisibleByIdForAdmin(77L, 3L)).thenReturn(Optional.of(report));
         mockSummaryCounts(ReportTargetType.OPEN_MAT, 10L, 4, 0, 1, 3, 0);
 
         ReportResponse response = reportService.updateStatus(1L, 77L, request);
@@ -132,6 +141,32 @@ class ReportServiceTest {
         assertThat(response.getProcessingMemo()).isEqualTo("반복 광고성 내용으로 확인되어 숨김 처리했습니다.");
         assertThat(response.getFinalAction()).isEqualTo("CONTENT_HIDDEN");
         assertThat(response.getTargetSummary().getResolvedCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("관리자 신고 상세 조회는 누적 신고 3건 미만 대상을 숨긴다")
+    void findByIdForAdmin_hidesTargetBelowThreshold() {
+        when(reportRepository.findVisibleByIdForAdmin(88L, 3L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reportService.findByIdForAdmin(88L))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("NOT_FOUND");
+                    assertThat(exception).hasMessage("신고를 찾을 수 없습니다");
+                });
+    }
+
+    @Test
+    @DisplayName("관리자 신고 상태 변경도 누적 신고 3건 미만 대상은 허용하지 않는다")
+    void updateStatus_rejectsTargetBelowThreshold() {
+        ReportStatusUpdateRequest request = new ReportStatusUpdateRequest();
+        ReflectionTestUtils.setField(request, "status", ReportStatus.IN_REVIEW);
+        when(reportRepository.findVisibleByIdForAdmin(89L, 3L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reportService.updateStatus(1L, 89L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("NOT_FOUND");
+                    assertThat(exception).hasMessage("신고를 찾을 수 없습니다");
+                });
     }
 
     @Test

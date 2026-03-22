@@ -172,4 +172,16 @@ class AuthServiceLifecycleTest {
         verify(userDeviceRepository, never()).findByUser_IdAndFcmToken(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
         verify(userDeviceRepository, never()).delete(org.mockito.ArgumentMatchers.any(UserDevice.class));
     }
+
+    @Test
+    @DisplayName("로그아웃 시 전달한 FCM 토큰이 없어도 리프레시 토큰 무효화는 계속 진행한다")
+    void logout_withMissingFcmTokenStillDeletesRefreshToken() {
+        when(userDeviceRepository.findByUser_IdAndFcmToken(52L, "missing-token")).thenReturn(Optional.empty());
+
+        authService.logout(52L, " missing-token ");
+
+        verify(userDeviceRepository).findByUser_IdAndFcmToken(52L, "missing-token");
+        verify(userDeviceRepository, never()).delete(org.mockito.ArgumentMatchers.any(UserDevice.class));
+        verify(refreshTokenRepository).deleteByUserId(52L);
+    }
 }
