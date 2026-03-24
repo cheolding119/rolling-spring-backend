@@ -1,0 +1,9 @@
+ALTER TABLE IF EXISTS inquiries
+    ADD COLUMN IF NOT EXISTS type VARCHAR(50);
+
+UPDATE inquiries
+SET type = 'OTHER'
+WHERE type IS NULL;
+
+ALTER TABLE inquiries
+    ALTER COLUMN type SET NOT NULL;
