@@ -193,5 +193,9 @@ public class OpenMat extends BaseTimeEntity {
     public void report() {
         this.reportCount++;
     }
+
+    public void clearReportBlock() {
+        this.reportCount = 0;
+    }
 }
 
