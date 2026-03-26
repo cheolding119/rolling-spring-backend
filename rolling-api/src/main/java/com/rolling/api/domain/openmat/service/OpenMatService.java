@@ -326,6 +326,21 @@ public class OpenMatService {
     }
 
     @Transactional
+    public OpenMatResponse clearReportBlock(Long adminUserId, Long openMatId) {
+        OpenMat openMat = openMatRepository.findById(openMatId)
+                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+
+        int previousReportCount = openMat.getReportCount() == null ? 0 : openMat.getReportCount();
+        openMat.clearReportBlock();
+        log.info("OpenMat report block cleared. openMatId={}, adminUserId={}, previousReportCount={}",
+                openMatId,
+                adminUserId,
+                previousReportCount);
+
+        return OpenMatResponse.from(openMat);
+    }
+
+    @Transactional
     public Page<OpenMatResponse> findMyOpenMats(Long userId, Pageable pageable) {
         syncExpiredOpenMats();
 

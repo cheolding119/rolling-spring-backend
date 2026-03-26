@@ -575,6 +575,31 @@ class OpenMatServiceTest {
     }
 
     @Test
+    @DisplayName("관리자는 신고 누적으로 차단된 오픈매트의 신고 차단을 해제할 수 있다")
+    void clearReportBlock_resetsReportCount() {
+        User host = createUser(1L, "host-clear-report", "host");
+        OpenMat openMat = createOpenMat(
+                22L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        openMat.report();
+        openMat.report();
+        openMat.report();
+
+        when(openMatRepository.findById(22L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.clearReportBlock(100L, 22L);
+
+        assertThat(openMat.getReportCount()).isEqualTo(0);
+        assertThat(openMat.isReported()).isFalse();
+        assertThat(response.getReported()).isFalse();
+    }
+
+    @Test
     @DisplayName("참가자가 있는 오픈매트의 일정이나 장소가 바뀌면 수정 알림 이벤트를 발행한다")
     void update_whenScheduleOrLocationChanged_publishesUpdatedEvent() {
         User host = createUser(1L, "host-update-notify", "host");
