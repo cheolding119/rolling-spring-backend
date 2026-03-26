@@ -1,0 +1,22 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches:
+      - main # 만약 기본 브랜치가 master라면 master로 바꿔주세요.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name:  서버에 접속해서 배포 스크립트 실행하기
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            # 아까 만든 배포 스크립트에 실행 권한을 다시 한번 확실히 주고 실행합니다.
+            chmod +x /home/ubuntu/deploy.sh
+            /home/ubuntu/deploy.sh
