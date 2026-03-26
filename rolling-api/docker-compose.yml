@@ -1,0 +1,47 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rolling-api
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./secrets:/run/secrets:ro
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: ${DB_URL:-jdbc:postgresql://host.docker.internal:5432/rolling}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
+      OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE: ${OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE:-false}
+      TOURNAMENT_CRAWLER_ADMIN_KEY: ${TOURNAMENT_CRAWLER_ADMIN_KEY:-}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-service-key.json
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+      PUSH_NOTIFICATION_ANDROID_CHANNEL_ID: ${PUSH_NOTIFICATION_ANDROID_CHANNEL_ID:-rolling_open_mat_alerts}
+      JAVA_OPTS: ${JAVA_OPTS:-}
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: rolling-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SERVER_NAME: ${SERVER_NAME:?SERVER_NAME is required}
+      SSL_CERT_PATH: /etc/letsencrypt/live/${SERVER_NAME:?SERVER_NAME is required}/fullchain.pem
+      SSL_KEY_PATH: /etc/letsencrypt/live/${SERVER_NAME:?SERVER_NAME is required}/privkey.pem
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot

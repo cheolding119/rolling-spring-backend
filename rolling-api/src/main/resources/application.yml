@@ -62,6 +62,7 @@ management:
 # port 번호
 server:
   port: 8080
+  forward-headers-strategy: framework
 
 # JWT 관련
 jwt:

@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.gradle
+.gradle-home
+.gradle-local
+.claude
+.codex
+build
+out
+.env
+.env.*
+secrets
+firebase-service-key.json
+*.log
+*.tmp
+*.html
