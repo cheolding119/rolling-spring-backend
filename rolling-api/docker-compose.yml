@@ -4,7 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: rolling-api
-    restart: unless-stopped
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -25,14 +30,19 @@ services:
       AWS_SECRET_KEY: ${AWS_SECRET_KEY}
       AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
       PUSH_NOTIFICATION_ANDROID_CHANNEL_ID: ${PUSH_NOTIFICATION_ANDROID_CHANNEL_ID:-rolling_open_mat_alerts}
-      JAVA_OPTS: ${JAVA_OPTS:-}
+      JAVA_OPTS: ${JAVA_OPTS:- -Xmx256m -Xms256m}
 
   nginx:
     build:
       context: ./nginx
       dockerfile: Dockerfile
     container_name: rolling-nginx
-    restart: unless-stopped
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
     depends_on:
       - api
     ports:
