@@ -13,7 +13,7 @@ FROM eclipse-temurin:17-jre-jammy AS runtime
 
 WORKDIR /app
 
-ENV JAVA_OPTS=""
+ENV JAVA_OPTS="-Xmx256m -Xms256m"
 ENV SPRING_PROFILES_ACTIVE=prod
 
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
