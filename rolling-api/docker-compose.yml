@@ -12,6 +12,11 @@ services:
           cpus: '0.5'
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./secrets:/run/secrets:ro
     environment:
@@ -35,7 +40,7 @@ services:
   nginx:
     build:
       context: ./nginx
-      dockerfile: Dockerfile
+      dockerfile: nginx/nginx.Dockerfile
     container_name: rolling-nginx
     restart: on-failure:3
     deploy:
