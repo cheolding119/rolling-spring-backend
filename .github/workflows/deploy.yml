@@ -3,20 +3,50 @@ name: Deploy to Lightsail
 on:
   push:
     branches:
-      - main # 만약 기본 브랜치가 master라면 master로 바꿔주세요.
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name:  서버에 접속해서 배포 스크립트 실행하기
+      # 1. GitHub에 올린 소스 코드를 가져옵니다.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Docker Hub에 로그인합니다 (아까 등록한 Secrets 사용)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3. Spring Boot 이미지를 빌드하고 Docker Hub에 올립니다.
+      - name: Build and Push Spring Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile  # Spring용 Dockerfile 경로
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/rolling-backend:latest
+
+      # 4. (추가) Nginx 이미지를 빌드하고 Docker Hub에 올립니다.
+      - name: Build and Push Nginx Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./nginx.Dockerfile  # Nginx용 Dockerfile 이름 (파일명이 다르면 수정하세요!)
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:latest
+
+      # 5. 마지막으로 서버에 접속해서 명령을 내립니다 (기존 코드)
+      - name: 서버에 접속해서 배포 스크립트 실행하기
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
-            # 아까 만든 배포 스크립트에 실행 권한을 다시 한번 확실히 주고 실행합니다.
+            # 이 부분은 다음 단계에서 수정할 겁니다!
             chmod +x /home/ubuntu/deploy.sh
             /home/ubuntu/deploy.sh
