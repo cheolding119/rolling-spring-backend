@@ -34,7 +34,7 @@ jobs:
       - name: Build and Push Nginx Image
         uses: docker/build-push-action@v5
         with:
-          context: ./rolling-api     
+          context: ./rolling-api/nginx
           file: ./rolling-api/nginx/nginx.Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:latest
