@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./nginx.Dockerfile  # Nginx용 Dockerfile 이름 (파일명이 다르면 수정하세요!)
+          file: ./Dockerfile  # Nginx용 Dockerfile 이름 (파일명이 다르면 수정하세요!)
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:latest
 
