@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./nginx/nginx.DockerFile
+          file: ./nginx/nginx.Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:latest
 
