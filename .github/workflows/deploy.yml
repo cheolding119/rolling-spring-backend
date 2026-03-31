@@ -57,11 +57,26 @@ jobs:
             
             cd rolling-api
             
-            # 3. 💡 핵심: 현재 배포 버전을 알리는 .env 파일 자동 생성
-            # 기존 .env 내용을 유지하고 싶다면 필요한 변수들만 덮어쓰도록 구성하세요.
-            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
-            echo "IMAGE_TAG=${{ github.sha }}" >> .env
-            echo "SERVER_NAME=${{ secrets.SERVER_NAME }}" >> .env
+            # 3. env 파일 세팅
+            cat <<EOF > .env
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            IMAGE_TAG=${{ github.sha }}
+            SERVER_NAME=${{ secrets.SERVER_NAME }}
+            DB_URL=${{ secrets.DB_URL }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+            AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
+            ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
+            TOURNAMENT_CRAWLER_ADMIN_KEY=${{ secrets.TOURNAMENT_CRAWLER_ADMIN_KEY }}
+            FIREBASE_ENABLED=${{ secrets.FIREBASE_ENABLED }}
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}
+            OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE=${{ secrets.OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE }}
+            SPRING_PROFILES_ACTIVE=${{ secrets.SPRING_PROFILES_ACTIVE }}
+            EOF
             
             # 4. 이미지 내려받기 (Docker Hub에서 가져오므로 pull이 이제 작동함)
             docker compose pull
