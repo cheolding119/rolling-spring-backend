@@ -47,5 +47,21 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
+            # 💡 1. 서버 내 프로젝트 폴더로 이동 (경로 확인 필수)
+            cd /home/ubuntu/rolling-spring-backend
+            
+            # 💡 2. GitHub에서 최신 docker-compose.yml 및 설정파일 가져오기
+            git pull origin main
+            
+            # 3. 배포 스크립트 실행
             chmod +x /home/ubuntu/deploy.sh
             /home/ubuntu/deploy.sh
+
+
+
+
+
+
+
+
+            
