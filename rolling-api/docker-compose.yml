@@ -1,8 +1,7 @@
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # 💡 build: 대신 미리 빌드된 이미지를 사용합니다.
+    image: ${DOCKER_USERNAME}/rolling-backend:${IMAGE_TAG:-latest}
     container_name: rolling-api
     restart: on-failure:3
     deploy:
@@ -38,9 +37,8 @@ services:
       JAVA_OPTS: ${JAVA_OPTS:- -Xmx256m -Xms256m}
 
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: nginx/nginx.Dockerfile
+    # 💡 Nginx 역시 미리 빌드된 이미지를 사용합니다.
+    image: ${DOCKER_USERNAME}/rolling-nginx:${IMAGE_TAG:-latest}
     container_name: rolling-nginx
     restart: on-failure:3
     deploy:
@@ -58,7 +56,8 @@ services:
       SSL_CERT_PATH: /etc/letsencrypt/live/${SERVER_NAME:?SERVER_NAME is required}/fullchain.pem
       SSL_KEY_PATH: /etc/letsencrypt/live/${SERVER_NAME:?SERVER_NAME is required}/privkey.pem
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # 💡 설정 주입을 위해 :ro를 제거했습니다.
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
       - /home/ubuntu/admin-frontend/build:/usr/share/nginx/html:ro
