@@ -1,16 +1,12 @@
 server {
     listen 80;
     listen [::]:80;
-
-    #  모든 도메인(루트, API, 관리자)을 한 번에 나열합니다.
     server_name ${SERVER_NAME} api.${SERVER_NAME} admin.${SERVER_NAME};
 
-    # Let's Encrypt 인증서 갱신을 위한 경로
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
-    # 80포트로 들어오는 모든 요청을 HTTPS로 강제 리다이렉트합니다.
     location / {
         return 301 https://$host$request_uri;
     }

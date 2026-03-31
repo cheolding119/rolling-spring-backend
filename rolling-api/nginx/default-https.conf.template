@@ -1,15 +1,12 @@
-# 1. 관리자 대시보드 (React) 설정
+# 1. 관리자 대시보드 (React)
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    
-    # admin.rolling-app.com 접속을 처리합니다.
     server_name admin.${SERVER_NAME};
 
     ssl_certificate ${SSL_CERT_PATH};
     ssl_certificate_key ${SSL_KEY_PATH};
 
-    # 리액트 빌드 파일이 위치한 경로입니다.
     location / {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
@@ -17,17 +14,14 @@ server {
     }
 }
 
-# 2. API 및 기본 도메인 (Spring Boot) 설정
+# 2. API 서버 (Spring Boot)
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-
     server_name ${SERVER_NAME} api.${SERVER_NAME};
 
     ssl_certificate ${SSL_CERT_PATH};
     ssl_certificate_key ${SSL_KEY_PATH};
-
-    client_max_body_size 20m;
 
     location / {
         proxy_pass http://api:8080;
@@ -35,23 +29,5 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
-
-        proxy_read_timeout 60s;
-        proxy_connect_timeout 60s;
-    }
-}
-
-# 3. HTTP -> HTTPS 자동 전환 (Port 80)
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${SERVER_NAME} api.${SERVER_NAME} admin.${SERVER_NAME};
-
-    location ^~ /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
     }
 }
