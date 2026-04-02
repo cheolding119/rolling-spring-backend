@@ -1,7 +1,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name ${SERVER_NAME} api.${SERVER_NAME} admin.${SERVER_NAME};
+    server_name ${SERVER_NAME} www.${SERVER_NAME} api.${SERVER_NAME} admin.${SERVER_NAME};
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
