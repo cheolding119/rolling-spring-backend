@@ -1,4 +1,34 @@
-# 1. 관리자 대시보드 (React)
+# 1. 랜딩 페이지 (React)
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${SERVER_NAME};
+
+    ssl_certificate ${SSL_CERT_PATH};
+    ssl_certificate_key ${SSL_KEY_PATH};
+
+    location / {
+        root   /usr/share/nginx/landing;
+        index  index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# 2. www -> 루트 도메인 리다이렉트
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name www.${SERVER_NAME};
+
+    ssl_certificate ${SSL_CERT_PATH};
+    ssl_certificate_key ${SSL_KEY_PATH};
+
+    location / {
+        return 301 https://${SERVER_NAME}$request_uri;
+    }
+}
+
+# 3. 관리자 대시보드 (React)
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -8,17 +38,17 @@ server {
     ssl_certificate_key ${SSL_KEY_PATH};
 
     location / {
-        root   /usr/share/nginx/html;
+        root   /usr/share/nginx/admin;
         index  index.html index.htm;
         try_files $uri $uri/ /index.html;
     }
 }
 
-# 2. API 서버 (Spring Boot)
+# 4. API 서버 (Spring Boot)
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name ${SERVER_NAME} api.${SERVER_NAME};
+    server_name api.${SERVER_NAME};
 
     ssl_certificate ${SSL_CERT_PATH};
     ssl_certificate_key ${SSL_KEY_PATH};
