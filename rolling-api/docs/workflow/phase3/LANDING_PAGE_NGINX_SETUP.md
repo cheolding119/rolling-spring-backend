@@ -201,7 +201,7 @@ HTTPS 설정은 아래 기준으로 정리한다.
 
 결론적으로 아래 두 경로는 서로 독립적으로 운영되어야 한다.
 
-- 랜딩 `dist`: `/home/ubuntu/ROLLING-REACT-LANDING/dist`
+- 랜딩 `dist`: `/home/ubuntu/ROLLING-REACT-LANDING-FRONTEND/dist`
 - 관리자 `dist`: `/home/ubuntu/ROLLING-REACT-ADMIN-FRONTEND/dist`
 
 권장 Nginx 내부 마운트 경로는 아래와 같다.
@@ -278,7 +278,7 @@ PHASE 2 확인 결과:
 
 PHASE 3 확인 결과:
 
-- 랜딩 React 정적 파일 경로는 `/home/ubuntu/ROLLING-REACT-LANDING/dist`로 분리하는 방향으로 확정한다.
+- 랜딩 React 정적 파일 경로는 `/home/ubuntu/ROLLING-REACT-LANDING-FRONTEND/dist`로 분리하는 방향으로 확정한다.
 - 관리자 React 정적 파일 경로는 기존 `/home/ubuntu/ROLLING-REACT-ADMIN-FRONTEND/dist`를 유지한다.
 - [docker-compose.yml](/C:/rolling/rolling-spring-backend/rolling-api/docker-compose.yml)에는 랜딩 정적 파일 마운트를 추가하고, 관리자 정적 파일 마운트는 기존 단일 root 구조에서 분리한다.
 - Nginx 내부 마운트 경로는 `/usr/share/nginx/landing`, `/usr/share/nginx/admin`으로 분리하는 방향으로 정리한다.
@@ -287,7 +287,7 @@ PHASE 3 확인 결과:
 - `./nginx/default.conf:/etc/nginx/conf.d/default.conf`
 - `/etc/letsencrypt:/etc/letsencrypt:ro`
 - `/var/www/certbot:/var/www/certbot`
-- `/home/ubuntu/ROLLING-REACT-LANDING/dist:/usr/share/nginx/landing:ro`
+- `/home/ubuntu/ROLLING-REACT-LANDING-FRONTEND/dist:/usr/share/nginx/landing:ro`
 - `/home/ubuntu/ROLLING-REACT-ADMIN-FRONTEND/dist:/usr/share/nginx/admin:ro`
 
 ### PHASE 4. 템플릿 파일 정합성 동기화안 작성
@@ -332,7 +332,7 @@ PHASE 5 확인 결과:
 - `admin.rolling-app.com`
 - `api.rolling-app.com`
 - 정적 파일 점검 기준은 서버에 아래 두 경로가 실제 존재하고, 최신 빌드 결과가 배치되어 있는지 확인하는 것이다.
-- `/home/ubuntu/ROLLING-REACT-LANDING/dist`
+- `/home/ubuntu/ROLLING-REACT-LANDING-FRONTEND/dist`
 - `/home/ubuntu/ROLLING-REACT-ADMIN-FRONTEND/dist`
 - SPA fallback 점검 기준은 랜딩과 관리자 페이지가 React SPA인 경우 `try_files ... /index.html` 구성이 각 도메인 블록에 반영되어 있는지 확인하는 것이다.
 - 주소별 최종 기대 결과는 아래와 같다.
