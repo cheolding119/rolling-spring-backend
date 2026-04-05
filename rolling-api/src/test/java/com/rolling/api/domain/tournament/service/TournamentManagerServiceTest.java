@@ -11,6 +11,7 @@ import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.infra.s3.S3Uploader;
 import com.rolling.api.global.exception.BusinessException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,9 +51,13 @@ class TournamentManagerServiceTest {
     @Mock
     private S3Uploader s3Uploader;
 
+    private SimpleMeterRegistry meterRegistry;
+
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         lenient().when(s3Uploader.uploadImageFromUrl(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(successCrawler.getSource()).thenReturn(TournamentSource.STREET_JIU_JITSU);
     }
 
     @Test
@@ -181,6 +186,11 @@ class TournamentManagerServiceTest {
         assertThat(result.getUpdatedCount()).isEqualTo(0);
         assertThat(result.getSkippedCount()).isEqualTo(1);
         verify(tournamentRepository, never()).save(any());
+        assertThat(meterRegistry.get("rolling_tournament_crawl_items_total")
+                .tag("source", "street_jiu_jitsu")
+                .tag("result", "skipped")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test
@@ -237,6 +247,15 @@ class TournamentManagerServiceTest {
         verify(tournamentRepository).findByApplyLink(model.getApplyLink());
         verify(tournamentRepository).findByTitleAndCompetitionDate(eq(model.getTitle()), eq(model.getCompetitionDate()));
         verify(tournamentRepository).save(any(Tournament.class));
+        assertThat(meterRegistry.get("rolling_tournament_crawl_items_total")
+                .tag("source", "street_jiu_jitsu")
+                .tag("result", "created")
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get("rolling_tournament_crawl_duration_seconds")
+                .tag("source", "street_jiu_jitsu")
+                .timer()
+                .count()).isEqualTo(1L);
     }
 
     @Test
@@ -406,7 +425,9 @@ class TournamentManagerServiceTest {
     }
 
     private TournamentManagerService managerService(TournamentCrawler... crawlers) {
-        return new TournamentManagerService(List.of(crawlers), tournamentRepository, s3Uploader);
+        TournamentManagerService managerService = new TournamentManagerService(List.of(crawlers), tournamentRepository, s3Uploader);
+        ReflectionTestUtils.setField(managerService, "meterRegistry", meterRegistry);
+        return managerService;
     }
     private TournamentModel validModel(String title, String competitionDate, String location, String applyLink) {
         TournamentModel model = new TournamentModel();

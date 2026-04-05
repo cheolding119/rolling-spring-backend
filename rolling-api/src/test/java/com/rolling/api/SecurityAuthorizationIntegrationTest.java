@@ -26,7 +26,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -126,6 +129,28 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1));
+    }
+
+    @Test
+    @DisplayName("prometheus 엔드포인트는 accessToken 없이 접근할 수 있다")
+    void prometheusEndpoint_isAccessibleWithoutToken() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("prometheus 외 actuator 엔드포인트는 관리자 accessToken이 필요하다")
+    void nonPrometheusActuatorEndpoints_requireAdminToken() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/actuator/info")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/actuator/info")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -252,7 +277,8 @@ class SecurityAuthorizationIntegrationTest {
             OpenMatController.class,
             NoticeController.class,
             NoticeAdminController.class,
-            TournamentCrawlerController.class
+            TournamentCrawlerController.class,
+            TestActuatorController.class
     })
     static class TestConfig {
 
@@ -274,6 +300,20 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         UserRepository userRepository() {
             return mock(UserRepository.class);
+        }
+    }
+
+    @RestController
+    static class TestActuatorController {
+
+        @GetMapping("/actuator/prometheus")
+        ResponseEntity<String> prometheus() {
+            return ResponseEntity.ok("# test metric");
+        }
+
+        @GetMapping("/actuator/info")
+        ResponseEntity<String> info() {
+            return ResponseEntity.ok("{\"app\":\"rolling-api\"}");
         }
     }
 }

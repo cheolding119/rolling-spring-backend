@@ -19,8 +19,10 @@ import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,12 @@ public class OpenMatService {
     private final ReportService reportService;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
+    private MeterRegistry meterRegistry;
+
+    @Autowired(required = false)
+    void setMeterRegistry(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Transactional
     public OpenMatResponse create(Long hostId, OpenMatCreateRequest request) {
@@ -196,46 +204,61 @@ public class OpenMatService {
     @Transactional
     public void apply(Long userId, Long openMatId) {
         OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
-                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+                .orElseThrow(() -> {
+                    incrementOpenMatCounter("rolling_openmat_apply_total", "not_found", 1);
+                    return BusinessException.notFound("오픈매트를 찾을 수 없습니다");
+                });
         LocalDateTime now = now();
         openMat.synchronizeStatus(now);
 
         if (openMat.getHost().getId().equals(userId)) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "host_cannot_apply", 1);
             throw new BusinessException("HOST_CANNOT_APPLY", "자신이 주최한 오픈매트에는 신청할 수 없습니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.isReported()) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "open_mat_reported", 1);
             throw new BusinessException("OPEN_MAT_REPORTED", "신고 누적으로 신청이 차단된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.getStatus() == OpenMatStatus.CLOSED) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "open_mat_closed", 1);
             throw new BusinessException("OPEN_MAT_CLOSED", "모집이 마감된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.getStatus() == OpenMatStatus.FINISHED) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "open_mat_finished", 1);
             throw new BusinessException("OPEN_MAT_FINISHED", "이미 종료된 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.isParticipant(userId)) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "already_applied", 1);
             throw new BusinessException("ALREADY_APPLIED", "이미 신청한 오픈매트입니다", HttpStatus.BAD_REQUEST);
         }
         if (openMat.isCapacityFull()) {
+            incrementOpenMatCounter("rolling_openmat_apply_total", "capacity_full", 1);
             throw new BusinessException("CAPACITY_FULL", "정원이 초과되었습니다", HttpStatus.BAD_REQUEST);
         }
 
         openMat.addParticipant(userId);
         openMat.synchronizeStatus(now);
+        incrementOpenMatCounter("rolling_openmat_apply_total", "success", 1);
     }
 
     @Transactional
     public void cancelApply(Long userId, Long openMatId) {
         OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
-                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+                .orElseThrow(() -> {
+                    incrementOpenMatCounter("rolling_openmat_cancel_total", "not_found", 1);
+                    return BusinessException.notFound("오픈매트를 찾을 수 없습니다");
+                });
         LocalDateTime now = now();
         openMat.synchronizeStatus(now);
 
         if (!openMat.isParticipant(userId)) {
+            incrementOpenMatCounter("rolling_openmat_cancel_total", "not_applied", 1);
             throw BusinessException.badRequest("신청하지 않은 오픈매트입니다");
         }
 
         openMat.removeParticipant(userId);
         openMat.synchronizeStatus(now);
+        incrementOpenMatCounter("rolling_openmat_cancel_total", "success", 1);
     }
 
     @Transactional(readOnly = true)
@@ -312,7 +335,10 @@ public class OpenMatService {
     @Transactional
     public void report(Long userId, Long openMatId, ReportReason reason, String customReason) {
         OpenMat openMat = openMatRepository.findByIdForUpdate(openMatId)
-                .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
+                .orElseThrow(() -> {
+                    incrementOpenMatCounter("rolling_openmat_report_total", "not_found", 1);
+                    return BusinessException.notFound("오픈매트를 찾을 수 없습니다");
+                });
 
         reportService.createReport(
                 userId,
@@ -323,6 +349,7 @@ public class OpenMatService {
                 customReason
         );
         openMat.report();
+        incrementOpenMatCounter("rolling_openmat_report_total", "success", 1);
     }
 
     @Transactional
@@ -379,6 +406,7 @@ public class OpenMatService {
         if (!expiredOpenMats.isEmpty()) {
             log.debug("Synchronized {} expired open mats to FINISHED", expiredOpenMats.size());
         }
+        incrementOpenMatCounter("rolling_openmat_sync_total", "success", expiredOpenMats.size());
         return expiredOpenMats.size();
     }
 
@@ -468,6 +496,14 @@ public class OpenMatService {
 
         String normalized = keyword.trim().replaceAll("\\s+", " ");
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void incrementOpenMatCounter(String metricName, String result, int amount) {
+        if (meterRegistry == null || amount <= 0) {
+            return;
+        }
+        meterRegistry.counter(metricName, "result", result)
+                .increment(amount);
     }
 }
 

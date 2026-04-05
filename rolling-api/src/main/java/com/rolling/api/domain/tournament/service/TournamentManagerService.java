@@ -9,11 +9,14 @@ import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.infra.s3.S3Uploader;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -30,18 +33,29 @@ public class TournamentManagerService {
     private final List<TournamentCrawler> crawlers;
     private final TournamentRepository tournamentRepository;
     private final S3Uploader s3Uploader;
+    private MeterRegistry meterRegistry;
+
+    @Autowired(required = false)
+    void setMeterRegistry(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Transactional(readOnly = true)
     public List<TournamentModel> crawlAll() {
         List<TournamentModel> merged = new ArrayList<>();
 
         for (TournamentCrawler crawler : crawlers) {
+            long startedAt = System.nanoTime();
+            String source = sourceTag(crawler.getSource());
             try {
                 List<TournamentModel> crawled = applySource(crawler.crawlAll(), crawler.getSource());
+                recordCrawlDuration(source, startedAt);
                 if (!crawled.isEmpty()) {
                     merged.addAll(crawled);
                 }
             } catch (Exception e) {
+                recordCrawlDuration(source, startedAt);
+                incrementTournamentItems(source, "failed", 1);
                 log.error("Tournament crawler failed: {}", crawler.getClass().getSimpleName(), e);
             }
         }
@@ -80,16 +94,21 @@ public class TournamentManagerService {
             Optional<NormalizedTournament> normalizedOptional = normalizeAndValidate(crawledModel);
             if (normalizedOptional.isEmpty()) {
                 skippedCount++;
+                incrementTournamentItems(sourceTag(crawledModel == null ? null : crawledModel.getSource()), "skipped", 1);
                 continue;
             }
 
             UpsertResult result = upsert(normalizedOptional.get());
             if (result == UpsertResult.CREATED) {
                 createdCount++;
+                incrementTournamentItems(sourceTag(normalizedOptional.get().source()), "created", 1);
             } else {
                 updatedCount++;
+                incrementTournamentItems(sourceTag(normalizedOptional.get().source()), "updated", 1);
             }
         }
+
+        incrementDeletedTournaments(deletedCount);
 
         TournamentCrawlResult crawlResult = TournamentCrawlResult.builder()
                 .crawledCount(safeCrawled.size())
@@ -109,9 +128,15 @@ public class TournamentManagerService {
     }
 
     private List<TournamentModel> crawlSingle(TournamentCrawler crawler) {
+        long startedAt = System.nanoTime();
+        String source = sourceTag(crawler.getSource());
         try {
-            return applySource(crawler.crawlAll(), crawler.getSource());
+            List<TournamentModel> crawled = applySource(crawler.crawlAll(), crawler.getSource());
+            recordCrawlDuration(source, startedAt);
+            return crawled;
         } catch (Exception e) {
+            recordCrawlDuration(source, startedAt);
+            incrementTournamentItems(source, "failed", 1);
             log.error("Tournament crawler failed: {}", crawler.getClass().getSimpleName(), e);
             return List.of();
         }
@@ -302,5 +327,33 @@ public class TournamentManagerService {
             String location,
             String applyLink
     ) {
+    }
+
+    private void incrementTournamentItems(String source, String result, double amount) {
+        if (meterRegistry == null || amount <= 0) {
+            return;
+        }
+        meterRegistry.counter("rolling_tournament_crawl_items_total", "source", source, "result", result)
+                .increment(amount);
+    }
+
+    private void incrementDeletedTournaments(int deletedCount) {
+        if (meterRegistry == null || deletedCount <= 0) {
+            return;
+        }
+        meterRegistry.counter("rolling_tournament_crawl_deleted_total")
+                .increment(deletedCount);
+    }
+
+    private void recordCrawlDuration(String source, long startedAtNanos) {
+        if (meterRegistry == null) {
+            return;
+        }
+        meterRegistry.timer("rolling_tournament_crawl_duration_seconds", "source", source)
+                .record(Duration.ofNanos(Math.max(0L, System.nanoTime() - startedAtNanos)));
+    }
+
+    private String sourceTag(TournamentSource source) {
+        return source == null ? "unknown" : source.name().toLowerCase();
     }
 }

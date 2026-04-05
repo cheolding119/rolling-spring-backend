@@ -14,7 +14,8 @@ import com.google.firebase.messaging.SendResponse;
 import com.rolling.api.domain.notification.model.PushNotificationCommand;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
@@ -27,7 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
-@RequiredArgsConstructor
 public class FcmPushNotificationService implements PushNotificationService {
 
     private static final int MAX_MULTICAST_SIZE = 500;
@@ -38,6 +38,23 @@ public class FcmPushNotificationService implements PushNotificationService {
     private final FirebaseMessaging firebaseMessaging;
     private final UserDeviceRepository userDeviceRepository;
     private final String androidChannelId;
+    private final MeterRegistry meterRegistry;
+
+    public FcmPushNotificationService(FirebaseMessaging firebaseMessaging,
+                                      UserDeviceRepository userDeviceRepository,
+                                      String androidChannelId) {
+        this(firebaseMessaging, userDeviceRepository, androidChannelId, null);
+    }
+
+    public FcmPushNotificationService(FirebaseMessaging firebaseMessaging,
+                                      UserDeviceRepository userDeviceRepository,
+                                      String androidChannelId,
+                                      MeterRegistry meterRegistry) {
+        this.firebaseMessaging = firebaseMessaging;
+        this.userDeviceRepository = userDeviceRepository;
+        this.androidChannelId = androidChannelId;
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     public void sendToUsers(Collection<Long> userIds, PushNotificationCommand command) {
@@ -76,11 +93,13 @@ public class FcmPushNotificationService implements PushNotificationService {
 
         for (int i = 0; i < tokens.size(); i += MAX_MULTICAST_SIZE) {
             List<String> batch = tokens.subList(i, Math.min(i + MAX_MULTICAST_SIZE, tokens.size()));
+            recordBatchSize(batch.size());
 
             try {
                 BatchResponse response = firebaseMessaging.sendEachForMulticast(buildMessage(batch, command, data));
 
                 collectInvalidTokens(command, batch, response.getResponses(), invalidTokens);
+                recordSendOutcome("success", "none", response.getSuccessCount());
                 log.info(
                         "Sent push notification. type={}, tokenCount={}, successCount={}, failureCount={}, tokenPrefixes={}, retryPolicy={}",
                         command.type(),
@@ -91,6 +110,11 @@ public class FcmPushNotificationService implements PushNotificationService {
                         RETRY_POLICY
                 );
             } catch (FirebaseMessagingException exception) {
+                recordSendOutcome(
+                        "failure",
+                        exception.getMessagingErrorCode() == null ? "unknown" : exception.getMessagingErrorCode().name().toLowerCase(),
+                        batch.size()
+                );
                 log.error(
                         "FCM batch send failed. type={}, tokenCount={}, tokenPrefixes={}, errorCode={}, retryPolicy={}",
                         command.type(),
@@ -106,6 +130,7 @@ public class FcmPushNotificationService implements PushNotificationService {
 
         if (!invalidTokens.isEmpty()) {
             userDeviceRepository.deleteAllByFcmTokenIn(new LinkedHashSet<>(invalidTokens));
+            incrementInvalidTokenCleanup(invalidTokens.size());
             log.info("Deleted {} invalid FCM tokens. tokenPrefixes={}", invalidTokens.size(), summarizeTokens(invalidTokens));
         }
     }
@@ -188,6 +213,7 @@ public class FcmPushNotificationService implements PushNotificationService {
 
             FirebaseMessagingException exception = response.getException();
             if (exception == null || exception.getMessagingErrorCode() == null) {
+                recordSendOutcome("failure", "unknown", 1);
                 log.warn(
                         "FCM token send failed without error code. type={}, tokenPrefix={}, retryPolicy={}",
                         command.type(),
@@ -199,6 +225,7 @@ public class FcmPushNotificationService implements PushNotificationService {
 
             MessagingErrorCode errorCode = exception.getMessagingErrorCode();
             boolean cleanupTarget = isInvalidTokenError(errorCode);
+            recordSendOutcome("failure", errorCode.name().toLowerCase(), 1);
 
             log.warn(
                     "FCM token send failed. type={}, tokenPrefix={}, errorCode={}, cleanupTarget={}, retryPolicy={}",
@@ -233,6 +260,31 @@ public class FcmPushNotificationService implements PushNotificationService {
         int prefixLength = Math.min(TOKEN_PREFIX_LENGTH, token.length());
         String prefix = token.substring(0, prefixLength);
         return token.length() > prefixLength ? prefix + "..." : prefix;
+    }
+
+    private void recordBatchSize(int batchSize) {
+        if (meterRegistry == null || batchSize <= 0) {
+            return;
+        }
+        DistributionSummary.builder("rolling_fcm_batch_size")
+                .register(meterRegistry)
+                .record(batchSize);
+    }
+
+    private void recordSendOutcome(String result, String errorCode, int amount) {
+        if (meterRegistry == null || amount <= 0) {
+            return;
+        }
+        meterRegistry.counter("rolling_fcm_send_total", "result", result, "error_code", errorCode)
+                .increment(amount);
+    }
+
+    private void incrementInvalidTokenCleanup(int count) {
+        if (meterRegistry == null || count <= 0) {
+            return;
+        }
+        meterRegistry.counter("rolling_fcm_invalid_token_cleanup_total")
+                .increment(count);
     }
 }
 

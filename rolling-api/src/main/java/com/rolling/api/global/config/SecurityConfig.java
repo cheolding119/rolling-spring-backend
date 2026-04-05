@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -35,6 +36,33 @@ public class SecurityConfig {
     private final AdminAccessConfig adminAccessConfig;
 
     @Bean
+    @Order(0)
+    public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+        JwtAuthenticationFilter jwtAuthenticationFilter =
+                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig);
+
+        http
+                .securityMatcher("/actuator/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/prometheus"
+                        ).permitAll()
+                        .anyRequest().hasRole("ADMIN"))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, e) -> writeUnauthorizedResponse(response)))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         JwtAuthenticationFilter jwtAuthenticationFilter =
                 new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig);
@@ -49,15 +77,11 @@ public class SecurityConfig {
                     auth.requestMatchers(
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
-                            "/actuator/health",
-                            "/actuator/health/**",
                             "/swagger-ui/**",
                             "/swagger-ui.html",
                             "/v3/api-docs/**",
                             "/error"
                     ).permitAll();
-
-                    auth.requestMatchers("/actuator/**").hasRole("ADMIN");
 
                     auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
                     auth.requestMatchers("/api/v1/admin/inquiries", "/api/v1/admin/inquiries/**").hasRole("ADMIN");
@@ -74,21 +98,23 @@ public class SecurityConfig {
                     auth.anyRequest().authenticated();
                 })
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, e) -> {
-                            MDC.put(LogMdcKeys.ERROR_CODE, "UNAUTHORIZED");
-                            MDC.put(LogMdcKeys.STATUS, Integer.toString(HttpServletResponse.SC_UNAUTHORIZED));
-
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write(
-                                    "{\"success\":false,\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다\"}}"
-                            );
-                        })
+                        .authenticationEntryPoint((request, response, e) -> writeUnauthorizedResponse(response))
                 )
                 .addFilterBefore(requestTrackingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(jwtAuthenticationFilter, RequestTrackingFilter.class);
 
         return http.build();
+    }
+
+    private void writeUnauthorizedResponse(HttpServletResponse response) throws java.io.IOException {
+        MDC.put(LogMdcKeys.ERROR_CODE, "UNAUTHORIZED");
+        MDC.put(LogMdcKeys.STATUS, Integer.toString(HttpServletResponse.SC_UNAUTHORIZED));
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write(
+                "{\"success\":false,\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다\"}}"
+        );
     }
 
     @Bean
