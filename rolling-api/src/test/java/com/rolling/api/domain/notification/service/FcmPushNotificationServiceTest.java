@@ -16,6 +16,7 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,13 +49,16 @@ class FcmPushNotificationServiceTest {
     private UserDeviceRepository userDeviceRepository;
 
     private FcmPushNotificationService fcmPushNotificationService;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         fcmPushNotificationService = new FcmPushNotificationService(
                 firebaseMessaging,
                 userDeviceRepository,
-                ANDROID_CHANNEL_ID
+                ANDROID_CHANNEL_ID,
+                meterRegistry
         );
     }
 
@@ -143,6 +147,19 @@ class FcmPushNotificationServiceTest {
         assertThat(aps).containsEntry("sound", "default");
 
         verify(userDeviceRepository).deleteAllByFcmTokenIn(java.util.Set.of("token-2"));
+        assertThat(meterRegistry.get("rolling_fcm_send_total")
+                .tag("result", "success")
+                .tag("error_code", "none")
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get("rolling_fcm_send_total")
+                .tag("result", "failure")
+                .tag("error_code", "unregistered")
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get("rolling_fcm_invalid_token_cleanup_total")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test
@@ -176,6 +193,11 @@ class FcmPushNotificationServiceTest {
 
         verify(firebaseMessaging).sendEachForMulticast(any(MulticastMessage.class));
         verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
+        assertThat(meterRegistry.get("rolling_fcm_send_total")
+                .tag("result", "failure")
+                .tag("error_code", "internal")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test

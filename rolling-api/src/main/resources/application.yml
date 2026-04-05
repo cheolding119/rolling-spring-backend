@@ -44,6 +44,8 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} level=%-5level requestId=%X{requestId:-} traceId=%X{traceId:-} userId=%X{userId:-} method=%X{method:-} path=%X{path:-} status=%X{status:-} errorCode=%X{errorCode:-} domainId=%X{domainId:-} logger=%logger{36} - %msg%n%wEx"
 
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       base-path: /actuator
@@ -58,6 +60,11 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
 
 # port 번호
 server:

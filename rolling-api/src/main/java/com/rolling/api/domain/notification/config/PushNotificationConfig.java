@@ -5,6 +5,7 @@ import com.rolling.api.domain.notification.service.FcmPushNotificationService;
 import com.rolling.api.domain.notification.service.NoOpPushNotificationService;
 import com.rolling.api.domain.notification.service.PushNotificationService;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.ApplicationRunner;
@@ -24,6 +25,7 @@ public class PushNotificationConfig {
     @Bean
     public PushNotificationService pushNotificationService(
             ObjectProvider<FirebaseMessaging> firebaseMessagingProvider,
+            ObjectProvider<MeterRegistry> meterRegistryProvider,
             UserDeviceRepository userDeviceRepository,
             ApplicationContext applicationContext,
             Environment environment,
@@ -43,7 +45,8 @@ public class PushNotificationConfig {
             return new FcmPushNotificationService(
                     firebaseMessaging,
                     userDeviceRepository,
-                    pushNotificationProperties.androidChannelId()
+                    pushNotificationProperties.androidChannelId(),
+                    meterRegistryProvider.getIfAvailable()
             );
         }
 

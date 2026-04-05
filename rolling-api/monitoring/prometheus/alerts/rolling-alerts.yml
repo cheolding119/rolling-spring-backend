@@ -1,0 +1,84 @@
+groups:
+  - name: rolling-api-alerts
+    rules:
+      - alert: RollingApiScrapeFailed
+        expr: up{job="rolling-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: rolling-api
+        annotations:
+          summary: "Rolling API scrape failed"
+          description: "Prometheus has not been able to scrape the rolling-api target for at least 2 minutes."
+
+      - alert: RollingApiHigh5xxErrorRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*"}[5m]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[5m])), 1)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: rolling-api
+        annotations:
+          summary: "Rolling API 5xx error rate is high"
+          description: "The 5xx ratio for non-actuator HTTP requests has stayed above 5% for 10 minutes."
+
+      - alert: RollingApiHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m])) by (le)
+          ) > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          service: rolling-api
+        annotations:
+          summary: "Rolling API p95 latency is high"
+          description: "The p95 latency for non-actuator HTTP requests has exceeded 1.5 seconds for 10 minutes."
+
+      - alert: RollingTournamentCrawlerDidNotSucceed
+        expr: |
+          (process_uptime_seconds > 93600 and absent(rolling_scheduler_last_success_unixtime{task="tournamentCrawler"}))
+          or
+          (time() - max(rolling_scheduler_last_success_unixtime{task="tournamentCrawler"}) > 93600)
+        for: 15m
+        labels:
+          severity: critical
+          service: rolling-api
+          task: tournamentCrawler
+        annotations:
+          summary: "Tournament crawler has not succeeded recently"
+          description: "No successful tournamentCrawler execution has been recorded in the last 26 hours, excluding the first 26 hours after process startup."
+
+      - alert: RollingOpenMatStatusSyncFailure
+        expr: increase(rolling_scheduler_execution_total{task="openMatStatusSync",result="failure"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: rolling-api
+          task: openMatStatusSync
+        annotations:
+          summary: "OpenMat status sync is failing"
+          description: "openMatStatusSync recorded one or more failures within the last 15 minutes."
+
+      - alert: RollingFcmHighFailureRate
+        expr: |
+          (
+            sum(increase(rolling_fcm_send_total{result="failure"}[15m]))
+            /
+            clamp_min(sum(increase(rolling_fcm_send_total[15m])), 1)
+          ) > 0.2
+          and
+          sum(increase(rolling_fcm_send_total[15m])) >= 10
+        for: 10m
+        labels:
+          severity: warning
+          service: rolling-api
+          integration: fcm
+        annotations:
+          summary: "FCM failure rate is high"
+          description: "FCM send failures have exceeded 20% over the last 15 minutes with at least 10 send attempts."

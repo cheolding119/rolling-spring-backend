@@ -19,6 +19,7 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,10 +70,12 @@ class OpenMatServiceTest {
 
     private OpenMatService openMatService;
     private Clock fixedClock;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
         fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), SEOUL_ZONE);
+        meterRegistry = new SimpleMeterRegistry();
         openMatService = new OpenMatService(
                 openMatRepository,
                 notificationRepository,
@@ -80,6 +83,7 @@ class OpenMatServiceTest {
                 reportService,
                 fixedClock,
                 applicationEventPublisher);
+        ReflectionTestUtils.setField(openMatService, "meterRegistry", meterRegistry);
     }
 
     @Test
@@ -102,6 +106,10 @@ class OpenMatServiceTest {
 
         assertThat(openMat.getParticipantUids()).containsExactly(2L, 3L);
         assertThat(openMat.getStatus()).isEqualTo(OpenMatStatus.CLOSED);
+        assertThat(meterRegistry.get("rolling_openmat_apply_total")
+                .tag("result", "success")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test
@@ -149,6 +157,10 @@ class OpenMatServiceTest {
                     assertThat(exception.getCode()).isEqualTo("OPEN_MAT_REPORTED");
                     assertThat(exception).hasMessage("신고 누적으로 신청이 차단된 오픈매트입니다");
                 });
+        assertThat(meterRegistry.get("rolling_openmat_apply_total")
+                .tag("result", "open_mat_reported")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test
@@ -572,6 +584,10 @@ class OpenMatServiceTest {
 
         verify(reportService).createReport(9L, ReportTargetType.OPEN_MAT, 17L, 1L, ReportReason.SPAM, null);
         assertThat(openMat.getReportCount()).isEqualTo(1);
+        assertThat(meterRegistry.get("rolling_openmat_report_total")
+                .tag("result", "success")
+                .counter()
+                .count()).isEqualTo(1.0);
     }
 
     @Test
