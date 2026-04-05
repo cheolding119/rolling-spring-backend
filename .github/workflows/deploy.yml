@@ -1,4 +1,4 @@
-name: Deploy Spring & Nginx to Lightsail
+name: Deploy Spring, Nginx, and Monitoring to Lightsail
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 💡 SHA 태그를 함께 사용하여 롤백이 가능하도록 빌드
+      # 1. Spring Boot 이미지 빌드 및 푸시
       - name: Build and Push Spring Image
         uses: docker/build-push-action@v5
         with:
@@ -30,7 +30,7 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/rolling-backend:latest
             ${{ secrets.DOCKER_USERNAME }}/rolling-backend:${{ github.sha }}
 
-      # 💡 Nginx 빌드 경로 및 태그 교정
+      # 2. Nginx 이미지 빌드 및 푸시
       - name: Build and Push Nginx Image
         uses: docker/build-push-action@v5
         with:
@@ -41,23 +41,25 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:latest
             ${{ secrets.DOCKER_USERNAME }}/rolling-nginx:${{ github.sha }}
 
-      - name: 서버에 접속해서 실무형 배포 명령 실행
-        uses: appleboy/ssh-action@v1.0.3 # 💡 버전을 명확히 고정
+      # 3. Lightsail 서버 접속 및 배포 명령 실행
+      - name: Deploy to Lightsail
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
-            # 1. 프로젝트 폴더로 이동
+            # 프로젝트 폴더로 이동
             cd /home/ubuntu/rolling-spring-backend
             
-            # 2. GitHub 설정 파일(docker-compose.yml 등) 강제 동기화
+            # 최신 docker-compose.yml 및 설정 파일 동기화
             git fetch origin main
             git reset --hard origin/main
             
+            # 작업 디렉토리 이동
             cd rolling-api
-            
-            # 3. env 파일 세팅
+
+            # .env 파일 생성 (기존 변수 + 모니터링 변수 통합)
             cat <<EOF > .env
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             IMAGE_TAG=${{ github.sha }}
@@ -76,13 +78,18 @@ jobs:
             FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}
             OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE=${{ secrets.OPENMAT_ALLOW_UNAUTHENTICATED_UPDATE }}
             SPRING_PROFILES_ACTIVE=${{ secrets.SPRING_PROFILES_ACTIVE }}
+            
+            # 모니터링 세션 추가
+            GRAFANA_ADMIN_USER=admin
+            GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+            GRAFANA_ROOT_URL=${{ secrets.GRAFANA_ROOT_URL }}
             EOF
-            
-            # 4. 이미지 내려받기 (Docker Hub에서 가져오므로 pull이 이제 작동함)
-            docker compose pull
-            
-            # 5. 재시작 (설정 변경분 반영 및 정리)
-            docker compose up -d --remove-orphans
-            
-            # 6. 구버전 이미지 청소
+
+            # 4. 이미지 내려받기 (기본 서버 + 모니터링 서버)
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml pull
+
+            # 5. 컨테이너 재실행 (모니터링 포함)
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d --remove-orphans
+
+            # 6. 사용하지 않는 구버전 이미지 정리
             docker image prune -f
