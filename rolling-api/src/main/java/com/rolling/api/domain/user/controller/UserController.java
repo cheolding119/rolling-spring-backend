@@ -3,6 +3,8 @@ package com.rolling.api.domain.user.controller;
 import com.rolling.api.domain.user.dto.UserFcmTokenDeleteRequest;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
+import com.rolling.api.domain.user.dto.UserSettingsResponse;
+import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.service.UserService;
 import com.rolling.api.global.exception.AuthException;
@@ -18,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -62,6 +65,24 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody UserUpdateRequest request) {
         UserResponse response = userService.updateMe(requireUserId(principal), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "내 설정 수정",
+            description = "현재 로그인한 사용자의 설정을 부분 수정합니다. 현재는 푸시 알림 수신 여부만 지원합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PatchMapping("/me/settings")
+    public ResponseEntity<ApiResponse<UserSettingsResponse>> updateSettings(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody UserSettingsUpdateRequest request) {
+        UserSettingsResponse response = userService.updateSettings(requireUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

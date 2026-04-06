@@ -44,6 +44,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private BeltColor beltColor;
 
+    @Column(nullable = false)
+    private Boolean pushNotificationEnabled = true;
+
     @OneToMany(mappedBy = "user")
     private List<UserDevice> devices = new ArrayList<>();
 
@@ -64,13 +67,21 @@ public class User extends BaseTimeEntity {
     private Set<User> blockedUsers = new HashSet<>();
 
     @Builder
-    public User(String socialId, SocialProvider socialProvider, String nickname, String email, String phone, BeltColor beltColor, String fcmToken) {
+    public User(String socialId,
+                SocialProvider socialProvider,
+                String nickname,
+                String email,
+                String phone,
+                BeltColor beltColor,
+                String fcmToken,
+                Boolean pushNotificationEnabled) {
         this.socialId = socialId;
         this.socialProvider = socialProvider;
         this.nickname = nickname;
         this.email = email;
         this.phone = phone;
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
+        this.pushNotificationEnabled = pushNotificationEnabled == null ? true : pushNotificationEnabled;
         if (fcmToken != null && !fcmToken.isBlank()) {
             new UserDevice(this, fcmToken.trim(), null, null, null);
         }
@@ -96,6 +107,10 @@ public class User extends BaseTimeEntity {
         if (beltColor != null) {
             this.beltColor = beltColor;
         }
+    }
+
+    public void updatePushNotificationEnabled(boolean enabled) {
+        this.pushNotificationEnabled = enabled;
     }
 
     void linkDevice(UserDevice device) {

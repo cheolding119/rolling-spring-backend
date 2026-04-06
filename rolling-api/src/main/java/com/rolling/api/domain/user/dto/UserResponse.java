@@ -42,6 +42,9 @@ public class UserResponse {
     @Schema(description = "관리자 여부", example = "false")
     private Boolean isAdmin;
 
+    @Schema(description = "사용자 설정")
+    private UserSettingsResponse settings;
+
     public static UserResponse from(User user, boolean isAdmin) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -54,6 +57,7 @@ public class UserResponse {
                 .withdrawalPending(user.getWithdrawalPending())
                 .withdrawalScheduledAt(user.getWithdrawalScheduledAt())
                 .isAdmin(isAdmin)
+                .settings(UserSettingsResponse.from(user))
                 .build();
     }
 }

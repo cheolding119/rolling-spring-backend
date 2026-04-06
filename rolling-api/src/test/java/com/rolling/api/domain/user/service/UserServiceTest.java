@@ -2,6 +2,8 @@ package com.rolling.api.domain.user.service;
 
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
+import com.rolling.api.domain.user.dto.UserSettingsResponse;
+import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -60,6 +62,7 @@ class UserServiceTest {
 
         assertThat(response.getIsAdmin()).isTrue();
         assertThat(response.getNickname()).isEqualTo("admin-user");
+        assertThat(response.getSettings().getPushNotificationEnabled()).isTrue();
     }
 
     @Test
@@ -129,6 +132,29 @@ class UserServiceTest {
 
         assertThat(response.getNickname()).isEqualTo("");
         assertThat(response.getBeltColor()).isEqualTo("BROWN");
+    }
+
+    @Test
+    @DisplayName("사용자 설정 수정 시 pushNotificationEnabled를 반영한다")
+    void updateSettings_updatesPushNotificationEnabled() {
+        User user = User.builder()
+                .socialId("social-settings")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("settings-user")
+                .email("settings@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 31L);
+
+        UserSettingsUpdateRequest request = new UserSettingsUpdateRequest();
+        ReflectionTestUtils.setField(request, "pushNotificationEnabled", false);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(31L)).thenReturn(Optional.of(user));
+
+        UserSettingsResponse response = userService.updateSettings(31L, request);
+
+        assertThat(user.getPushNotificationEnabled()).isFalse();
+        assertThat(response.getPushNotificationEnabled()).isFalse();
     }
 
     @Test
