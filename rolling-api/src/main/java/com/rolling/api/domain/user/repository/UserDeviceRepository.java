@@ -22,6 +22,7 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
             where u.id in :userIds
               and u.isWithdrawn = false
               and u.withdrawalPending = false
+              and u.pushNotificationEnabled = true
             """)
     List<UserDevice> findPushTargetDevicesByUserIds(@Param("userIds") Collection<Long> userIds);
 

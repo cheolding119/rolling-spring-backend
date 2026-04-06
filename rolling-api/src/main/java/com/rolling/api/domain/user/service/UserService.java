@@ -2,6 +2,8 @@ package com.rolling.api.domain.user.service;
 
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
+import com.rolling.api.domain.user.dto.UserSettingsResponse;
+import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
@@ -36,6 +38,13 @@ public class UserService {
         user.updateBeltColor(request.getBeltColor());
 
         return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
+    }
+
+    @Transactional
+    public UserSettingsResponse updateSettings(Long userId, UserSettingsUpdateRequest request) {
+        User user = getActiveUser(userId);
+        user.updatePushNotificationEnabled(request.getPushNotificationEnabled());
+        return UserSettingsResponse.from(user);
     }
 
     @Transactional
