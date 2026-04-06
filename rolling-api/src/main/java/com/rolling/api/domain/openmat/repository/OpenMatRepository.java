@@ -7,6 +7,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,16 +18,22 @@ import java.util.Optional;
 
 public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
 
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalse(Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndRegion(Region region, Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndStatus(OpenMatStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndRegionAndStatus(Region region, OpenMatStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByHost_IdAndIsHiddenFalse(Long hostId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
     @Query(
             value = """
                     SELECT o FROM OpenMat o
@@ -67,14 +74,30 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
             LocalDateTime endDateTime
     );
 
+    @Query("""
+            select o.id as openMatId, count(p) as participantCount
+            from OpenMat o
+            left join o.participantUids p
+            where o.id in :openMatIds
+            group by o.id
+            """)
+    List<OpenMatParticipantCountView> countParticipantsByOpenMatIds(@Param("openMatIds") List<Long> openMatIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM OpenMat o WHERE o.id = :id AND o.isHidden = false")
     Optional<OpenMat> findByIdForUpdate(@Param("id") Long id);
 
+    @EntityGraph(attributePaths = "host")
     @Query(
             value = "SELECT DISTINCT o FROM OpenMat o JOIN o.participantUids p WHERE p = :userId AND o.isHidden = false",
             countQuery = "SELECT COUNT(DISTINCT o.id) FROM OpenMat o JOIN o.participantUids p WHERE p = :userId AND o.isHidden = false"
     )
     Page<OpenMat> findByParticipantUidsContaining(@Param("userId") Long userId, Pageable pageable);
+
+    interface OpenMatParticipantCountView {
+        Long getOpenMatId();
+
+        Long getParticipantCount();
+    }
 }
 

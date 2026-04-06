@@ -269,6 +269,8 @@ class OpenMatServiceTest {
         when(openMatRepository.findByIsHiddenFalseAndRegionAndStatus(
                 eq(Region.SEOUL), eq(OpenMatStatus.CLOSED), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(openMat)));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(14L)))
+                .thenReturn(List.of(participantCount(14L, 2L)));
 
         openMatService.findAll(Region.SEOUL, OpenMatStatus.CLOSED, PageRequest.of(0, 20));
 
@@ -301,6 +303,8 @@ class OpenMatServiceTest {
         when(openMatRepository.searchVisible(
                 eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(openMat)));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(16L)))
+                .thenReturn(List.of(participantCount(16L, 1L)));
 
         Page<OpenMatResponse> page = openMatService.findAll(
                 Region.SEOUL,
@@ -336,6 +340,8 @@ class OpenMatServiceTest {
                 .thenReturn(List.of());
         when(openMatRepository.findByHost_IdAndIsHiddenFalse(eq(1L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(openMat)));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(32L)))
+                .thenReturn(List.of(participantCount(32L, 1L)));
 
         Page<OpenMatResponse> page = openMatService.findMyHostedOpenMats(1L, PageRequest.of(0, 10));
 
@@ -546,6 +552,8 @@ class OpenMatServiceTest {
         when(openMatRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
                 eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
                 .thenReturn(List.of(openMat));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(15L)))
+                .thenReturn(List.of(participantCount(15L, 2L)));
 
         int synchronizedCount = openMatService.syncExpiredOpenMats();
 
@@ -743,6 +751,20 @@ class OpenMatServiceTest {
             openMat.addParticipant(participantId);
         }
         return openMat;
+    }
+
+    private OpenMatRepository.OpenMatParticipantCountView participantCount(Long openMatId, Long participantCount) {
+        return new OpenMatRepository.OpenMatParticipantCountView() {
+            @Override
+            public Long getOpenMatId() {
+                return openMatId;
+            }
+
+            @Override
+            public Long getParticipantCount() {
+                return participantCount;
+            }
+        };
     }
 }
 

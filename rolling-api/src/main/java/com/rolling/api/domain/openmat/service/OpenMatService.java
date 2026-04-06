@@ -32,10 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -90,10 +92,7 @@ public class OpenMatService {
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
         Page<OpenMat> page = findOpenMats(region, status, normalizeKeyword(keyword), pageableWithSort);
-        LocalDateTime now = now();
-        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
-
-        return page.map(OpenMatResponse::from);
+        return toOpenMatResponsePage(page);
     }
 
     @Transactional
@@ -349,9 +348,7 @@ public class OpenMatService {
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
         Page<OpenMat> page = openMatRepository.findByParticipantUidsContaining(userId, pageableWithSort);
-        LocalDateTime now = now();
-        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
-        return page.map(OpenMatResponse::from);
+        return toOpenMatResponsePage(page);
     }
 
     @Transactional
@@ -363,9 +360,7 @@ public class OpenMatService {
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
         Page<OpenMat> page = openMatRepository.findByHost_IdAndIsHiddenFalse(userId, pageableWithSort);
-        LocalDateTime now = now();
-        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now));
-        return page.map(OpenMatResponse::from);
+        return toOpenMatResponsePage(page);
     }
 
     @Transactional
@@ -373,8 +368,8 @@ public class OpenMatService {
         LocalDateTime now = now();
         List<OpenMat> expiredOpenMats = openMatRepository
                 .findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(OpenMatStatus.FINISHED, now);
-
-        expiredOpenMats.forEach(openMat -> openMat.synchronizeStatus(now));
+        Map<Long, Integer> participantCounts = loadParticipantCounts(expiredOpenMats);
+        expiredOpenMats.forEach(openMat -> openMat.synchronizeStatus(now, resolveParticipantCount(openMat, participantCounts)));
 
         if (!expiredOpenMats.isEmpty()) {
             log.debug("Synchronized {} expired open mats to FINISHED", expiredOpenMats.size());
@@ -455,6 +450,39 @@ public class OpenMatService {
             return openMatRepository.findByIsHiddenFalseAndStatus(status, pageable);
         }
         return openMatRepository.findByIsHiddenFalse(pageable);
+    }
+
+    private Page<OpenMatResponse> toOpenMatResponsePage(Page<OpenMat> page) {
+        Map<Long, Integer> participantCounts = loadParticipantCounts(page.getContent());
+        LocalDateTime now = now();
+        page.getContent().forEach(openMat -> openMat.synchronizeStatus(now, resolveParticipantCount(openMat, participantCounts)));
+        return page.map(openMat -> OpenMatResponse.from(openMat, resolveParticipantCount(openMat, participantCounts)));
+    }
+
+    private Map<Long, Integer> loadParticipantCounts(List<OpenMat> openMats) {
+        if (openMats == null || openMats.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> openMatIds = openMats.stream()
+                .map(OpenMat::getId)
+                .toList();
+        List<OpenMatRepository.OpenMatParticipantCountView> counts = openMatRepository.countParticipantsByOpenMatIds(openMatIds);
+        if (counts == null || counts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return counts.stream().collect(Collectors.toMap(
+                OpenMatRepository.OpenMatParticipantCountView::getOpenMatId,
+                count -> Math.toIntExact(count.getParticipantCount()),
+                (left, right) -> left,
+                LinkedHashMap::new
+        ));
+    }
+
+    private int resolveParticipantCount(OpenMat openMat, Map<Long, Integer> participantCounts) {
+        Integer participantCount = participantCounts.get(openMat.getId());
+        return participantCount != null ? participantCount : openMat.getParticipantUids().size();
     }
 
     private LocalDateTime now() {

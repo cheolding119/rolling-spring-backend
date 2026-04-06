@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -256,11 +257,8 @@ class ReportServiceTest {
                                    long inReview,
                                    long resolved,
                                    long rejected) {
-        when(reportRepository.countByTargetTypeAndTargetId(targetType, targetId)).thenReturn(total);
-        when(reportRepository.countByTargetTypeAndTargetIdAndStatus(targetType, targetId, ReportStatus.RECEIVED)).thenReturn(received);
-        when(reportRepository.countByTargetTypeAndTargetIdAndStatus(targetType, targetId, ReportStatus.IN_REVIEW)).thenReturn(inReview);
-        when(reportRepository.countByTargetTypeAndTargetIdAndStatus(targetType, targetId, ReportStatus.RESOLVED)).thenReturn(resolved);
-        when(reportRepository.countByTargetTypeAndTargetIdAndStatus(targetType, targetId, ReportStatus.REJECTED)).thenReturn(rejected);
+        when(reportRepository.summarizeTargets(any(Collection.class), any(Collection.class)))
+                .thenReturn(List.of(summaryRow(targetType, targetId, total, received, inReview, resolved, rejected)));
     }
 
     private User createUser(Long id, String socialId, String nickname) {
@@ -288,5 +286,50 @@ class ReportServiceTest {
         ReflectionTestUtils.setField(report, "createdAt", LocalDateTime.of(2026, 3, 20, 9, 0));
         ReflectionTestUtils.setField(report, "updatedAt", LocalDateTime.of(2026, 3, 20, 9, 0));
         return report;
+    }
+
+    private ReportRepository.ReportTargetSummaryView summaryRow(ReportTargetType targetType,
+                                                               Long targetId,
+                                                               long total,
+                                                               long received,
+                                                               long inReview,
+                                                               long resolved,
+                                                               long rejected) {
+        return new ReportRepository.ReportTargetSummaryView() {
+            @Override
+            public ReportTargetType getTargetType() {
+                return targetType;
+            }
+
+            @Override
+            public Long getTargetId() {
+                return targetId;
+            }
+
+            @Override
+            public Long getTotalReportCount() {
+                return total;
+            }
+
+            @Override
+            public Long getReceivedCount() {
+                return received;
+            }
+
+            @Override
+            public Long getInReviewCount() {
+                return inReview;
+            }
+
+            @Override
+            public Long getResolvedCount() {
+                return resolved;
+            }
+
+            @Override
+            public Long getRejectedCount() {
+                return rejected;
+            }
+        };
     }
 }

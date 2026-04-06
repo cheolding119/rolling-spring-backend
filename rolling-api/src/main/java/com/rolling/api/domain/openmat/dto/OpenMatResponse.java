@@ -32,6 +32,10 @@ public class OpenMatResponse {
     private LocalDateTime createdAt;
 
     public static OpenMatResponse from(OpenMat openMat) {
+        return from(openMat, openMat.getParticipantUids().size());
+    }
+
+    public static OpenMatResponse from(OpenMat openMat, int currentParticipants) {
         return OpenMatResponse.builder()
                 .id(openMat.getId())
                 .title(openMat.getTitle())
@@ -42,7 +46,7 @@ public class OpenMatResponse {
                 .address(openMat.getAddress())
                 .region(openMat.getRegion())
                 .maxCapacity(openMat.getMaxCapacity())
-                .currentParticipants(openMat.getParticipantUids().size())
+                .currentParticipants(currentParticipants)
                 .status(openMat.getStatus())
                 .reported(openMat.isReported())
                 .hostId(openMat.getHost().getId())
