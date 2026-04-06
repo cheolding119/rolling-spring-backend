@@ -140,6 +140,10 @@ public class OpenMat extends BaseTimeEntity {
         return maxCapacity != -1 && participantUids.size() >= maxCapacity;
     }
 
+    public boolean isCapacityFull(int participantCount) {
+        return maxCapacity != -1 && participantCount >= maxCapacity;
+    }
+
     public boolean isReported() {
         return reportCount != null && reportCount >= REPORT_BLOCK_THRESHOLD;
     }
@@ -168,6 +172,10 @@ public class OpenMat extends BaseTimeEntity {
     }
 
     public void synchronizeStatus(LocalDateTime now) {
+        synchronizeStatus(now, participantUids.size());
+    }
+
+    public void synchronizeStatus(LocalDateTime now, int participantCount) {
         if (now == null) {
             return;
         }
@@ -182,7 +190,7 @@ public class OpenMat extends BaseTimeEntity {
             return;
         }
 
-        if (isCapacityFull()) {
+        if (isCapacityFull(participantCount)) {
             this.status = OpenMatStatus.CLOSED;
             return;
         }

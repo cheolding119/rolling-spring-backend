@@ -28,6 +28,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,14 +102,14 @@ public class ReportService {
                 ),
                 normalizeAdminPageable(pageable)
         );
-        Map<String, ReportTargetSummary> summaryCache = new HashMap<>();
+        Map<String, ReportTargetSummary> summaryCache = loadTargetSummaries(reports.getContent());
         return reports.map(report -> ReportResponse.from(report, getTargetSummary(report, summaryCache)));
     }
 
     @Transactional(readOnly = true)
     public ReportResponse findByIdForAdmin(Long reportId) {
         Report report = getReport(reportId);
-        return ReportResponse.from(report, getTargetSummary(report, new HashMap<>()));
+        return ReportResponse.from(report, getTargetSummary(report, loadTargetSummaries(List.of(report))));
     }
 
     @Transactional
@@ -121,7 +123,7 @@ public class ReportService {
                 normalizeOptionalText(request.getFinalAction())
         );
 
-        return ReportResponse.from(report, getTargetSummary(report, new HashMap<>()));
+        return ReportResponse.from(report, getTargetSummary(report, loadTargetSummaries(List.of(report))));
     }
 
     private ReportReason requireReason(ReportReason reason) {
@@ -225,14 +227,56 @@ public class ReportService {
 
     private ReportTargetSummary getTargetSummary(Report report, Map<String, ReportTargetSummary> summaryCache) {
         String cacheKey = report.getTargetType() + ":" + report.getTargetId();
-        return summaryCache.computeIfAbsent(cacheKey, key -> ReportTargetSummary.builder()
+        return summaryCache.getOrDefault(cacheKey, ReportTargetSummary.builder()
                 .targetType(report.getTargetType())
                 .targetId(report.getTargetId())
-                .totalReportCount(reportRepository.countByTargetTypeAndTargetId(report.getTargetType(), report.getTargetId()))
-                .receivedCount(reportRepository.countByTargetTypeAndTargetIdAndStatus(report.getTargetType(), report.getTargetId(), ReportStatus.RECEIVED))
-                .inReviewCount(reportRepository.countByTargetTypeAndTargetIdAndStatus(report.getTargetType(), report.getTargetId(), ReportStatus.IN_REVIEW))
-                .resolvedCount(reportRepository.countByTargetTypeAndTargetIdAndStatus(report.getTargetType(), report.getTargetId(), ReportStatus.RESOLVED))
-                .rejectedCount(reportRepository.countByTargetTypeAndTargetIdAndStatus(report.getTargetType(), report.getTargetId(), ReportStatus.REJECTED))
+                .totalReportCount(0L)
+                .receivedCount(0L)
+                .inReviewCount(0L)
+                .resolvedCount(0L)
+                .rejectedCount(0L)
                 .build());
+    }
+
+    private Map<String, ReportTargetSummary> loadTargetSummaries(List<Report> reports) {
+        if (reports == null || reports.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Set<String> requestedKeys = new HashSet<>();
+        Set<ReportTargetType> targetTypes = new HashSet<>();
+        Set<Long> targetIds = new HashSet<>();
+        reports.forEach(report -> {
+            requestedKeys.add(targetKey(report.getTargetType(), report.getTargetId()));
+            targetTypes.add(report.getTargetType());
+            targetIds.add(report.getTargetId());
+        });
+
+        List<ReportRepository.ReportTargetSummaryView> rows = reportRepository.summarizeTargets(targetTypes, targetIds);
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, ReportTargetSummary> summaries = new HashMap<>();
+        rows.forEach(row -> {
+            String key = targetKey(row.getTargetType(), row.getTargetId());
+            if (!requestedKeys.contains(key)) {
+                return;
+            }
+            summaries.put(key, ReportTargetSummary.builder()
+                    .targetType(row.getTargetType())
+                    .targetId(row.getTargetId())
+                    .totalReportCount(row.getTotalReportCount())
+                    .receivedCount(row.getReceivedCount())
+                    .inReviewCount(row.getInReviewCount())
+                    .resolvedCount(row.getResolvedCount())
+                    .rejectedCount(row.getRejectedCount())
+                    .build());
+        });
+        return summaries;
+    }
+
+    private String targetKey(ReportTargetType targetType, Long targetId) {
+        return targetType + ":" + targetId;
     }
 }
