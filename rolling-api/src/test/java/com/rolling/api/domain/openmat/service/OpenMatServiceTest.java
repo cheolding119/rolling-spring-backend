@@ -250,8 +250,8 @@ class OpenMatServiceTest {
     }
 
     @Test
-    @DisplayName("오픈매트 목록 조회는 status 필터를 사용하고 기본 정렬을 시작 시간 오름차순으로 맞춘다")
-    void findAll_usesStatusFilterAndAscendingSort() {
+    @DisplayName("오픈매트 목록 조회는 status 필터를 사용하고 기본 정렬을 시작 시간 내림차순으로 맞춘다")
+    void findAll_usesStatusFilterAndDescendingSort() {
         User host = createUser(1L, "host-5", "host");
         OpenMat openMat = createOpenMat(
                 14L,
@@ -280,7 +280,7 @@ class OpenMatServiceTest {
 
         Pageable pageable = pageableCaptor.getValue();
         assertThat(pageable.getSort().getOrderFor("startDateTime")).isNotNull();
-        assertThat(pageable.getSort().getOrderFor("startDateTime").isAscending()).isTrue();
+        assertThat(pageable.getSort().getOrderFor("startDateTime").isDescending()).isTrue();
     }
 
     @Test
@@ -319,6 +319,7 @@ class OpenMatServiceTest {
         verify(openMatRepository).searchVisible(
                 eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime").isDescending()).isTrue();
     }
 
     @Test
