@@ -262,7 +262,7 @@ class OpenMatServiceTest {
     }
 
     @Test
-    @DisplayName("오픈매트 목록 조회는 status 필터를 사용하고 기본 정렬을 시작 시간 내림차순으로 맞춘다")
+    @DisplayName("오픈매트 목록 조회는 status 필터를 사용하고 기본 정렬을 생성일 내림차순으로 맞춘다")
     void findAll_usesStatusFilterAndDescendingSort() {
         User host = createUser(1L, "host-5", "host");
         OpenMat openMat = createOpenMat(
@@ -291,8 +291,10 @@ class OpenMatServiceTest {
                 eq(Region.SEOUL), eq(OpenMatStatus.CLOSED), pageableCaptor.capture());
 
         Pageable pageable = pageableCaptor.getValue();
-        assertThat(pageable.getSort().getOrderFor("startDateTime")).isNotNull();
-        assertThat(pageable.getSort().getOrderFor("startDateTime").isDescending()).isTrue();
+        assertThat(pageable.getSort().getOrderFor("createdAt")).isNotNull();
+        assertThat(pageable.getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        assertThat(pageable.getSort().getOrderFor("id")).isNotNull();
+        assertThat(pageable.getSort().getOrderFor("id").isDescending()).isTrue();
     }
 
     @Test
@@ -330,8 +332,10 @@ class OpenMatServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(openMatRepository).searchVisible(
                 eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
-        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime")).isNotNull();
-        assertThat(pageableCaptor.getValue().getSort().getOrderFor("startDateTime").isDescending()).isTrue();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt")).isNotNull();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("id")).isNotNull();
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("id").isDescending()).isTrue();
     }
 
     @Test

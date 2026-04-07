@@ -97,7 +97,11 @@ public class OpenMatService {
 
         Pageable pageableWithSort = pageable.getSort().isSorted()
                 ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").descending());
+                : PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+                );
 
         Page<OpenMat> page = findOpenMats(region, status, normalizeKeyword(keyword), pageableWithSort);
         return toOpenMatResponsePage(page);
