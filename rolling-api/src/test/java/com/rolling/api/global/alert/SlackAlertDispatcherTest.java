@@ -25,7 +25,7 @@ class SlackAlertDispatcherTest {
 
         dispatcher.handle(new OperationalAlertEvent(testAlert()));
 
-        verify(slackWebhookClient, times(1)).send(org.mockito.ArgumentMatchers.contains("Unexpected exception"));
+        verify(slackWebhookClient, times(1)).send(org.mockito.ArgumentMatchers.contains("예상하지 못한 서버 오류"));
     }
 
     @Test
