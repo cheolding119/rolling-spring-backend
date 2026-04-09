@@ -2,7 +2,9 @@ package com.rolling.api.domain.tournament.scheduler;
 
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.service.TournamentManagerService;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.monitoring.MonitoringTaskNames;
+import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class TournamentCrawlerScheduler {
 
     private final TournamentManagerService tournamentManagerService;
     private final ScheduledTaskTracker scheduledTaskTracker;
+    private final OperationalAlertPublisher operationalAlertPublisher;
 
     @Scheduled(
             cron = "${tournament.crawler.schedule.cron:0 0 2 * * *}",
@@ -50,6 +53,12 @@ public class TournamentCrawlerScheduler {
                     result.getSkippedCount());
         } catch (Exception e) {
             scheduledTaskTracker.recordFailure(MonitoringTaskNames.TOURNAMENT_CRAWLER, e);
+            ScheduledTaskSnapshot snapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.TOURNAMENT_CRAWLER);
+            operationalAlertPublisher.publishSchedulerFailure(
+                    MonitoringTaskNames.TOURNAMENT_CRAWLER,
+                    snapshot.lastSummary(),
+                    e
+            );
             log.error("Tournament scheduled crawl failed", e);
         }
     }

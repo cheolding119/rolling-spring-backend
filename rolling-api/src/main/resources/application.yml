@@ -66,6 +66,20 @@ management:
           server:
             requests: true
 
+slack:
+  alert:
+    enabled: ${SLACK_ALERT_ENABLED:false}
+    webhook-url: ${SLACK_ALERT_WEBHOOK_URL:}
+    environment: ${SLACK_ALERT_ENVIRONMENT:${spring.application.name}}
+    connect-timeout-ms: ${SLACK_ALERT_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${SLACK_ALERT_READ_TIMEOUT_MS:3000}
+    default-cooldown-seconds: ${SLACK_ALERT_DEFAULT_COOLDOWN_SECONDS:300}
+    scheduler-cooldown-seconds: ${SLACK_ALERT_SCHEDULER_COOLDOWN_SECONDS:600}
+    notify-unexpected-exception: ${SLACK_ALERT_NOTIFY_UNEXPECTED_EXCEPTION:true}
+    notify-external-api-exception: ${SLACK_ALERT_NOTIFY_EXTERNAL_API_EXCEPTION:true}
+    notify-scheduler-failure: ${SLACK_ALERT_NOTIFY_SCHEDULER_FAILURE:true}
+    notify-startup-health-down: ${SLACK_ALERT_NOTIFY_STARTUP_HEALTH_DOWN:true}
+
 # port 번호
 server:
   port: 8080

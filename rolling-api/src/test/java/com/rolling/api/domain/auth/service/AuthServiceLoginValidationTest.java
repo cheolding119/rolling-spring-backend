@@ -4,6 +4,7 @@ import com.rolling.api.domain.auth.dto.SocialLoginRequest;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
@@ -51,6 +52,9 @@ class AuthServiceLoginValidationTest {
 
     @Mock
     private ScheduledTaskTracker scheduledTaskTracker;
+
+    @Mock
+    private OperationalAlertPublisher operationalAlertPublisher;
 
     @InjectMocks
     private AuthService authService;
