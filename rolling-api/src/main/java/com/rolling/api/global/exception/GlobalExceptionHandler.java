@@ -1,9 +1,11 @@
 package com.rolling.api.global.exception;
 
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.logging.LogMdcKeys;
 import com.rolling.api.global.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,6 +16,12 @@ import org.springframework.web.client.RestClientException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final ObjectProvider<OperationalAlertPublisher> alertPublisherProvider;
+
+    public GlobalExceptionHandler(ObjectProvider<OperationalAlertPublisher> alertPublisherProvider) {
+        this.alertPublisherProvider = alertPublisherProvider;
+    }
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthException(AuthException e) {
@@ -36,6 +44,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ApiResponse<Void>> handleRestClientException(RestClientException e) {
         applyErrorContext(HttpStatus.BAD_GATEWAY, "EXTERNAL_API_ERROR");
+        publishIfAvailable(publisher -> publisher.publishExternalApiFailure(e, "GlobalExceptionHandler"));
         log.error("RestClientException: {}", e.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_GATEWAY)
@@ -59,6 +68,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         applyErrorContext(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR");
+        publishIfAvailable(publisher -> publisher.publishUnexpectedException(e));
         log.error("Unexpected exception: ", e);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -68,5 +78,12 @@ public class GlobalExceptionHandler {
     private void applyErrorContext(HttpStatus status, String errorCode) {
         MDC.put(LogMdcKeys.STATUS, Integer.toString(status.value()));
         MDC.put(LogMdcKeys.ERROR_CODE, errorCode);
+    }
+
+    private void publishIfAvailable(java.util.function.Consumer<OperationalAlertPublisher> publisherAction) {
+        OperationalAlertPublisher publisher = alertPublisherProvider.getIfAvailable();
+        if (publisher != null) {
+            publisherAction.accept(publisher);
+        }
     }
 }

@@ -12,9 +12,11 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.monitoring.MonitoringTaskNames;
+import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -54,6 +56,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final AdminAccessConfig adminAccessConfig;
     private final ScheduledTaskTracker scheduledTaskTracker;
+    private final OperationalAlertPublisher operationalAlertPublisher;
 
     @Value("${jwt.access-token-expiry}")
     private Long accessTokenExpiry;
@@ -241,6 +244,12 @@ public class AuthService {
             );
         } catch (Exception e) {
             scheduledTaskTracker.recordFailure(MonitoringTaskNames.WITHDRAWAL_PROCESSOR, e);
+            ScheduledTaskSnapshot snapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.WITHDRAWAL_PROCESSOR);
+            operationalAlertPublisher.publishSchedulerFailure(
+                    MonitoringTaskNames.WITHDRAWAL_PROCESSOR,
+                    snapshot.lastSummary(),
+                    e
+            );
             throw e;
         }
     }

@@ -1,7 +1,9 @@
 package com.rolling.api.domain.openmat.scheduler;
 
 import com.rolling.api.domain.openmat.service.OpenMatService;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.monitoring.MonitoringTaskNames;
+import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ public class OpenMatStatusScheduler {
 
     private final OpenMatService openMatService;
     private final ScheduledTaskTracker scheduledTaskTracker;
+    private final OperationalAlertPublisher operationalAlertPublisher;
 
     @Scheduled(
             cron = "${openmat.status.schedule.cron:0 * * * * *}",
@@ -39,6 +42,12 @@ public class OpenMatStatusScheduler {
             log.info("OpenMat status sync finished: synchronized={}", synchronizedCount);
         } catch (Exception e) {
             scheduledTaskTracker.recordFailure(MonitoringTaskNames.OPEN_MAT_STATUS_SYNC, e);
+            ScheduledTaskSnapshot snapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.OPEN_MAT_STATUS_SYNC);
+            operationalAlertPublisher.publishSchedulerFailure(
+                    MonitoringTaskNames.OPEN_MAT_STATUS_SYNC,
+                    snapshot.lastSummary(),
+                    e
+            );
             log.error("OpenMat status sync failed", e);
         }
     }

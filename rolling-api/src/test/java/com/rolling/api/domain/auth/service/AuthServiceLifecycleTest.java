@@ -12,6 +12,7 @@ import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -61,6 +62,9 @@ class AuthServiceLifecycleTest {
 
     @Mock
     private ScheduledTaskTracker scheduledTaskTracker;
+
+    @Mock
+    private OperationalAlertPublisher operationalAlertPublisher;
 
     @InjectMocks
     private AuthService authService;

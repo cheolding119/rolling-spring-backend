@@ -7,7 +7,9 @@ import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -57,6 +59,9 @@ class AuthServiceWithdrawTest {
 
     @Mock
     private ScheduledTaskTracker scheduledTaskTracker;
+
+    @Mock
+    private OperationalAlertPublisher operationalAlertPublisher;
 
     @InjectMocks
     private AuthService authService;
@@ -154,5 +159,25 @@ class AuthServiceWithdrawTest {
         assertThat(user.getPhone()).isNull();
         assertThat(user.getDevices()).isEmpty();
         assertThat(user.getFcmToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("탈퇴 스케줄러 처리 중 예외가 발생하면 알림 publisher를 호출하고 예외를 다시 던진다")
+    void processScheduledWithdrawals_whenFailure_publishesAlertAndRethrows() {
+        when(userRepository.findAllByIsWithdrawnFalseAndWithdrawalPendingTrueAndWithdrawalScheduledAtLessThanEqual(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new RuntimeException("withdraw failed"));
+        when(scheduledTaskTracker.snapshot("withdrawalProcessor")).thenReturn(
+                new ScheduledTaskSnapshot("withdrawalProcessor", "FAILED", false, null, null, null, null, null, null, 1)
+        );
+
+        assertThatThrownBy(() -> authService.processScheduledWithdrawals())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("withdraw failed");
+
+        verify(operationalAlertPublisher).publishSchedulerFailure(
+                org.mockito.ArgumentMatchers.eq("withdrawalProcessor"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(RuntimeException.class)
+        );
     }
 }
