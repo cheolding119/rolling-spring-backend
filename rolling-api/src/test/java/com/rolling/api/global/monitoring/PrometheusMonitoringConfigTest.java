@@ -76,6 +76,8 @@ class PrometheusMonitoringConfigTest {
         assertThat(alertFile).contains("rolling_fcm_send_total{result=\"failure\"}");
         assertThat(alertFile).contains("dashboard_path:");
         assertThat(alertFile).contains("runbook:");
+        assertThat(alertFile).contains("Rolling API 메트릭 수집 실패");
+        assertThat(alertFile).contains("FCM 실패율 증가");
     }
 
     @Test
@@ -116,6 +118,8 @@ class PrometheusMonitoringConfigTest {
         assertThat(template).contains("severity=\"critical\"");
         assertThat(template).contains("__SLACK_METRICS_ALERT_WEBHOOK_URL__");
         assertThat(template).contains("__GRAFANA_ROOT_URL__");
-        assertThat(template).contains("*dashboard*:");
+        assertThat(template).contains("치명/CRITICAL");
+        assertThat(template).contains("*무슨 문제인가*:");
+        assertThat(template).contains("*대시보드*:");
     }
 }

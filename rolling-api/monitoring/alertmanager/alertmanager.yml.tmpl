@@ -24,17 +24,15 @@ receivers:
         username: "rolling-alertmanager"
         icon_emoji: ":satellite:"
         color: "warning"
-        title: "[ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ .CommonLabels.severity }}][{{ .Status }}] {{ .CommonAnnotations.summary }}"
+        title: >-
+          [ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ if eq .CommonLabels.severity "critical" }}치명/CRITICAL{{ else }}경고/WARNING{{ end }}][{{ if eq .Status "resolved" }}복구/RESOLVED{{ else }}발생/FIRING{{ end }}] {{ .CommonAnnotations.summary }}
         text: |-
-          *service*: {{ .CommonLabels.service }}
-          *alert*: {{ .CommonLabels.alertname }}
-          *summary*: {{ .CommonAnnotations.summary }}
-          *description*: {{ .CommonAnnotations.description }}
-          {{ if .CommonAnnotations.current_value_hint }}*current*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
-          {{ if .CommonAnnotations.threshold_hint }}*threshold*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
-          {{ if .CommonAnnotations.observation_window }}*window*: {{ .CommonAnnotations.observation_window }}{{ end }}
-          {{ if .CommonAnnotations.dashboard_path }}*dashboard*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}
-          {{ if .CommonAnnotations.runbook }}*runbook*: {{ .CommonAnnotations.runbook }}{{ end }}
+          *무슨 문제인가*: {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.current_value_hint }}*확인된 값*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
+          {{ if .CommonAnnotations.threshold_hint }}*기준*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
+          {{ if .CommonAnnotations.observation_window }}*관찰 구간*: {{ .CommonAnnotations.observation_window }}{{ end }}
+          {{ if .CommonAnnotations.runbook }}*지금 확인할 것*: {{ .CommonAnnotations.runbook }}{{ end }}
+          {{ if .CommonAnnotations.dashboard_path }}*대시보드*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}
 
   - name: slack-critical
     slack_configs:
@@ -43,14 +41,12 @@ receivers:
         username: "rolling-alertmanager"
         icon_emoji: ":rotating_light:"
         color: "danger"
-        title: "[ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ .CommonLabels.severity }}][{{ .Status }}] {{ .CommonAnnotations.summary }}"
+        title: >-
+          [ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ if eq .CommonLabels.severity "critical" }}치명/CRITICAL{{ else }}경고/WARNING{{ end }}][{{ if eq .Status "resolved" }}복구/RESOLVED{{ else }}발생/FIRING{{ end }}] {{ .CommonAnnotations.summary }}
         text: |-
-          *service*: {{ .CommonLabels.service }}
-          *alert*: {{ .CommonLabels.alertname }}
-          *summary*: {{ .CommonAnnotations.summary }}
-          *description*: {{ .CommonAnnotations.description }}
-          {{ if .CommonAnnotations.current_value_hint }}*current*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
-          {{ if .CommonAnnotations.threshold_hint }}*threshold*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
-          {{ if .CommonAnnotations.observation_window }}*window*: {{ .CommonAnnotations.observation_window }}{{ end }}
-          {{ if .CommonAnnotations.dashboard_path }}*dashboard*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}
-          {{ if .CommonAnnotations.runbook }}*runbook*: {{ .CommonAnnotations.runbook }}{{ end }}
+          *무슨 문제인가*: {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.current_value_hint }}*확인된 값*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
+          {{ if .CommonAnnotations.threshold_hint }}*기준*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
+          {{ if .CommonAnnotations.observation_window }}*관찰 구간*: {{ .CommonAnnotations.observation_window }}{{ end }}
+          {{ if .CommonAnnotations.runbook }}*지금 확인할 것*: {{ .CommonAnnotations.runbook }}{{ end }}
+          {{ if .CommonAnnotations.dashboard_path }}*대시보드*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}

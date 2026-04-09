@@ -8,12 +8,12 @@ groups:
           severity: critical
           service: rolling-api
         annotations:
-          summary: "Rolling API scrape failed"
-          description: "Prometheus has not been able to scrape the rolling-api target for at least 2 minutes."
+          summary: "Rolling API 메트릭 수집 실패"
+          description: "Prometheus가 rolling-api 메트릭을 2분 이상 수집하지 못하고 있습니다."
           threshold_hint: "up == 0"
-          observation_window: "for 2m"
+          observation_window: "2분 이상"
           dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
-          runbook: "Check container health, internal Docker network, and /actuator/prometheus reachability."
+          runbook: "컨테이너 상태, Docker 네트워크, /actuator/prometheus 접근 가능 여부를 확인하세요."
 
       - alert: RollingApiHigh5xxErrorRate
         expr: |
@@ -27,13 +27,13 @@ groups:
           severity: warning
           service: rolling-api
         annotations:
-          summary: "Rolling API 5xx error rate is high"
-          description: "The 5xx ratio for non-actuator HTTP requests has stayed above 5% for 10 minutes."
+          summary: "Rolling API 5xx 비율 증가"
+          description: "비관리용 HTTP 요청의 5xx 비율이 10분 이상 5%를 넘고 있습니다."
           current_value_hint: '{{ printf "%.4f" $value }}'
           threshold_hint: "5xx ratio > 0.05"
-          observation_window: "5m rate, for 10m"
+          observation_window: "최근 5분 rate 기준, 10분 이상 지속"
           dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
-          runbook: "Check overview dashboard, request logs, and recent 5xx responses grouped by URI."
+          runbook: "overview 대시보드와 요청 로그에서 5xx URI 분포를 확인하세요."
 
       - alert: RollingApiHighP95Latency
         expr: |
@@ -46,13 +46,13 @@ groups:
           severity: warning
           service: rolling-api
         annotations:
-          summary: "Rolling API p95 latency is high"
-          description: "The p95 latency for non-actuator HTTP requests has exceeded 1.5 seconds for 10 minutes."
+          summary: "Rolling API p95 지연 증가"
+          description: "비관리용 HTTP 요청의 p95 응답 시간이 10분 이상 1.5초를 넘고 있습니다."
           current_value_hint: '{{ printf "%.2fs" $value }}'
           threshold_hint: "p95 latency > 1.5s"
-          observation_window: "5m histogram, for 10m"
+          observation_window: "최근 5분 histogram 기준, 10분 이상 지속"
           dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
-          runbook: "Check latency, DB pool, and JVM pressure on the overview dashboard before inspecting slow endpoints."
+          runbook: "overview 대시보드에서 JVM, DB pool, 느린 엔드포인트를 확인하세요."
 
       - alert: RollingTournamentCrawlerDidNotSucceed
         expr: |
@@ -65,12 +65,12 @@ groups:
           service: rolling-api
           task: tournamentCrawler
         annotations:
-          summary: "Tournament crawler has not succeeded recently"
-          description: "No successful tournamentCrawler execution has been recorded in the last 26 hours, excluding the first 26 hours after process startup."
+          summary: "대회 크롤러 장시간 미성공"
+          description: "프로세스 시작 후 첫 26시간을 제외하고, 최근 26시간 내 대회 크롤러 성공 이력이 없습니다."
           threshold_hint: "last success older than 26h"
-          observation_window: "26h gap, for 15m"
+          observation_window: "26시간 공백, 15분 이상 지속"
           dashboard_path: "/d/rolling-scheduler/rolling-scheduler?orgId=1&from=now-48h&to=now"
-          runbook: "Check tournament scheduler logs, crawler source availability, and the latest scheduler success timestamp."
+          runbook: "scheduler 대시보드와 crawler 로그에서 최근 성공 시각과 source 장애를 확인하세요."
 
       - alert: RollingOpenMatStatusSyncFailure
         expr: increase(rolling_scheduler_execution_total{task="openMatStatusSync",result="failure"}[15m]) > 0
@@ -80,13 +80,13 @@ groups:
           service: rolling-api
           task: openMatStatusSync
         annotations:
-          summary: "OpenMat status sync is failing"
-          description: "openMatStatusSync recorded one or more failures within the last 15 minutes."
+          summary: "OpenMat 상태 동기화 실패"
+          description: "최근 15분 내 openMatStatusSync 실패가 1회 이상 발생했습니다."
           current_value_hint: '{{ printf "%.0f" $value }} failures'
           threshold_hint: "increase(failures[15m]) > 0"
-          observation_window: "15m increase, for 5m"
+          observation_window: "최근 15분 증가분 기준, 5분 이상 지속"
           dashboard_path: "/d/rolling-scheduler/rolling-scheduler?orgId=1&from=now-6h&to=now"
-          runbook: "Check scheduler logs and openmat sync metrics to confirm whether the failure is repeating or transient."
+          runbook: "scheduler 로그와 sync 실패 메트릭이 일시적 실패인지 반복 실패인지 확인하세요."
 
       - alert: RollingFcmHighFailureRate
         expr: |
@@ -103,10 +103,10 @@ groups:
           service: rolling-api
           integration: fcm
         annotations:
-          summary: "FCM failure rate is high"
-          description: "FCM send failures have exceeded 20% over the last 15 minutes with at least 10 send attempts."
+          summary: "FCM 실패율 증가"
+          description: "최근 15분 동안 최소 10건 이상 전송 중 FCM 실패율이 20%를 넘고 있습니다."
           current_value_hint: '{{ printf "%.4f" $value }}'
           threshold_hint: "failure ratio > 0.2 with total sends >= 10"
-          observation_window: "15m increase, for 10m"
+          observation_window: "최근 15분 증가분 기준, 10분 이상 지속"
           dashboard_path: "/d/rolling-business/rolling-business?orgId=1&from=now-6h&to=now"
-          runbook: "Check FCM error-code breakdown, invalid token cleanup trend, and Firebase credentials health."
+          runbook: "business 대시보드에서 FCM error code, invalid token cleanup, Firebase 상태를 확인하세요."

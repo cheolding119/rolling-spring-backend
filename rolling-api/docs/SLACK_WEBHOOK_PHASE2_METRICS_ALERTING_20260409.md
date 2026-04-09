@@ -110,6 +110,27 @@
 - [x] 반복 알림 폭주 여부 검증
 - [ ] 복구 알림 동작 검증
 
+### Phase 2-6. Slack 메시지 가독성 개선
+
+- [x] 영어 위주의 메시지 제목을 한국어 중심 표현으로 정리
+- [x] `CRITICAL`, `ERROR`, `WARN` 표기를 `치명`, `오류`, `경고`로 병기
+- [x] `UP`, `DOWN` 상태값을 `정상`, `비정상`으로 변환
+- [x] 원본 detail 전체 출력 대신 이상 항목만 요약해 표시
+- [x] 정상 항목은 숨기고 실제 문제 원인만 상단에 노출
+- [x] `무슨 문제인가`, `확인된 원인`, `영향`, `지금 확인할 것` 순서로 메시지 구조 재정리
+- [x] startup health down 전용 한국어 포맷 추가
+- [x] Prometheus/Alertmanager 메트릭 메시지에도 동일한 한국어 가독성 규칙 적용
+- [x] dashboard 링크는 유지하되 운영자가 바로 이해할 수 있는 설명 문구로 치환
+- [ ] 실제 Slack 모바일 화면 기준으로 10줄 안쪽 가독성 점검
+
+## Phase 2-6 반영 내용
+
+- 앱 내부 Slack 메시지는 alert type별 한국어 전용 포맷으로 재구성했다.
+- startup health down 메시지는 정상 항목을 숨기고 비정상 항목과 조치만 요약하도록 변경했다.
+- `CRITICAL`, `ERROR`, `WARN`, `UP`, `DOWN`, `FAILED` 등 주요 상태 표현은 한국어 병기 기준으로 통일했다.
+- Alertmanager Slack 템플릿도 `무슨 문제인가`, `확인된 값`, `기준`, `지금 확인할 것`, `대시보드` 구조로 정리했다.
+- Prometheus alert rule annotation의 summary, description, runbook도 한국어 운영 문구로 변경했다.
+
 ## 이번 반영 범위
 
 - `docker-compose.monitoring.yml`에 `alertmanager` 서비스를 추가하고 Slack webhook 환경변수를 분리했다.
@@ -135,6 +156,18 @@
 - `RollingTournamentCrawlerDidNotSucceed`: scheduler 대시보드와 crawler 로그에서 최근 성공 시각과 source 장애 확인
 - `RollingOpenMatStatusSyncFailure`: scheduler 로그와 sync 실패 메트릭이 일시적 실패인지 반복 실패인지 확인
 - `RollingFcmHighFailureRate`: business 대시보드에서 FCM error code, invalid token cleanup, Firebase 설정 상태 확인
+
+## 다음 개선 예정
+
+현재 메시지는 운영 정보는 충분하지만, 처음 보는 운영자가 읽기에는 원본 detail이 많고 영어 상태값 비중이 높다.
+
+다음 단계에서는 아래 방향으로 개선한다.
+
+- 문제 원인을 맨 위 1줄로 요약
+- 정상 항목은 숨기고 비정상 항목만 노출
+- 영어 상태값과 severity를 한국어로 병기
+- startup health down, 앱 예외, 메트릭 알림 각각에 맞는 전용 포맷 적용
+- Slack 모바일 푸시 화면에서 바로 이해되는 길이와 문장으로 축약
 
 ## 완료 기준
 
