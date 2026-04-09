@@ -14,6 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PrometheusMonitoringConfigTest {
 
+    private static final Path MONITORING_COMPOSE_CONFIG = Path.of("docker-compose.monitoring.yml");
+    private static final Path ALERTMANAGER_TEMPLATE = Path.of("monitoring", "alertmanager", "alertmanager.yml.tmpl");
     private static final Path PROMETHEUS_CONFIG = Path.of("monitoring", "prometheus", "prometheus.yml");
     private static final Path ALERT_RULES_CONFIG = Path.of("monitoring", "prometheus", "alerts", "rolling-alerts.yml");
     private static final Path APPLICATION_CONFIG = Path.of("src", "main", "resources", "application.yml");
@@ -21,13 +23,20 @@ class PrometheusMonitoringConfigTest {
     private final Yaml yaml = new Yaml();
 
     @Test
-    @DisplayName("Prometheus 설정은 rolling alert rule 파일과 rolling-api scrape target을 포함한다")
+    @DisplayName("Prometheus 설정은 rolling alert rule, alertmanager target, rolling-api scrape target을 포함한다")
     @SuppressWarnings("unchecked")
     void prometheusConfig_includesRuleFileAndApiTarget() throws IOException {
         Map<String, Object> prometheusConfig = yaml.load(Files.readString(PROMETHEUS_CONFIG));
 
         assertThat((List<String>) prometheusConfig.get("rule_files"))
                 .contains("/etc/prometheus/alerts/rolling-alerts.yml");
+
+        Map<String, Object> alerting = (Map<String, Object>) prometheusConfig.get("alerting");
+        List<Map<String, Object>> alertManagers = (List<Map<String, Object>>) alerting.get("alertmanagers");
+        List<Map<String, Object>> alertManagerStaticConfigs =
+                (List<Map<String, Object>>) alertManagers.get(0).get("static_configs");
+        assertThat((List<String>) alertManagerStaticConfigs.get(0).get("targets"))
+                .containsExactly("alertmanager:9093");
 
         List<Map<String, Object>> scrapeConfigs = (List<Map<String, Object>>) prometheusConfig.get("scrape_configs");
         Map<String, Object> rollingApiJob = scrapeConfigs.stream()
@@ -65,6 +74,8 @@ class PrometheusMonitoringConfigTest {
         assertThat(alertFile).contains("process_uptime_seconds > 93600");
         assertThat(alertFile).contains("rolling_scheduler_last_success_unixtime{task=\"tournamentCrawler\"}");
         assertThat(alertFile).contains("rolling_fcm_send_total{result=\"failure\"}");
+        assertThat(alertFile).contains("dashboard_path:");
+        assertThat(alertFile).contains("runbook:");
     }
 
     @Test
@@ -81,5 +92,30 @@ class PrometheusMonitoringConfigTest {
         Map<String, Object> server = (Map<String, Object>) http.get("server");
 
         assertThat(server.get("requests")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("Monitoring compose는 alertmanager 서비스와 필수 Slack webhook 환경 변수를 정의한다")
+    @SuppressWarnings("unchecked")
+    void monitoringCompose_definesAlertmanagerService() throws IOException {
+        Map<String, Object> composeConfig = yaml.load(Files.readString(MONITORING_COMPOSE_CONFIG));
+        Map<String, Object> services = (Map<String, Object>) composeConfig.get("services");
+        Map<String, Object> alertmanager = (Map<String, Object>) services.get("alertmanager");
+
+        assertThat(alertmanager).isNotNull();
+        assertThat(((Map<String, Object>) alertmanager.get("environment")).get("SLACK_METRICS_ALERT_WEBHOOK_URL"))
+                .isEqualTo("${SLACK_METRICS_ALERT_WEBHOOK_URL:?SLACK_METRICS_ALERT_WEBHOOK_URL is required}");
+    }
+
+    @Test
+    @DisplayName("Alertmanager 템플릿은 resolve 알림, Grafana 링크, severity 기반 Slack 메시지를 포함한다")
+    void alertmanagerTemplate_includesSlackRoutingPolicy() throws IOException {
+        String template = Files.readString(ALERTMANAGER_TEMPLATE);
+
+        assertThat(template).contains("send_resolved: true");
+        assertThat(template).contains("severity=\"critical\"");
+        assertThat(template).contains("__SLACK_METRICS_ALERT_WEBHOOK_URL__");
+        assertThat(template).contains("__GRAFANA_ROOT_URL__");
+        assertThat(template).contains("*dashboard*:");
     }
 }

@@ -11,6 +11,13 @@
 - 기존 `requestId`, `userId`, `path`, `status`, `errorCode` 같은 운영 추적 정보를 Slack 메시지에 재사용한다.
 - Slack 전송 실패가 본래 API 응답이나 스케줄러 흐름을 망치지 않게 한다.
 
+## 현재 진행 상태
+
+- Phase 1 앱 이벤트 기반 Slack 알림은 구현과 기본 테스트까지 반영 완료
+- Phase 2 메트릭 기반 Slack 알림은 `Prometheus Alertmanager` 기준 설정과 정적 검증까지 반영 완료
+- 실제 Slack 수신 확인과 threshold 튜닝은 배포 환경 검증으로 남아 있음
+- Phase 2는 앱 내부 예외 알림을 대체하는 작업이 아니라, 운영 지표 이상 징후 탐지를 보완하는 단계로 진행
+
 ## 현재 코드베이스 기준 현황
 
 ### 이미 준비된 기반

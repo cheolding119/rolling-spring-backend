@@ -1,0 +1,56 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: slack-warning
+  group_by:
+    - alertname
+    - service
+    - severity
+  group_wait: 30s
+  group_interval: 10m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: slack-critical
+      repeat_interval: 30m
+
+receivers:
+  - name: slack-warning
+    slack_configs:
+      - api_url: "__SLACK_METRICS_ALERT_WEBHOOK_URL__"
+        send_resolved: true
+        username: "rolling-alertmanager"
+        icon_emoji: ":satellite:"
+        color: "warning"
+        title: "[ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ .CommonLabels.severity }}][{{ .Status }}] {{ .CommonAnnotations.summary }}"
+        text: |-
+          *service*: {{ .CommonLabels.service }}
+          *alert*: {{ .CommonLabels.alertname }}
+          *summary*: {{ .CommonAnnotations.summary }}
+          *description*: {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.current_value_hint }}*current*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
+          {{ if .CommonAnnotations.threshold_hint }}*threshold*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
+          {{ if .CommonAnnotations.observation_window }}*window*: {{ .CommonAnnotations.observation_window }}{{ end }}
+          {{ if .CommonAnnotations.dashboard_path }}*dashboard*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}
+          {{ if .CommonAnnotations.runbook }}*runbook*: {{ .CommonAnnotations.runbook }}{{ end }}
+
+  - name: slack-critical
+    slack_configs:
+      - api_url: "__SLACK_METRICS_ALERT_WEBHOOK_URL__"
+        send_resolved: true
+        username: "rolling-alertmanager"
+        icon_emoji: ":rotating_light:"
+        color: "danger"
+        title: "[ROLLING API][__SLACK_METRICS_ALERT_ENVIRONMENT__][{{ .CommonLabels.severity }}][{{ .Status }}] {{ .CommonAnnotations.summary }}"
+        text: |-
+          *service*: {{ .CommonLabels.service }}
+          *alert*: {{ .CommonLabels.alertname }}
+          *summary*: {{ .CommonAnnotations.summary }}
+          *description*: {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.current_value_hint }}*current*: {{ .CommonAnnotations.current_value_hint }}{{ end }}
+          {{ if .CommonAnnotations.threshold_hint }}*threshold*: {{ .CommonAnnotations.threshold_hint }}{{ end }}
+          {{ if .CommonAnnotations.observation_window }}*window*: {{ .CommonAnnotations.observation_window }}{{ end }}
+          {{ if .CommonAnnotations.dashboard_path }}*dashboard*: __GRAFANA_ROOT_URL__{{ .CommonAnnotations.dashboard_path }}{{ end }}
+          {{ if .CommonAnnotations.runbook }}*runbook*: {{ .CommonAnnotations.runbook }}{{ end }}
