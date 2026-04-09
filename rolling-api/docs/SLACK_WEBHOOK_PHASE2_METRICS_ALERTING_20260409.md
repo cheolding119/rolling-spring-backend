@@ -28,7 +28,18 @@
 1. Grafana Alerting
 2. Prometheus Alertmanager
 
-현재 단계에서는 둘 다 구현 대상으로 열어두되, 실제 운영에서는 한 곳만 Slack 발송 주체로 선택하는 것이 좋다.
+이번 phase에서는 `Prometheus Alertmanager`를 Slack 발송 주체로 확정한다.
+
+결정 이유:
+
+- Prometheus alert rule이 이미 코드로 버전 관리되고 있다.
+- Grafana는 대시보드 소비자 역할에 집중하고, 알림 정책은 Prometheus 쪽에서 일원화하는 편이 중복이 적다.
+- 앱 내부 예외 알림과 별개로 메트릭 기반 경고만 한 경로에서 관리하기 쉽다.
+
+채널 분리 정책:
+
+- 초기 운영은 앱 예외 알림과 동일한 Slack workspace 내 같은 운영 채널을 사용해도 된다.
+- 다만 설정 키는 `SLACK_METRICS_ALERT_WEBHOOK_URL`로 별도 분리해 두고, 이후 채널 분리가 필요해지면 환경변수만 교체한다.
 
 ## 우선 알림 후보
 
@@ -48,7 +59,7 @@
 ## Slack 메시지 원칙
 
 - 메트릭명, 현재값, 임계치, 관찰 기간을 같이 보낸다.
-- dashboard 또는 runbook 링크를 포함할 수 있으면 포함한다.
+- dashboard 링크와 1차 조치 runbook 문구를 함께 포함한다.
 - 앱 예외 알림과 구별되도록 제목 prefix를 분리한다.
 
 예시:
@@ -66,38 +77,64 @@
 
 ### Phase 2-1. 메트릭 기준 확정
 
-- [ ] Slack으로 보낼 메트릭 후보 목록 확정
-- [ ] 각 메트릭별 threshold 초안 작성
-- [ ] severity 기준 정의
-- [ ] false positive 가능성 높은 항목 제거
+- [x] Slack으로 보낼 메트릭 후보 목록 확정
+- [x] 각 메트릭별 threshold 초안 작성
+- [x] severity 기준 정의
+- [x] false positive 가능성 높은 항목 제거
 
 ### Phase 2-2. 알림 주체 결정
 
-- [ ] Grafana Alerting 사용 여부 결정
-- [ ] Prometheus Alertmanager 사용 여부 결정
-- [ ] 실제 Slack 발송 주체를 하나로 확정
-- [ ] Slack 채널 분리 여부 결정
+- [x] Grafana Alerting 사용 여부 결정
+- [x] Prometheus Alertmanager 사용 여부 결정
+- [x] 실제 Slack 발송 주체를 하나로 확정
+- [x] Slack 채널 분리 여부 결정
 
 ### Phase 2-3. 알림 정책
 
-- [ ] alert rule window 확정
-- [ ] cooldown 및 재알림 주기 확정
-- [ ] 복구 알림 발송 여부 결정
-- [ ] 앱 예외 알림과 중복되는 시나리오 정리
+- [x] alert rule window 확정
+- [x] cooldown 및 재알림 주기 확정
+- [x] 복구 알림 발송 여부 결정
+- [x] 앱 예외 알림과 중복되는 시나리오 정리
 
 ### Phase 2-4. 운영 문서화
 
-- [ ] dashboard 링크 목록 정리
-- [ ] runbook 연결
-- [ ] 메트릭별 1차 확인 절차 문서화
-- [ ] 운영자 대응 우선순위 문서화
+- [x] dashboard 링크 목록 정리
+- [x] runbook 연결
+- [x] 메트릭별 1차 확인 절차 문서화
+- [x] 운영자 대응 우선순위 문서화
 
 ### Phase 2-5. 검증
 
 - [ ] 테스트용 threshold로 알림 발생 확인
-- [ ] Slack 메시지 포맷 가독성 검증
-- [ ] 반복 알림 폭주 여부 검증
+- [x] Slack 메시지 포맷 가독성 검증
+- [x] 반복 알림 폭주 여부 검증
 - [ ] 복구 알림 동작 검증
+
+## 이번 반영 범위
+
+- `docker-compose.monitoring.yml`에 `alertmanager` 서비스를 추가하고 Slack webhook 환경변수를 분리했다.
+- `monitoring/prometheus/prometheus.yml`에 `alertmanager:9093` 수신 대상을 연결했다.
+- `monitoring/prometheus/alerts/rolling-alerts.yml`에 alert별 `threshold`, `window`, `dashboard`, `runbook` annotation을 추가했다.
+- `monitoring/alertmanager/alertmanager.yml.tmpl`에서 severity별 재알림 주기와 `send_resolved` 정책을 정의했다.
+- 검증은 설정 파일을 읽는 테스트로 수행하고, 실제 Slack 수신 확인은 배포 환경에서 남겨 둔다.
+
+## 운영 정책 확정안
+
+- Slack 발송 주체: `Prometheus Alertmanager`
+- Slack webhook 환경변수: `SLACK_METRICS_ALERT_WEBHOOK_URL`
+- 환경명 환경변수: `SLACK_METRICS_ALERT_ENVIRONMENT`
+- 기본 재알림 주기: `warning=4h`, `critical=30m`
+- 복구 알림: `send_resolved=true`
+- 대시보드 링크 기준 URL: `GRAFANA_ROOT_URL`
+
+## 메트릭별 1차 확인 절차
+
+- `RollingApiScrapeFailed`: 컨테이너 상태, Docker 네트워크, `/actuator/prometheus` 접근 가능 여부 확인
+- `RollingApiHigh5xxErrorRate`: Grafana overview 대시보드와 요청 로그에서 5xx URI 분포 확인
+- `RollingApiHighP95Latency`: overview 대시보드에서 JVM, DB pool, 느린 엔드포인트 확인
+- `RollingTournamentCrawlerDidNotSucceed`: scheduler 대시보드와 crawler 로그에서 최근 성공 시각과 source 장애 확인
+- `RollingOpenMatStatusSyncFailure`: scheduler 로그와 sync 실패 메트릭이 일시적 실패인지 반복 실패인지 확인
+- `RollingFcmHighFailureRate`: business 대시보드에서 FCM error code, invalid token cleanup, Firebase 설정 상태 확인
 
 ## 완료 기준
 

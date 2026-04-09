@@ -14,12 +14,38 @@ services:
       - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: rolling-alertmanager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"
+    environment:
+      SLACK_METRICS_ALERT_WEBHOOK_URL: ${SLACK_METRICS_ALERT_WEBHOOK_URL:?SLACK_METRICS_ALERT_WEBHOOK_URL is required}
+      SLACK_METRICS_ALERT_ENVIRONMENT: ${SLACK_METRICS_ALERT_ENVIRONMENT:-prod}
+      GRAFANA_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        test -n "$$SLACK_METRICS_ALERT_WEBHOOK_URL"
+        sed \
+          -e "s|__SLACK_METRICS_ALERT_WEBHOOK_URL__|$$SLACK_METRICS_ALERT_WEBHOOK_URL|g" \
+          -e "s|__SLACK_METRICS_ALERT_ENVIRONMENT__|$$SLACK_METRICS_ALERT_ENVIRONMENT|g" \
+          -e "s|__GRAFANA_ROOT_URL__|$$GRAFANA_ROOT_URL|g" \
+          /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml.tmpl:/etc/alertmanager/alertmanager.yml.tmpl:ro
+      - alertmanager_data:/alertmanager
+
   grafana:
     image: grafana/grafana:11.6.0
     container_name: rolling-grafana
     restart: unless-stopped
     depends_on:
       - prometheus
+      - alertmanager
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -33,4 +59,5 @@ services:
 
 volumes:
   prometheus_data:
+  alertmanager_data:
   grafana_data:

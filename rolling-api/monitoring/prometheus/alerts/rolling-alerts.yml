@@ -10,6 +10,10 @@ groups:
         annotations:
           summary: "Rolling API scrape failed"
           description: "Prometheus has not been able to scrape the rolling-api target for at least 2 minutes."
+          threshold_hint: "up == 0"
+          observation_window: "for 2m"
+          dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
+          runbook: "Check container health, internal Docker network, and /actuator/prometheus reachability."
 
       - alert: RollingApiHigh5xxErrorRate
         expr: |
@@ -25,6 +29,11 @@ groups:
         annotations:
           summary: "Rolling API 5xx error rate is high"
           description: "The 5xx ratio for non-actuator HTTP requests has stayed above 5% for 10 minutes."
+          current_value_hint: '{{ printf "%.4f" $value }}'
+          threshold_hint: "5xx ratio > 0.05"
+          observation_window: "5m rate, for 10m"
+          dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
+          runbook: "Check overview dashboard, request logs, and recent 5xx responses grouped by URI."
 
       - alert: RollingApiHighP95Latency
         expr: |
@@ -39,6 +48,11 @@ groups:
         annotations:
           summary: "Rolling API p95 latency is high"
           description: "The p95 latency for non-actuator HTTP requests has exceeded 1.5 seconds for 10 minutes."
+          current_value_hint: '{{ printf "%.2fs" $value }}'
+          threshold_hint: "p95 latency > 1.5s"
+          observation_window: "5m histogram, for 10m"
+          dashboard_path: "/d/rolling-overview/rolling-overview?orgId=1&from=now-6h&to=now"
+          runbook: "Check latency, DB pool, and JVM pressure on the overview dashboard before inspecting slow endpoints."
 
       - alert: RollingTournamentCrawlerDidNotSucceed
         expr: |
@@ -53,6 +67,10 @@ groups:
         annotations:
           summary: "Tournament crawler has not succeeded recently"
           description: "No successful tournamentCrawler execution has been recorded in the last 26 hours, excluding the first 26 hours after process startup."
+          threshold_hint: "last success older than 26h"
+          observation_window: "26h gap, for 15m"
+          dashboard_path: "/d/rolling-scheduler/rolling-scheduler?orgId=1&from=now-48h&to=now"
+          runbook: "Check tournament scheduler logs, crawler source availability, and the latest scheduler success timestamp."
 
       - alert: RollingOpenMatStatusSyncFailure
         expr: increase(rolling_scheduler_execution_total{task="openMatStatusSync",result="failure"}[15m]) > 0
@@ -64,6 +82,11 @@ groups:
         annotations:
           summary: "OpenMat status sync is failing"
           description: "openMatStatusSync recorded one or more failures within the last 15 minutes."
+          current_value_hint: '{{ printf "%.0f" $value }} failures'
+          threshold_hint: "increase(failures[15m]) > 0"
+          observation_window: "15m increase, for 5m"
+          dashboard_path: "/d/rolling-scheduler/rolling-scheduler?orgId=1&from=now-6h&to=now"
+          runbook: "Check scheduler logs and openmat sync metrics to confirm whether the failure is repeating or transient."
 
       - alert: RollingFcmHighFailureRate
         expr: |
@@ -82,3 +105,8 @@ groups:
         annotations:
           summary: "FCM failure rate is high"
           description: "FCM send failures have exceeded 20% over the last 15 minutes with at least 10 send attempts."
+          current_value_hint: '{{ printf "%.4f" $value }}'
+          threshold_hint: "failure ratio > 0.2 with total sends >= 10"
+          observation_window: "15m increase, for 10m"
+          dashboard_path: "/d/rolling-business/rolling-business?orgId=1&from=now-6h&to=now"
+          runbook: "Check FCM error-code breakdown, invalid token cleanup trend, and Firebase credentials health."
