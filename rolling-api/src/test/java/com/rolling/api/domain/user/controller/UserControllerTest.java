@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -87,7 +88,30 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(2))
+                .andExpect(jsonPath("$.data.affiliation").value("롤링짐 강남"))
                 .andExpect(jsonPath("$.data.settings.pushNotificationEnabled").value(true));
+    }
+
+    @Test
+    @DisplayName("내 정보 수정은 소속 체육관 필드를 포함해 성공한다")
+    void updateMe_withAffiliation_returnsUpdatedProfile() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.updateMe(eq(2L), any())).willReturn(userResponse(true));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "affiliation": "롤링짐 강남"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.affiliation").value("롤링짐 강남"));
     }
 
     @Test
@@ -152,6 +176,7 @@ class UserControllerTest {
                 .nickname("rolling-user")
                 .email("user@test.com")
                 .phone("010-1234-5678")
+                .affiliation("롤링짐 강남")
                 .socialProvider("GOOGLE")
                 .beltColor("BLUE")
                 .createdAt(LocalDateTime.of(2026, 4, 6, 12, 0))

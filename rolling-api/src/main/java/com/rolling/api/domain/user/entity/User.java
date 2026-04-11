@@ -33,6 +33,9 @@ public class User extends BaseTimeEntity {
 
     private String phone;
 
+    @Column(length = 255)
+    private String affiliation;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SocialProvider socialProvider;
@@ -72,6 +75,7 @@ public class User extends BaseTimeEntity {
                 String nickname,
                 String email,
                 String phone,
+                String affiliation,
                 BeltColor beltColor,
                 String fcmToken,
                 Boolean pushNotificationEnabled) {
@@ -80,6 +84,7 @@ public class User extends BaseTimeEntity {
         this.nickname = nickname;
         this.email = email;
         this.phone = phone;
+        this.affiliation = affiliation;
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
         this.pushNotificationEnabled = pushNotificationEnabled == null ? true : pushNotificationEnabled;
         if (fcmToken != null && !fcmToken.isBlank()) {
@@ -101,6 +106,12 @@ public class User extends BaseTimeEntity {
 
     public void updatePhone(String phone) {
         this.phone = phone;
+    }
+
+    public void updateAffiliation(String affiliation) {
+        if (affiliation != null) {
+            this.affiliation = affiliation;
+        }
     }
 
     public void updateBeltColor(BeltColor beltColor) {
@@ -154,6 +165,7 @@ public class User extends BaseTimeEntity {
         this.nickname = "withdrawn_user_" + this.id;
         this.email = null;
         this.phone = null;
+        this.affiliation = null;
         this.devices.clear();
         this.socialId = "withdrawn-" + this.id + "-" + UUID.randomUUID();
         this.withdrawalPending = false;

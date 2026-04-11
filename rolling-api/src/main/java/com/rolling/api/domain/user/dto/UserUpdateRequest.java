@@ -11,6 +11,9 @@ public class UserUpdateRequest {
     @Schema(description = "닉네임", example = "rolling_user")
     private String nickname;
 
+    @Schema(description = "소속 체육관", example = "롤링짐 강남", nullable = true)
+    private String affiliation;
+
     @Schema(description = "주짓수 벨트 색상", example = "BLUE", allowableValues = {"WHITE", "BLUE", "PURPLE", "BROWN", "BLACK"})
     private BeltColor beltColor;
 }

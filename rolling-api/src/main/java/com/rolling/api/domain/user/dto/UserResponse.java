@@ -24,6 +24,9 @@ public class UserResponse {
     @Schema(description = "전화번호", example = "010-1234-5678")
     private String phone;
 
+    @Schema(description = "소속 체육관", example = "롤링짐 강남", nullable = true)
+    private String affiliation;
+
     @Schema(description = "소셜 로그인 제공자", example = "GOOGLE")
     private String socialProvider;
 
@@ -51,6 +54,7 @@ public class UserResponse {
                 .nickname(user.getNickname())
                 .email(user.getEmail())
                 .phone(user.getPhone())
+                .affiliation(user.getAffiliation())
                 .socialProvider(user.getSocialProvider().name())
                 .beltColor(user.getBeltColor().name())
                 .createdAt(user.getCreatedAt())

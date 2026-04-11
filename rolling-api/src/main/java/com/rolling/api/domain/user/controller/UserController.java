@@ -53,7 +53,7 @@ public class UserController {
 
     @Operation(
             summary = "내 정보 수정",
-            description = "닉네임 또는 벨트 색상을 수정합니다. 요청 검증은 수행하지 않습니다."
+            description = "닉네임, 소속 체육관, 벨트 색상을 수정합니다. 요청 검증은 수행하지 않습니다."
     )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({

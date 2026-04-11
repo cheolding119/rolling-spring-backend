@@ -51,6 +51,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("admin-user")
                 .email("admin@test.com")
+                .affiliation("롤링짐 강남")
                 .beltColor(BeltColor.BLACK)
                 .build();
         ReflectionTestUtils.setField(user, "id", 11L);
@@ -62,23 +63,26 @@ class UserServiceTest {
 
         assertThat(response.getIsAdmin()).isTrue();
         assertThat(response.getNickname()).isEqualTo("admin-user");
+        assertThat(response.getAffiliation()).isEqualTo("롤링짐 강남");
         assertThat(response.getSettings().getPushNotificationEnabled()).isTrue();
     }
 
     @Test
-    @DisplayName("내 정보 수정 시 nickname, beltColor를 반영한다")
-    void updateMe_updatesNicknameAndBeltColor() {
+    @DisplayName("내 정보 수정 시 nickname, affiliation, beltColor를 반영한다")
+    void updateMe_updatesNicknameAffiliationAndBeltColor() {
         User user = User.builder()
                 .socialId("social-1")
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("old")
                 .email("user@test.com")
+                .affiliation("old-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 1L);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "new-nickname");
+        ReflectionTestUtils.setField(request, "affiliation", "new-gym");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
 
         when(userRepository.findByIdAndIsWithdrawnFalse(1L)).thenReturn(Optional.of(user));
@@ -86,6 +90,7 @@ class UserServiceTest {
         UserResponse response = userService.updateMe(1L, request);
 
         assertThat(response.getNickname()).isEqualTo("new-nickname");
+        assertThat(response.getAffiliation()).isEqualTo("new-gym");
         assertThat(response.getBeltColor()).isEqualTo("BLUE");
     }
 
@@ -97,6 +102,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.KAKAO)
                 .nickname("current")
                 .email("user2@test.com")
+                .affiliation("current-gym")
                 .beltColor(BeltColor.PURPLE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 2L);
@@ -108,6 +114,7 @@ class UserServiceTest {
         UserResponse response = userService.updateMe(2L, request);
 
         assertThat(response.getNickname()).isEqualTo("current");
+        assertThat(response.getAffiliation()).isEqualTo("current-gym");
         assertThat(response.getBeltColor()).isEqualTo("PURPLE");
     }
 
@@ -119,18 +126,46 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("nickname")
                 .email("user3@test.com")
+                .affiliation("gym")
                 .beltColor(BeltColor.BROWN)
                 .build();
         ReflectionTestUtils.setField(user, "id", 3L);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "");
+        ReflectionTestUtils.setField(request, "affiliation", "");
 
         when(userRepository.findByIdAndIsWithdrawnFalse(3L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.updateMe(3L, request);
 
         assertThat(response.getNickname()).isEqualTo("");
+        assertThat(response.getAffiliation()).isEqualTo("");
+        assertThat(response.getBeltColor()).isEqualTo("BROWN");
+    }
+
+    @Test
+    @DisplayName("내 정보 수정에서 affiliation만 전달해도 반영된다")
+    void updateMe_updatesOnlyAffiliation() {
+        User user = User.builder()
+                .socialId("social-3b")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("nickname")
+                .email("user3b@test.com")
+                .affiliation("old-gym")
+                .beltColor(BeltColor.BROWN)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 33L);
+
+        UserUpdateRequest request = new UserUpdateRequest();
+        ReflectionTestUtils.setField(request, "affiliation", "new-gym");
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(33L)).thenReturn(Optional.of(user));
+
+        UserResponse response = userService.updateMe(33L, request);
+
+        assertThat(response.getNickname()).isEqualTo("nickname");
+        assertThat(response.getAffiliation()).isEqualTo("new-gym");
         assertThat(response.getBeltColor()).isEqualTo("BROWN");
     }
 
@@ -142,6 +177,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("settings-user")
                 .email("settings@test.com")
+                .affiliation("settings-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 31L);
@@ -165,6 +201,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("push-user")
                 .email("user4@test.com")
+                .affiliation("push-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 4L);
@@ -193,6 +230,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("push-user")
                 .email("user4b@test.com")
+                .affiliation("push-gym-2")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 44L);
@@ -218,6 +256,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("previous")
                 .email("previous@test.com")
+                .affiliation("prev-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(previousUser, "id", 40L);
@@ -227,6 +266,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.KAKAO)
                 .nickname("current")
                 .email("current@test.com")
+                .affiliation("current-gym")
                 .beltColor(BeltColor.BLUE)
                 .build();
         ReflectionTestUtils.setField(currentUser, "id", 41L);
@@ -258,6 +298,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("push-user")
                 .email("user8@test.com")
+                .affiliation("remove-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 8L);
@@ -287,6 +328,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.KAKAO)
                 .nickname("push-user")
                 .email("user9@test.com")
+                .affiliation("missing-gym")
                 .beltColor(BeltColor.BLUE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 9L);
@@ -307,6 +349,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("push-user")
                 .email("user10@test.com")
+                .affiliation("reconnect-gym")
                 .beltColor(BeltColor.WHITE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 10L);
@@ -341,6 +384,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.GOOGLE)
                 .nickname("owner")
                 .email("owner@test.com")
+                .affiliation("owner-gym")
                 .beltColor(BeltColor.BLUE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 5L);
@@ -350,6 +394,7 @@ class UserServiceTest {
                 .socialProvider(SocialProvider.KAKAO)
                 .nickname("blocked")
                 .email("blocked@test.com")
+                .affiliation("blocked-gym")
                 .beltColor(BeltColor.PURPLE)
                 .build();
         ReflectionTestUtils.setField(blockedUser, "id", 6L);
