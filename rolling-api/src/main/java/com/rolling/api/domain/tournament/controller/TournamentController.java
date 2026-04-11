@@ -1,9 +1,12 @@
 package com.rolling.api.domain.tournament.controller;
 
 import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
+import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlRequest;
+import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlResponse;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.dto.TournamentUpdateRequest;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
+import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.domain.tournament.service.TournamentService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
@@ -76,6 +79,22 @@ public class TournamentController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "대회 포스터 업로드 URL 발급", description = "대회 포스터를 S3에 직접 업로드하기 위한 presigned URL을 발급합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PostMapping("/poster-upload-url")
+    public ResponseEntity<ApiResponse<TournamentPosterUploadUrlResponse>> createPosterUploadUrl(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody TournamentPosterUploadUrlRequest request) {
+        requireUserId(principal);
+        TournamentPosterUploadUrlResponse response = tournamentService.createPosterUploadUrl(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "대회 수정", description = "작성자 또는 관리자가 대회 정보를 수정합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -104,6 +123,23 @@ public class TournamentController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
         tournamentService.delete(requireUserId(principal), id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "대회 신고", description = "대회를 신고합니다. 동일 사용자는 같은 대회를 한 번만 신고할 수 있습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "신고 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "중복 신고/자기 신고/요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대회를 찾을 수 없음")
+    })
+    @PostMapping("/{id}/report")
+    public ResponseEntity<ApiResponse<Void>> report(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody ReportCreateRequest request) {
+        tournamentService.report(requireUserId(principal), id, request);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

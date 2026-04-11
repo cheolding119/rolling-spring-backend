@@ -56,6 +56,9 @@ public class Tournament extends BaseTimeEntity {
     @Column(name = "poster_url", length = 1000)
     private String posterUrl;
 
+    @Column(name = "poster_key", length = 1000)
+    private String posterKey;
+
     // 대회 개최일 (YYYY-MM-DD)
     @Column(name = "competition_date", nullable = false)
     private String competitionDate;
@@ -78,6 +81,7 @@ public class Tournament extends BaseTimeEntity {
                       String title,
                       String organizer,
                       String posterUrl,
+                      String posterKey,
                       String competitionDate,
                       String registrationDeadline,
                       String location,
@@ -87,6 +91,7 @@ public class Tournament extends BaseTimeEntity {
         this.title = title;
         this.organizer = organizer;
         this.posterUrl = posterUrl;
+        this.posterKey = posterKey;
         this.competitionDate = competitionDate;
         this.registrationDeadline = registrationDeadline;
         this.location = location;

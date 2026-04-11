@@ -5,6 +5,7 @@ import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import lombok.Builder;
 import lombok.Getter;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +30,10 @@ public class TournamentResponse {
     private LocalDateTime createdAt;
 
     public static TournamentResponse from(Tournament tournament) {
+        return from(tournament, tournament.getPosterUrl());
+    }
+
+    public static TournamentResponse from(Tournament tournament, String posterUrl) {
         LocalDate competitionDate = TournamentDateUtils.parse(tournament.getCompetitionDate());
         LocalDate registrationDeadline = TournamentDateUtils.parse(tournament.getRegistrationDeadline());
         boolean registrationClosed = registrationDeadline != null && LocalDate.now(SEOUL_ZONE).isAfter(registrationDeadline);
@@ -38,7 +43,7 @@ public class TournamentResponse {
                 .source(resolveSource(tournament.getSource()))
                 .title(tournament.getTitle())
                 .organizer(tournament.getOrganizer())
-                .posterUrl(tournament.getPosterUrl())
+                .posterUrl(StringUtils.hasText(posterUrl) ? posterUrl : tournament.getPosterUrl())
                 .competitionDate(competitionDate)
                 .registrationDeadline(registrationDeadline)
                 .location(tournament.getLocation())

@@ -622,7 +622,8 @@ Response data: `null`
 `GET /api/v1/tournaments`
 
 - 인증: 불필요
-- Response: 페이징된 `TournamentModel`
+- Response: 페이징된 `TournamentResponse`
+- `posterUrl`은 수동 등록 대회의 `posterKey` 또는 크롤링 저장 URL을 기준으로 응답 전용으로 내려간다.
 
 Query parameters:
 
@@ -637,13 +638,17 @@ Query parameters:
 `GET /api/v1/tournaments/{id}`
 
 - 인증: 불필요
-- Response: `TournamentModel`
+- Response: `TournamentResponse`
+- 작성자 포함 모든 사용자가 동일한 응답을 받는다.
 
 ### 5.5.3 대회 등록
 
 `POST /api/v1/tournaments`
 
 - 인증: 필요
+- Request body: `posterKey`를 받는다.
+- Response: `TournamentResponse`
+- `posterUrl`은 응답 시 `posterKey`를 기준으로 조립된다.
 
 Request body:
 
@@ -651,7 +656,7 @@ Request body:
 | --- | --- | --- |
 | `title` | `String` | O |
 | `organizer` | `String?` | - |
-| `posterUrl` | `String` | O |
+| `posterKey` | `String` | O |
 | `competitionDate` | `Date` | O |
 | `registrationDeadline` | `Date` | O |
 | `location` | `String?` | - |
@@ -659,12 +664,19 @@ Request body:
 
 Response: `TournamentModel`
 
+현재 개편 메모:
+
+- 대회 생성/상세/신고 개편 기준 문서는 [BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md](/C:/rolling/rolling-spring-backend/rolling-api/docs/BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md)다.
+- 대회 생성은 `POST /api/v1/tournaments/poster-upload-url`로 받은 `posterKey`를 사용한다.
+- 응답의 `posterUrl`은 `posterKey`를 기반으로 내려간다.
+- 상세 조회는 작성자 포함 공용 `TournamentModel`을 그대로 사용한다.
+
 ### 5.5.4 대회 수정
 
 `PUT /api/v1/tournaments/{id}`
 
 - 인증: 필요
-- Request body: 등록 API와 동일 필드, 모두 optional
+- Request body: 현재는 등록 API와 별개로 `posterUrl`을 포함한 기존 수정 필드를 유지한다.
 - Response: `TournamentModel`
 
 현재 구현 메모:
@@ -709,6 +721,31 @@ Response data:
 - 관리자 여부 최종 판별은 항상 서버가 수행한다.
 - 관리자 페이지 버튼 노출 여부는 프론트 UX 정책이고, 실제 관리자 액션 보호는 서버 `403 FORBIDDEN` 응답으로 처리한다.
 - `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
+
+### 5.5.7 대회 포스터 업로드 URL 발급
+
+`POST /api/v1/tournaments/poster-upload-url`
+
+- 인증: 필요
+- Response: `TournamentPosterUploadUrlResponse`
+
+현재 구현 메모:
+
+- 클라이언트는 먼저 업로드 URL을 발급받고 S3에 직접 업로드한 뒤, 생성 API에 `posterKey`를 전달한다.
+- 응답에는 `posterKey`와 업로드 URL이 내려가고, 생성/조회 응답의 `posterUrl`은 `posterKey` 기준으로 조립한다.
+
+### 5.5.8 대회 신고
+
+`POST /api/v1/tournaments/{id}/report`
+
+- 인증: 필요
+- Response: `null`
+
+현재 구현 메모:
+
+- 동일 사용자는 같은 대회를 한 번만 신고할 수 있다.
+- 자기 작성 대회 신고는 차단한다.
+- 신고 저장은 공통 `Report` 도메인을 재사용한다.
 
 ## 5.6 공지사항 API
 

@@ -1,12 +1,17 @@
 package com.rolling.api.domain.tournament.service;
 
 import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
+import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlRequest;
+import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlResponse;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.dto.TournamentUpdateRequest;
 import com.rolling.api.domain.tournament.entity.Tournament;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
+import com.rolling.api.domain.report.dto.ReportCreateRequest;
+import com.rolling.api.domain.report.entity.ReportTargetType;
+import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.security.AdminAccessConfig;
@@ -27,6 +32,8 @@ public class TournamentService {
 
     private final TournamentRepository tournamentRepository;
     private final UserRepository userRepository;
+    private final ReportService reportService;
+    private final TournamentPosterService tournamentPosterService;
     private final AdminAccessConfig adminAccessConfig;
 
     @Transactional(readOnly = true)
@@ -38,7 +45,7 @@ public class TournamentService {
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
         List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
                 .filter(tournament -> matchesSource(tournament, source))
-                .map(TournamentResponse::from)
+                .map(this::toResponse)
                 .sorted(
                         Comparator.comparing(TournamentResponse::isRegistrationClosed)
                                 .thenComparing(TournamentResponse::getRegistrationDeadline, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -60,7 +67,7 @@ public class TournamentService {
     public TournamentResponse findById(Long id) {
         Tournament tournament = tournamentRepository.findById(id)
                 .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
-        return TournamentResponse.from(tournament);
+        return toResponse(tournament);
     }
 
     @Transactional
@@ -71,12 +78,16 @@ public class TournamentService {
         LocalDate registrationDeadline = request.getRegistrationDeadline();
         validateDatePolicy(competitionDate, registrationDeadline);
 
+        String posterKey = requireText(request.getPosterKey(), "포스터 key는 필수입니다");
+        String posterUrl = tournamentPosterService.buildPublicUrl(posterKey);
+
         Tournament tournament = Tournament.builder()
                 .hostUserId(userId)
                 .source(TournamentSource.MANUAL)
                 .title(requireText(request.getTitle(), "대회 제목은 필수입니다"))
                 .organizer(optionalText(request.getOrganizer()))
-                .posterUrl(requireText(request.getPosterUrl(), "포스터 URL은 필수입니다"))
+                .posterUrl(posterUrl)
+                .posterKey(posterKey)
                 .competitionDate(TournamentDateUtils.toIsoString(competitionDate))
                 .registrationDeadline(TournamentDateUtils.toIsoString(registrationDeadline))
                 .location(optionalText(request.getLocation()))
@@ -84,7 +95,12 @@ public class TournamentService {
                 .build();
 
         Tournament saved = tournamentRepository.save(tournament);
-        return TournamentResponse.from(saved);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public TournamentPosterUploadUrlResponse createPosterUploadUrl(TournamentPosterUploadUrlRequest request) {
+        return tournamentPosterService.createUploadUrl(request);
     }
 
     @Transactional
@@ -129,7 +145,7 @@ public class TournamentService {
                 effectiveApplyLink
         );
 
-        return TournamentResponse.from(tournament);
+        return toResponse(tournament);
     }
 
     @Transactional
@@ -138,6 +154,21 @@ public class TournamentService {
                 .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
         validateOwner(tournament, userId);
         tournamentRepository.delete(tournament);
+    }
+
+    @Transactional
+    public void report(Long userId, Long tournamentId, ReportCreateRequest request) {
+        Tournament tournament = tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
+
+        reportService.createReport(
+                userId,
+                ReportTargetType.TOURNAMENT,
+                tournamentId,
+                tournament.getHostUserId(),
+                request.getReason(),
+                request.getCustomReason()
+        );
     }
 
     private void validateActiveUser(Long userId) {
@@ -190,6 +221,10 @@ public class TournamentService {
 
     private TournamentSource resolveSource(Tournament tournament) {
         return tournament.getSource() == null ? TournamentSource.MANUAL : tournament.getSource();
+    }
+
+    private TournamentResponse toResponse(Tournament tournament) {
+        return TournamentResponse.from(tournament, tournamentPosterService.resolveDisplayUrl(tournament));
     }
 
     private String requireText(String value, String message) {

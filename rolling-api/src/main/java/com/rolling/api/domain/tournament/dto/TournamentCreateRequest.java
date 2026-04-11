@@ -18,9 +18,9 @@ public class TournamentCreateRequest {
     @Schema(description = "주최사", example = "롤링 주짓수")
     private String organizer;
 
-    @NotBlank(message = "포스터 URL은 필수입니다")
-    @Schema(description = "포스터 이미지 URL", example = "https://cdn.rolling.com/posters/1.jpg")
-    private String posterUrl;
+    @NotBlank(message = "포스터 key는 필수입니다")
+    @Schema(description = "S3 포스터 object key", example = "tournaments/posters/uuid.jpg")
+    private String posterKey;
 
     @NotNull(message = "대회 개최일은 필수입니다")
     @Schema(description = "대회 개최일", example = "2026-04-15")
