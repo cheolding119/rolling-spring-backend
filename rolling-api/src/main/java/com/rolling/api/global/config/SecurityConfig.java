@@ -4,11 +4,13 @@ import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.logging.LogMdcKeys;
 import com.rolling.api.global.logging.RequestTrackingFilter;
 import com.rolling.api.global.security.AdminAccessConfig;
+import com.rolling.api.global.security.TestUserHeaderAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -34,6 +36,7 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
+    private final ObjectProvider<TestUserHeaderAuthenticationFilter> testUserHeaderAuthenticationFilterProvider;
 
     @Bean
     @Order(0)
@@ -102,6 +105,12 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(requestTrackingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(jwtAuthenticationFilter, RequestTrackingFilter.class);
+
+        TestUserHeaderAuthenticationFilter testUserHeaderAuthenticationFilter =
+                testUserHeaderAuthenticationFilterProvider.getIfAvailable();
+        if (testUserHeaderAuthenticationFilter != null) {
+            http.addFilterAfter(testUserHeaderAuthenticationFilter, JwtAuthenticationFilter.class);
+        }
 
         return http.build();
     }

@@ -197,6 +197,7 @@ Response data:
 | `nickname` | `String` |
 | `email` | `String?` |
 | `phone` | `String?` |
+| `affiliation` | `String?` |
 | `socialProvider` | `String` |
 | `beltColor` | `String` |
 | `createdAt` | `DateTime` |
@@ -209,7 +210,7 @@ Response data:
 현재 구현 메모:
 
 - `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
-- `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`가 포함된다.
+- `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`와 소속 `affiliation`이 포함된다.
 - 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
 - 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
 - 서버는 accessToken에서 확인한 `userId`와 `admin.user-ids` 설정값으로 `ROLE_USER`/`ROLE_ADMIN`을 내부 판단한다.
@@ -228,11 +229,13 @@ Request body:
 | 필드 | 타입 | 필수 |
 | --- | --- | --- |
 | `nickname` | `String` | - |
+| `affiliation` | `String` | - |
 | `beltColor` | `String` | - |
 
 현재 구현 메모:
 
 - `phone` 수정은 아직 미지원이다.
+- `affiliation`은 선택 입력이며, 빈 값 없이 전달된 문자열을 그대로 반영한다.
 
 ### 5.2.3 내 설정 수정
 

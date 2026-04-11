@@ -35,6 +35,7 @@ public class UserService {
         User user = getActiveUser(userId);
 
         user.updateNickname(request.getNickname());
+        user.updateAffiliation(request.getAffiliation());
         user.updateBeltColor(request.getBeltColor());
 
         return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
