@@ -166,7 +166,7 @@ public class OpenMatController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
-    @Operation(summary = "오픈매트 참가자 목록 조회", description = "오픈매트 작성자가 참가자 목록을 조회합니다.")
+    @Operation(summary = "오픈매트 참가자 목록 조회", description = "로그인한 사용자가 오픈매트 참가자 목록을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),

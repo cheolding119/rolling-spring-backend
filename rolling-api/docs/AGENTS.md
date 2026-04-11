@@ -43,7 +43,7 @@
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
 - 오픈매트 작성자 관리 UI는 현재 상세 화면 안에서 바로 노출한다.
-- 작성자 전용 관리 범위는 `참가자 목록 조회`, `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
+- 작성자 전용 관리 범위는 `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
 - 현재 클라이언트는 작성자 권한을 상세 응답의 `hostId == 현재 사용자 id`로 판단한다.
 - 다만 작성자 관리 API는 아직 `api-spec.json`에 정식 반영되지 않았다. 프론트는 현재 연결 기준으로 선반영했고, 최종 완료 판단은 백엔드 계약/실서버 검증 후 닫는다.
 - 현재 로그인 API 요청 허용값은 `GOOGLE`, `KAKAO`다. `APPLE` 버튼을 노출하더라도 실제 호출 가능 여부는 출시 정책 확정 후 다시 맞춘다.
@@ -538,7 +538,7 @@ Query parameters:
 `GET /api/v1/open-mats/{id}/participants`
 
 - 인증: 필요
-- 권한: 작성자 전용
+- 권한: 로그인 사용자
 - Response data: `List<OpenMatParticipantResponse>`
 
 Response item 메모:
@@ -552,7 +552,7 @@ Response item 메모:
 
 프론트 구현 메모:
 
-- 오픈매트 상세 화면에서 작성자에게만 참가자 목록을 노출한다.
+- 오픈매트 상세 화면에서 로그인한 사용자에게 참가자 목록을 노출한다.
 - 참가자 목록은 현재 신청 순서대로 반환한다.
 - 현재 프론트는 API 실패 시 상세 응답의 `participantUids`로 최소 fallback 목록을 구성한다.
 - 이 endpoint는 아직 `api-spec.json`에 반영되지 않았으므로 실서버 검증 전까지 확정 계약으로 보지 않는다.

@@ -78,7 +78,7 @@
 - [x] Swagger/테스트/문서 반영
 
 결과 메모:
-- `GET /api/v1/open-mats/{id}/participants`로 작성자가 참가자 목록을 조회할 수 있다.
+- `GET /api/v1/open-mats/{id}/participants`로 로그인한 사용자가 참가자 목록을 조회할 수 있다.
 - `DELETE /api/v1/open-mats/{id}/participants/{participantUserId}`로 작성자가 특정 참가자를 강제 취소할 수 있다.
 - `PATCH /api/v1/open-mats/{id}/status`로 작성자가 모집 상태를 `RECRUITING`, `CLOSED`로 수동 변경할 수 있다.
 - 수동 마감 상태는 내부 `manualClosed` 플래그로 유지되어, 참가 취소로 자리가 나도 작성자가 다시 열기 전까지 `CLOSED`를 유지한다.

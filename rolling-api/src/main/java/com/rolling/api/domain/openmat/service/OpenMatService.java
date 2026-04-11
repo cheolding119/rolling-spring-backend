@@ -265,11 +265,9 @@ public class OpenMatService {
     }
 
     @Transactional(readOnly = true)
-    public List<OpenMatParticipantResponse> findParticipants(Long hostUserId, Long openMatId) {
+    public List<OpenMatParticipantResponse> findParticipants(Long requesterUserId, Long openMatId) {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(openMatId)
                 .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다"));
-
-        validateHostManager(openMat, hostUserId);
 
         if (openMat.getParticipantUids().isEmpty()) {
             return List.of();

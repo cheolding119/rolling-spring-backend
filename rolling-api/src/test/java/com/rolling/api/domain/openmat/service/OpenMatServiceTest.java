@@ -410,9 +410,12 @@ class OpenMatServiceTest {
     }
 
     @Test
-    @DisplayName("작성자가 아닌 사용자는 참가자 목록을 조회할 수 없다")
-    void findParticipants_forbiddenWhenNotHost() {
+    @DisplayName("작성자가 아닌 사용자도 참가자 목록을 조회할 수 있다")
+    void findParticipants_nonHostCanViewParticipants() {
         User host = createUser(1L, "host-participants-block", "host");
+        User participant = createUser(2L, "participant-visible", "alpha");
+        ReflectionTestUtils.setField(participant, "affiliation", "롤링짐 강남");
+        ReflectionTestUtils.setField(participant, "beltColor", BeltColor.BLUE);
         OpenMat openMat = createOpenMat(
                 36L,
                 host,
@@ -424,10 +427,16 @@ class OpenMatServiceTest {
         );
 
         when(openMatRepository.findByIdAndIsHiddenFalse(36L)).thenReturn(java.util.Optional.of(openMat));
+        when(userRepository.findAllByIdInAndIsWithdrawnFalse(List.of(2L)))
+                .thenReturn(List.of(participant));
 
-        assertThatThrownBy(() -> openMatService.findParticipants(99L, 36L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("작성자만 참가자/모집 상태를 관리할 수 있습니다");
+        List<OpenMatParticipantResponse> response = openMatService.findParticipants(99L, 36L);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getUserId()).isEqualTo(2L);
+        assertThat(response.get(0).getName()).isEqualTo("alpha");
+        assertThat(response.get(0).getAffiliation()).isEqualTo("롤링짐 강남");
+        assertThat(response.get(0).getBeltColor()).isEqualTo(BeltColor.BLUE);
     }
 
     @Test
