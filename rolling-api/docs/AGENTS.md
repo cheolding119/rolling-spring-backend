@@ -539,19 +539,21 @@ Query parameters:
 
 - 인증: 필요
 - 권한: 작성자 전용
-- Response data: `List<OpenMatParticipant>`
+- Response data: `List<OpenMatParticipantResponse>`
 
 Response item 메모:
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `userId` | `Long` | 참가자 사용자 ID |
-| `nickname` | `String` | 참가자 닉네임 |
-| `beltColor` | `String?` | 벨트 색상 |
+| `name` | `String` | 참가자 이름. 현재 구현에서는 `nickname`을 사용 |
+| `affiliation` | `String?` | 참가자 소속 |
+| `beltColor` | `String` | 벨트 색상 |
 
 프론트 구현 메모:
 
 - 오픈매트 상세 화면에서 작성자에게만 참가자 목록을 노출한다.
+- 참가자 목록은 현재 신청 순서대로 반환한다.
 - 현재 프론트는 API 실패 시 상세 응답의 `participantUids`로 최소 fallback 목록을 구성한다.
 - 이 endpoint는 아직 `api-spec.json`에 반영되지 않았으므로 실서버 검증 전까지 확정 계약으로 보지 않는다.
 

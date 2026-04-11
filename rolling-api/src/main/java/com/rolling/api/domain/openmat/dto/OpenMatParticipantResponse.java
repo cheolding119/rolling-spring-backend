@@ -14,21 +14,21 @@ public class OpenMatParticipantResponse {
     @Schema(description = "참가자 사용자 ID", example = "12")
     private Long userId;
 
-    @Schema(description = "참가자 닉네임", example = "rolling_user")
-    private String nickname;
+    @Schema(description = "참가자 이름", example = "rolling_user")
+    private String name;
+
+    @Schema(description = "참가자 소속", example = "롤링짐 강남", nullable = true)
+    private String affiliation;
 
     @Schema(description = "참가자 벨트", example = "BLUE")
     private BeltColor beltColor;
 
-    @Schema(description = "참가자 연락처", example = "010-1234-5678")
-    private String phone;
-
     public static OpenMatParticipantResponse from(User user) {
         return OpenMatParticipantResponse.builder()
                 .userId(user.getId())
-                .nickname(user.getNickname())
+                .name(user.getNickname())
+                .affiliation(user.getAffiliation())
                 .beltColor(user.getBeltColor())
-                .phone(user.getPhone())
                 .build();
     }
 }

@@ -377,10 +377,10 @@ class OpenMatServiceTest {
     void findParticipants_byHost_returnsOrderedParticipants() {
         User host = createUser(1L, "host-participants", "host");
         User participant1 = createUser(2L, "participant-1", "alpha");
-        ReflectionTestUtils.setField(participant1, "phone", "010-0000-0001");
+        ReflectionTestUtils.setField(participant1, "affiliation", "롤링짐 강남");
         ReflectionTestUtils.setField(participant1, "beltColor", BeltColor.BLUE);
         User participant2 = createUser(3L, "participant-2", "beta");
-        ReflectionTestUtils.setField(participant2, "phone", "010-0000-0002");
+        ReflectionTestUtils.setField(participant2, "affiliation", "롤링짐 잠실");
         ReflectionTestUtils.setField(participant2, "beltColor", BeltColor.PURPLE);
 
         OpenMat openMat = createOpenMat(
@@ -402,7 +402,11 @@ class OpenMatServiceTest {
 
         assertThat(response).hasSize(2);
         assertThat(response).extracting(OpenMatParticipantResponse::getUserId).containsExactly(3L, 2L);
-        assertThat(response).extracting(OpenMatParticipantResponse::getNickname).containsExactly("beta", "alpha");
+        assertThat(response).extracting(OpenMatParticipantResponse::getName).containsExactly("beta", "alpha");
+        assertThat(response).extracting(OpenMatParticipantResponse::getAffiliation)
+                .containsExactly("롤링짐 잠실", "롤링짐 강남");
+        assertThat(response).extracting(OpenMatParticipantResponse::getBeltColor)
+                .containsExactly(BeltColor.PURPLE, BeltColor.BLUE);
     }
 
     @Test
