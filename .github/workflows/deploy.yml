@@ -63,6 +63,7 @@ jobs:
             AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
             AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
+            AWS_S3_PUBLIC_BASE_URL=${{ secrets.AWS_S3_PUBLIC_BASE_URL }}
             ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
             TOURNAMENT_CRAWLER_ADMIN_KEY=${{ secrets.TOURNAMENT_CRAWLER_ADMIN_KEY }}
             FIREBASE_ENABLED=${{ secrets.FIREBASE_ENABLED }}
@@ -81,6 +82,8 @@ jobs:
 
             SLACK_METRICS_ALERT_WEBHOOK_URL=${{ secrets.SLACK_METRICS_ALERT_WEBHOOK_URL }}
             SLACK_METRICS_ALERT_ENVIRONMENT=prod
+
+            
             EOF
 
             docker compose -f docker-compose.yml -f docker-compose.monitoring.yml pull
