@@ -623,7 +623,8 @@ Response data: `null`
 
 - 인증: 불필요
 - Response: 페이징된 `TournamentResponse`
-- `posterUrl`은 수동 등록 대회의 `posterKey` 또는 크롤링 저장 URL을 기준으로 응답 전용으로 내려간다.
+- `posterUrl`은 수동 등록 대회의 `posterKey` 또는 크롤링 저장 URL을 기준으로 조립된 공개 이미지 URL이다.
+- 리스트 응답에는 `posterKey`가 없고, 프론트는 `posterUrl`만 사용한다.
 
 Query parameters:
 
@@ -640,15 +641,20 @@ Query parameters:
 - 인증: 불필요
 - Response: `TournamentResponse`
 - 작성자 포함 모든 사용자가 동일한 응답을 받는다.
+- 상세 응답에도 `posterKey`는 없고, `posterUrl`만 사용한다.
+- 상세의 `posterUrl` 역시 브라우저에서 직접 열 수 있는 공개 URL이어야 한다.
 
 ### 5.5.3 대회 등록
 
 `POST /api/v1/tournaments`
 
 - 인증: 필요
-- Request body: `posterKey`를 받는다.
+- 포스터 이미지는 먼저 `POST /api/v1/tournaments/poster-upload-url`로 업로드 URL을 발급받은 뒤 S3에 직접 업로드한다.
+- 업로드 성공 후 생성 API에는 업로드된 파일이 아니라 `posterKey`만 전달한다.
+- 허용 이미지 형식은 `jpg`, `png`이며 `webp`, `gif`는 선택 확장 형식이다.
 - Response: `TournamentResponse`
 - `posterUrl`은 응답 시 `posterKey`를 기준으로 조립된다.
+- `posterKey`가 없으면 생성 요청은 실패한다.
 
 Request body:
 
@@ -662,14 +668,17 @@ Request body:
 | `location` | `String?` | - |
 | `applyLink` | `String` | O |
 
-Response: `TournamentModel`
+Response: `TournamentResponse`
 
 현재 개편 메모:
 
 - 대회 생성/상세/신고 개편 기준 문서는 [BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md](/C:/rolling/rolling-spring-backend/rolling-api/docs/BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md)다.
 - 대회 생성은 `POST /api/v1/tournaments/poster-upload-url`로 받은 `posterKey`를 사용한다.
-- 응답의 `posterUrl`은 `posterKey`를 기반으로 내려간다.
-- 상세 조회는 작성자 포함 공용 `TournamentModel`을 그대로 사용한다.
+- 응답의 `posterUrl`은 `posterKey`를 기반으로 조립된 공개 URL이다.
+- 프론트는 `poster-upload-url` 응답의 `uploadUrl`로 S3에 PUT 업로드를 수행하고, 그 다음 생성 API를 호출해야 한다.
+- 업로드 요청의 `contentType`은 실제 파일 MIME type과 일치해야 한다. 예: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
+- `fileName` 또는 `contentType`이 비정상이면 업로드 URL 발급 단계에서 실패한다.
+- 상세 조회는 작성자 포함 공용 `TournamentResponse`를 그대로 사용한다.
 
 ### 5.5.4 대회 수정
 
@@ -677,7 +686,7 @@ Response: `TournamentModel`
 
 - 인증: 필요
 - Request body: 현재는 등록 API와 별개로 `posterUrl`을 포함한 기존 수정 필드를 유지한다.
-- Response: `TournamentModel`
+- Response: `TournamentResponse`
 
 현재 구현 메모:
 
@@ -733,6 +742,10 @@ Response data:
 
 - 클라이언트는 먼저 업로드 URL을 발급받고 S3에 직접 업로드한 뒤, 생성 API에 `posterKey`를 전달한다.
 - 응답에는 `posterKey`와 업로드 URL이 내려가고, 생성/조회 응답의 `posterUrl`은 `posterKey` 기준으로 조립한다.
+- 운영 환경에서는 `AWS_S3_PUBLIC_BASE_URL`에 CloudFront 또는 공개 이미지 도메인을 넣고, 누락 시 서버 시작이 실패해야 한다.
+- 운영 배포 전 smoke test는 `poster-upload-url` 발급 -> S3 PUT 업로드 -> `POST /api/v1/tournaments` -> 목록/상세 `posterUrl` 200 확인 순서로 진행한다.
+- 출시 성공 기준은 업로드/생성/신고 성공률과 `posterUrl` GET 성공률을 분리해서 본다.
+- `posterUrl`이 S3 직링크로 보이면 운영 설정 누락으로 보고 우선 점검한다.
 
 ### 5.5.8 대회 신고
 
@@ -746,6 +759,7 @@ Response data:
 - 동일 사용자는 같은 대회를 한 번만 신고할 수 있다.
 - 자기 작성 대회 신고는 차단한다.
 - 신고 저장은 공통 `Report` 도메인을 재사용한다.
+- 신고 운영은 제출 성공률과 중복/자기신고 차단 실패율을 함께 본다.
 
 ## 5.6 공지사항 API
 
