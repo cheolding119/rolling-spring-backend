@@ -49,6 +49,9 @@ public class TournamentPosterService {
     @Value("${cloud.aws.region.static}")
     private String region;
 
+    @Value("${cloud.aws.s3.public-base-url:}")
+    private String publicBaseUrl;
+
     public TournamentPosterUploadUrlResponse createUploadUrl(TournamentPosterUploadUrlRequest request) {
         String extension = resolveExtension(request.getFileName(), request.getContentType());
         if (!StringUtils.hasText(extension)) {
@@ -85,7 +88,7 @@ public class TournamentPosterService {
         if (!StringUtils.hasText(posterKey)) {
             return null;
         }
-        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + posterKey;
+        return joinUrl(resolvePublicBaseUrl(), posterKey);
     }
 
     public String resolveDisplayUrl(Tournament tournament) {
@@ -98,6 +101,23 @@ public class TournamentPosterService {
             return buildPublicUrl(posterKey);
         }
         return tournament.getPosterUrl();
+    }
+
+    private String resolvePublicBaseUrl() {
+        if (StringUtils.hasText(publicBaseUrl)) {
+            return publicBaseUrl.trim();
+        }
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com";
+    }
+
+    private String joinUrl(String baseUrl, String path) {
+        if (!StringUtils.hasText(baseUrl)) {
+            return path;
+        }
+
+        String normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String normalizedPath = path.startsWith("/") ? path.substring(1) : path;
+        return normalizedBaseUrl + "/" + normalizedPath;
     }
 
     private String resolveExtension(String fileName, String contentType) {

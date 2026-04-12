@@ -33,13 +33,15 @@ class S3UploaderTest {
     private S3Client s3Client;
 
     private MockRestServiceServer mockServer;
+    private RestClient restClient;
     private S3Uploader s3Uploader;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         mockServer = MockRestServiceServer.bindTo(builder).build();
-        s3Uploader = new S3Uploader(builder.build(), s3Client, "rolling-jiujitsu-bucket", "ap-northeast-2");
+        restClient = builder.build();
+        s3Uploader = new S3Uploader(restClient, s3Client, "rolling-jiujitsu-bucket", "ap-northeast-2", "");
     }
 
     @Test
@@ -64,6 +66,26 @@ class S3UploaderTest {
         assertThat(uploadedUrl)
                 .startsWith("https://rolling-jiujitsu-bucket.s3.ap-northeast-2.amazonaws.com/posters/")
                 .endsWith(".webp");
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("공개 base URL이 있으면 그 도메인으로 업로드 결과를 반환한다")
+    void uploadImageFromUrl_usesConfiguredPublicBaseUrl() {
+        String sourceImageUrl = "https://origin.example.com/poster.jpg";
+        String publicBaseUrl = "https://cdn.rolling.com/";
+        S3Uploader publicUrlUploader = createUploader(publicBaseUrl);
+
+        mockServer.expect(requestTo(sourceImageUrl))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(new byte[] {1, 2, 3}, MediaType.IMAGE_JPEG));
+
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().eTag("etag").build());
+
+        String uploadedUrl = publicUrlUploader.uploadImageFromUrl(sourceImageUrl);
+
+        assertThat(uploadedUrl).startsWith("https://cdn.rolling.com/posters/");
         mockServer.verify();
     }
 
@@ -121,5 +143,9 @@ class S3UploaderTest {
         assertThat(uploadedUrl).isEqualTo(sourceImageUrl);
         verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
         mockServer.verify();
+    }
+
+    private S3Uploader createUploader(String publicBaseUrl) {
+        return new S3Uploader(restClient, s3Client, "rolling-jiujitsu-bucket", "ap-northeast-2", publicBaseUrl);
     }
 }

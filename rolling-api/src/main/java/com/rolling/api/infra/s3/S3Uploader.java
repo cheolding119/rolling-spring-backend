@@ -50,15 +50,18 @@ public class S3Uploader {
     private final S3Client s3Client;
     private final String bucket;
     private final String region;
+    private final String publicBaseUrl;
 
     public S3Uploader(RestClient restClient,
                       S3Client s3Client,
                       @Value("${cloud.aws.s3.bucket}") String bucket,
-                      @Value("${cloud.aws.region.static}") String region) {
+                      @Value("${cloud.aws.region.static}") String region,
+                      @Value("${cloud.aws.s3.public-base-url:}") String publicBaseUrl) {
         this.restClient = restClient;
         this.s3Client = s3Client;
         this.bucket = bucket;
         this.region = region;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     public String uploadImageFromUrl(String sourceImageUrl) {
@@ -181,7 +184,24 @@ public class S3Uploader {
     }
 
     private String buildPublicUrl(String key) {
-        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
+        return joinUrl(resolvePublicBaseUrl(), key);
+    }
+
+    private String resolvePublicBaseUrl() {
+        if (StringUtils.hasText(publicBaseUrl)) {
+            return publicBaseUrl.trim();
+        }
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com";
+    }
+
+    private String joinUrl(String baseUrl, String path) {
+        if (!StringUtils.hasText(baseUrl)) {
+            return path;
+        }
+
+        String normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String normalizedPath = path.startsWith("/") ? path.substring(1) : path;
+        return normalizedBaseUrl + "/" + normalizedPath;
     }
 
     private record DownloadedImage(byte[] bytes, String contentType) {
