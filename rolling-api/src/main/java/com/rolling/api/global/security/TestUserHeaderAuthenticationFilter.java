@@ -1,6 +1,7 @@
 package com.rolling.api.global.security;
 
 import com.rolling.api.domain.user.repository.UserRepository;
+import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.global.logging.LogMdcKeys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,6 +18,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -28,6 +32,7 @@ public class TestUserHeaderAuthenticationFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
+    private final Clock clock;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -48,12 +53,24 @@ public class TestUserHeaderAuthenticationFilter extends OncePerRequestFilter {
         try {
             Long userId = Long.parseLong(testUserIdHeader);
 
-            if (!userRepository.existsByIdAndIsWithdrawnFalse(userId)) {
+            Optional<User> userOptional = userRepository.findByIdAndIsWithdrawnFalse(userId);
+            UserPrincipal principal;
+            if (userOptional.isPresent()) {
+                User user = userOptional.get();
+                LocalDateTime now = LocalDateTime.now(clock);
+                principal = new UserPrincipal(
+                        userId,
+                        adminAccessConfig.isAdmin(userId),
+                        user.getEffectiveAccountStatus(now),
+                        user.getEffectiveSuspensionUntil(now)
+                );
+            } else if (userRepository.existsByIdAndIsWithdrawnFalse(userId)) {
+                principal = new UserPrincipal(userId, adminAccessConfig.isAdmin(userId));
+            } else {
                 log.debug("Local test header authentication rejected for missing or withdrawn user. userId={}", userId);
                 return;
             }
 
-            UserPrincipal principal = new UserPrincipal(userId, adminAccessConfig.isAdmin(userId));
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(auth);

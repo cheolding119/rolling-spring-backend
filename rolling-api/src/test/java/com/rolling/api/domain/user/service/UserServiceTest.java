@@ -16,6 +16,7 @@ import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.AdminAccessConfig;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,13 +24,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,8 +53,17 @@ class UserServiceTest {
     @Mock
     private AdminAccessConfig adminAccessConfig;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-04-14T03:00:00Z"));
+    }
 
     @Test
     @DisplayName("내 정보 조회 응답에 관리자 여부를 포함한다")

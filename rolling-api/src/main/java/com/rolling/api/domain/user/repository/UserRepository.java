@@ -2,16 +2,18 @@ package com.rolling.api.domain.user.repository;
 
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.entity.AccountStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Collection;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
     Optional<User> findBySocialIdAndSocialProvider(String socialId, SocialProvider socialProvider);
 
@@ -26,6 +28,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByIdAndIsWithdrawnFalse(Long id);
 
     List<User> findAllByIdInAndIsWithdrawnFalse(Collection<Long> ids);
+
+    List<User> findAllByAccountStatusAndSuspensionUntilLessThanEqual(AccountStatus accountStatus, LocalDateTime suspensionUntil);
 
     @Query("""
             select blocked.blockedUser.id

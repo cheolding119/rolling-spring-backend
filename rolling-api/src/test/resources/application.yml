@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:rolling_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+jwt:
+  secret: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+  access-token-expiry: 1800000
+  refresh-token-expiry: 1209600000
+
+firebase:
+  enabled: false
+
+openmat:
+  status:
+    schedule:
+      enabled: false
+
+tournament:
+  crawler:
+    schedule:
+      enabled: false
+
+cloud:
+  aws:
+    s3:
+      bucket: test-bucket
+      public-base-url: https://cdn.test.rolling.local
+    credentials:
+      access-key: test-access-key
+      secret-key: test-secret-key
+    region:
+      static: ap-northeast-2

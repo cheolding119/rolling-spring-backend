@@ -4,6 +4,7 @@ import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.logging.LogMdcKeys;
 import com.rolling.api.global.logging.RequestTrackingFilter;
 import com.rolling.api.global.security.AdminAccessConfig;
+import com.rolling.api.global.security.UserSanctionAccessFilter;
 import com.rolling.api.global.security.TestUserHeaderAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtAuthenticationFilter;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
@@ -25,6 +26,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 
@@ -37,12 +40,14 @@ public class SecurityConfig {
     private final UserRepository userRepository;
     private final AdminAccessConfig adminAccessConfig;
     private final ObjectProvider<TestUserHeaderAuthenticationFilter> testUserHeaderAuthenticationFilterProvider;
+    private final ObjectProvider<Clock> clockProvider;
 
     @Bean
     @Order(0)
     public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         JwtAuthenticationFilter jwtAuthenticationFilter =
-                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig);
+                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig, resolveClock());
+        UserSanctionAccessFilter userSanctionAccessFilter = new UserSanctionAccessFilter();
 
         http
                 .securityMatcher("/actuator/**")
@@ -60,6 +65,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, e) -> writeUnauthorizedResponse(response)))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(userSanctionAccessFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -68,8 +74,9 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         JwtAuthenticationFilter jwtAuthenticationFilter =
-                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig);
+                new JwtAuthenticationFilter(jwtTokenProvider, userRepository, adminAccessConfig, resolveClock());
         RequestTrackingFilter requestTrackingFilter = new RequestTrackingFilter();
+        UserSanctionAccessFilter userSanctionAccessFilter = new UserSanctionAccessFilter();
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -89,6 +96,7 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.POST, "/api/v1/tournaments/crawl", "/api/v1/tournaments/crawl/**").hasRole("ADMIN");
                     auth.requestMatchers("/api/v1/admin/inquiries", "/api/v1/admin/inquiries/**").hasRole("ADMIN");
                     auth.requestMatchers("/api/v1/admin/reports", "/api/v1/admin/reports/**").hasRole("ADMIN");
+                    auth.requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasRole("ADMIN");
 
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my", "/api/v1/open-mats/my-hosting").authenticated();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}").permitAll();
@@ -110,6 +118,9 @@ public class SecurityConfig {
                 testUserHeaderAuthenticationFilterProvider.getIfAvailable();
         if (testUserHeaderAuthenticationFilter != null) {
             http.addFilterAfter(testUserHeaderAuthenticationFilter, JwtAuthenticationFilter.class);
+            http.addFilterAfter(userSanctionAccessFilter, TestUserHeaderAuthenticationFilter.class);
+        } else {
+            http.addFilterAfter(userSanctionAccessFilter, JwtAuthenticationFilter.class);
         }
 
         return http.build();
@@ -138,5 +149,10 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private Clock resolveClock() {
+        Clock clock = clockProvider.getIfAvailable();
+        return clock != null ? clock : Clock.system(ZoneId.of("Asia/Seoul"));
     }
 }

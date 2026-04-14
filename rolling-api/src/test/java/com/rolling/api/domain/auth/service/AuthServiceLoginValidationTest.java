@@ -14,6 +14,7 @@ import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
 import com.rolling.api.infra.kakao.dto.KakaoUserResponse;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,7 +22,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,8 +62,17 @@ class AuthServiceLoginValidationTest {
     @Mock
     private OperationalAlertPublisher operationalAlertPublisher;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private AuthService authService;
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-04-14T03:00:00Z"));
+    }
 
     @Test
     @DisplayName("구글 socialId(sub)가 없으면 GOOGLE_API_ERROR를 반환한다")

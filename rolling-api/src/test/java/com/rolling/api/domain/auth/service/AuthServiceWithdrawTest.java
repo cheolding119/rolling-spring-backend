@@ -16,6 +16,7 @@ import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.kakao.KakaoClient;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,12 +24,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,8 +68,17 @@ class AuthServiceWithdrawTest {
     @Mock
     private OperationalAlertPublisher operationalAlertPublisher;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-04-14T03:00:00Z"));
+    }
 
     @Test
     @DisplayName("회원 탈퇴 요청 시 다음날 21:00으로 예약되고 즉시 탈퇴는 실행되지 않는다")

@@ -1,5 +1,6 @@
 package com.rolling.api.global.security;
 
+import com.rolling.api.domain.user.entity.AccountStatus;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -7,6 +8,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
 @Getter
@@ -14,22 +16,42 @@ public class UserPrincipal implements UserDetails {
 
     private final Long userId;
     private final UserRole role;
+    private final AccountStatus accountStatus;
+    private final LocalDateTime suspensionUntil;
 
     public UserPrincipal(Long userId) {
-        this(userId, UserRole.USER);
+        this(userId, UserRole.USER, AccountStatus.ACTIVE, null);
     }
 
     public UserPrincipal(Long userId, boolean admin) {
-        this(userId, admin ? UserRole.ADMIN : UserRole.USER);
+        this(userId, admin ? UserRole.ADMIN : UserRole.USER, AccountStatus.ACTIVE, null);
     }
 
     public UserPrincipal(Long userId, UserRole role) {
+        this(userId, role, AccountStatus.ACTIVE, null);
+    }
+
+    public UserPrincipal(Long userId, boolean admin, AccountStatus accountStatus, LocalDateTime suspensionUntil) {
+        this(userId, admin ? UserRole.ADMIN : UserRole.USER, accountStatus, suspensionUntil);
+    }
+
+    public UserPrincipal(Long userId, UserRole role, AccountStatus accountStatus, LocalDateTime suspensionUntil) {
         this.userId = userId;
         this.role = role == null ? UserRole.USER : role;
+        this.accountStatus = accountStatus == null ? AccountStatus.ACTIVE : accountStatus;
+        this.suspensionUntil = suspensionUntil;
     }
 
     public boolean isAdmin() {
         return role == UserRole.ADMIN;
+    }
+
+    public boolean isSuspended() {
+        return accountStatus == AccountStatus.SUSPENDED;
+    }
+
+    public boolean isBanned() {
+        return accountStatus == AccountStatus.BANNED || accountStatus == AccountStatus.WITHDRAWN;
     }
 
     @Override
@@ -67,6 +89,6 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return !isBanned();
     }
 }
