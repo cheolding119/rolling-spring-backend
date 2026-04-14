@@ -20,6 +20,7 @@ import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,11 +28,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,8 +71,17 @@ class AuthServiceLifecycleTest {
     @Mock
     private OperationalAlertPublisher operationalAlertPublisher;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private AuthService authService;
+
+    @BeforeEach
+    void stubClock() {
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-04-14T03:00:00Z"));
+    }
 
     @Test
     @DisplayName("소셜 로그인 응답에 관리자 여부를 포함한다")
@@ -92,7 +106,6 @@ class AuthServiceLifecycleTest {
 
         ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
         ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
-
         when(googleClient.getUserInfo("google-token")).thenReturn(googleUserResponse);
         when(userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse("social-1", SocialProvider.GOOGLE))
                 .thenReturn(Optional.of(user));
@@ -114,7 +127,6 @@ class AuthServiceLifecycleTest {
     void refresh_includesIsAdmin() {
         ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
         ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
-
         TokenRefreshRequest request = new TokenRefreshRequest();
         ReflectionTestUtils.setField(request, "refreshToken", "old-refresh-token");
 
@@ -126,6 +138,15 @@ class AuthServiceLifecycleTest {
 
         when(refreshTokenRepository.findByToken("old-refresh-token")).thenReturn(Optional.of(savedToken));
         when(jwtTokenProvider.validateToken("old-refresh-token")).thenReturn(true);
+        User user = User.builder()
+                .socialId("social-refresh")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("refresh-user")
+                .email("refresh@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 2L);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.createAccessToken(2L)).thenReturn("new-access-token");
         when(jwtTokenProvider.createRefreshToken(2L)).thenReturn("new-refresh-token");
         when(adminAccessConfig.isAdmin(2L)).thenReturn(false);

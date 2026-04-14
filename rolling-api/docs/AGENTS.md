@@ -9,6 +9,8 @@
 - 오픈매트는 정원이 차면 `CLOSED`, 종료 시점이 지나면 `FINISHED`가 되며, 신고 누적 3건 이상이면 신규 신청이 차단된다.
 - 호스트는 자신이 주최한 오픈매트에 신청할 수 없다.
 - 사용자 차단은 조회자 기준 개인화 필터이며, 차단한 작성자의 오픈매트/대회는 목록과 상세에서 숨긴다.
+- 관리자 사용자 제재는 별도 운영 상태로 관리하며, `user_sanctions` 이력 테이블과 `users`의 상태 캐시를 분리해서 다룬다.
+- 일시정지(`TEMP_SUSPEND`)는 로그인 허용 + 제한 모드로, 영구정지(`PERMANENT_BAN`)는 기본 로그인 차단으로 다룬다.
 - 로그인 사용자의 오픈매트/대회 목록·검색 요청은 `Authorization: Bearer {accessToken}`을 함께 보내야 차단 필터가 적용된다.
 - 알림의 source of truth는 FCM 성공 여부가 아니라 백엔드 `Notification` 저장 데이터다.
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
@@ -335,6 +337,33 @@ Response data: `null`
 
 - 차단 해제는 기존 차단 관계를 제거한다.
 - 차단 해제 이후에는 오픈매트/대회 콘텐츠가 다시 일반 조회 결과에 노출된다.
+
+### 5.2.8 관리자 사용자 제재
+
+관리자 사용자 제재는 운영 상태로 구현되어 있다.
+
+핵심 원칙:
+
+- 제재 이력은 `user_sanctions` 테이블에 저장한다.
+- `users`에는 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`를 두어 현재 상태를 빠르게 보여준다.
+- 상태 예시: `ACTIVE`, `WARNING`, `SUSPENDED`, `BANNED`, `WITHDRAWN`
+- `TEMP_SUSPEND`는 로그인 허용 + 제한 모드다.
+- `PERMANENT_BAN`은 기본 로그인 차단이다.
+
+현재 관리자 API:
+
+- `GET /api/v1/admin/users`
+- `GET /api/v1/admin/users/{id}`
+- `GET /api/v1/admin/users/{id}/sanctions`
+- `POST /api/v1/admin/users/{id}/sanctions`
+- `DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}`
+
+제한 모드 메모:
+
+- 허용 범위는 문의, 도움말, 알림 on/off, 차단한 사용자 관리, 로그아웃으로 최소화한다.
+- 사용자 정보 수정과 탈퇴는 기본 차단한다.
+- 제재 만료는 스케줄러가 자동 해제한다.
+- 영구정지 사용자는 기본적으로 로그인할 수 없다.
 
 ## 5.3 알림 API
 

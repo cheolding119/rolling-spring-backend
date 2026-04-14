@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.util.List;
 
 @Service
@@ -28,11 +29,12 @@ public class UserService {
     private final UserDeviceRepository userDeviceRepository;
     private final UserBlockRepository userBlockRepository;
     private final AdminAccessConfig adminAccessConfig;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public UserResponse getMe(Long userId) {
         User user = getActiveUser(userId);
-        return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
+        return UserResponse.from(user, adminAccessConfig.isAdmin(userId), now());
     }
 
     @Transactional
@@ -43,7 +45,7 @@ public class UserService {
         user.updateAffiliation(request.getAffiliation());
         user.updateBeltColor(request.getBeltColor());
 
-        return UserResponse.from(user, adminAccessConfig.isAdmin(userId));
+        return UserResponse.from(user, adminAccessConfig.isAdmin(userId), now());
     }
 
     @Transactional
@@ -136,5 +138,9 @@ public class UserService {
 
     private String normalizeOptional(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private java.time.LocalDateTime now() {
+        return java.time.LocalDateTime.now(clock);
     }
 }

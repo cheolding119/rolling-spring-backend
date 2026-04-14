@@ -8,6 +8,7 @@ import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.entity.RefreshToken;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
+import com.rolling.api.domain.user.entity.AccountStatus;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -57,6 +59,7 @@ public class AuthService {
     private final AdminAccessConfig adminAccessConfig;
     private final ScheduledTaskTracker scheduledTaskTracker;
     private final OperationalAlertPublisher operationalAlertPublisher;
+    private final Clock clock;
 
     @Value("${jwt.access-token-expiry}")
     private Long accessTokenExpiry;
@@ -94,6 +97,8 @@ public class AuthService {
 
         boolean[] isNewUser = {false};
         User user = findOrCreateUser(socialId, provider, nickname, email, isNewUser);
+        LocalDateTime now = now();
+        ensureLoginAllowed(user, now);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
@@ -118,6 +123,9 @@ public class AuthService {
                 .email(user.getEmail())
                 .name(user.getNickname())
                 .isAdmin(adminAccessConfig.isAdmin(user.getId()))
+                .accountStatus(user.getEffectiveAccountStatus(now).name())
+                .suspensionUntil(user.getEffectiveSuspensionUntil(now))
+                .sanctionReasonSummary(user.getEffectiveSanctionReasonSummary(now))
                 .build();
     }
 
@@ -139,6 +147,10 @@ public class AuthService {
         }
 
         Long userId = savedToken.getUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AuthException.invalidRefreshToken());
+        LocalDateTime now = now();
+        ensureLoginAllowed(user, now);
 
         String newAccessToken = jwtTokenProvider.createAccessToken(userId);
         String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
@@ -159,6 +171,9 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(accessTokenExpiry / 1000)
                 .isAdmin(adminAccessConfig.isAdmin(userId))
+                .accountStatus(user.getEffectiveAccountStatus(now).name())
+                .suspensionUntil(user.getEffectiveSuspensionUntil(now))
+                .sanctionReasonSummary(user.getEffectiveSanctionReasonSummary(now))
                 .build();
     }
 
@@ -325,5 +340,16 @@ public class AuthService {
                     log.info("New user created: {}", savedUser.getId());
                     return savedUser;
                 });
+    }
+
+    private void ensureLoginAllowed(User user, LocalDateTime now) {
+        AccountStatus effectiveStatus = user.getEffectiveAccountStatus(now);
+        if (effectiveStatus == AccountStatus.BANNED || effectiveStatus == AccountStatus.WITHDRAWN) {
+            throw BusinessException.forbidden("이용이 정지된 계정입니다");
+        }
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 }

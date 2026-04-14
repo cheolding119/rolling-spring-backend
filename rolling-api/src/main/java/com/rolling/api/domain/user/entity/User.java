@@ -48,6 +48,15 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private BeltColor beltColor;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
+    private LocalDateTime suspensionUntil;
+
+    @Column(length = 255)
+    private String sanctionReasonSummary;
+
     @Column(nullable = false)
     private Boolean pushNotificationEnabled = true;
 
@@ -84,6 +93,7 @@ public class User extends BaseTimeEntity {
         this.phone = phone;
         this.affiliation = affiliation;
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
+        this.accountStatus = AccountStatus.ACTIVE;
         this.pushNotificationEnabled = pushNotificationEnabled == null ? true : pushNotificationEnabled;
         if (fcmToken != null && !fcmToken.isBlank()) {
             new UserDevice(this, fcmToken.trim(), null, null, null);
@@ -120,6 +130,56 @@ public class User extends BaseTimeEntity {
 
     public void updatePushNotificationEnabled(boolean enabled) {
         this.pushNotificationEnabled = enabled;
+    }
+
+    public AccountStatus getEffectiveAccountStatus(LocalDateTime now) {
+        if (accountStatus == AccountStatus.SUSPENDED && suspensionUntil != null && !now.isBefore(suspensionUntil)) {
+            return AccountStatus.ACTIVE;
+        }
+        return accountStatus == null ? AccountStatus.ACTIVE : accountStatus;
+    }
+
+    public LocalDateTime getEffectiveSuspensionUntil(LocalDateTime now) {
+        if (getEffectiveAccountStatus(now) != AccountStatus.SUSPENDED) {
+            return null;
+        }
+        return suspensionUntil;
+    }
+
+    public String getEffectiveSanctionReasonSummary(LocalDateTime now) {
+        AccountStatus effectiveStatus = getEffectiveAccountStatus(now);
+        if (effectiveStatus == AccountStatus.ACTIVE || effectiveStatus == AccountStatus.WITHDRAWN) {
+            return null;
+        }
+        return sanctionReasonSummary;
+    }
+
+    public boolean isTemporarilySuspended(LocalDateTime now) {
+        return getEffectiveAccountStatus(now) == AccountStatus.SUSPENDED;
+    }
+
+    public void warn(String reasonSummary) {
+        this.accountStatus = AccountStatus.WARNING;
+        this.suspensionUntil = null;
+        this.sanctionReasonSummary = normalizeSummary(reasonSummary);
+    }
+
+    public void suspend(LocalDateTime until, String reasonSummary) {
+        this.accountStatus = AccountStatus.SUSPENDED;
+        this.suspensionUntil = until;
+        this.sanctionReasonSummary = normalizeSummary(reasonSummary);
+    }
+
+    public void ban(String reasonSummary) {
+        this.accountStatus = AccountStatus.BANNED;
+        this.suspensionUntil = null;
+        this.sanctionReasonSummary = normalizeSummary(reasonSummary);
+    }
+
+    public void releaseSanction() {
+        this.accountStatus = AccountStatus.ACTIVE;
+        this.suspensionUntil = null;
+        this.sanctionReasonSummary = null;
     }
 
     void linkDevice(UserDevice device) {
@@ -179,10 +239,21 @@ public class User extends BaseTimeEntity {
         this.withdrawalRequestedAt = null;
         this.withdrawalScheduledAt = null;
         this.isWithdrawn = true;
+        this.accountStatus = AccountStatus.WITHDRAWN;
+        this.suspensionUntil = null;
+        this.sanctionReasonSummary = null;
         this.blockedUserLinks.clear();
     }
 
     private boolean isBlocked(User user) {
         return blockedUserLinks.stream().anyMatch(link -> link.isBlockedUser(user));
+    }
+
+    private String normalizeSummary(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

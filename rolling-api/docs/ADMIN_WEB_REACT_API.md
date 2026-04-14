@@ -28,15 +28,21 @@
 - 문의 관리
 - 신고 관리
 - 대회 운영 / 크롤링
+- 사용자 관리 / 제재
 
 없는 기능:
 
-- 사용자 관리
 - 권한 세분화
 - 매출/통계
 - 푸시 발송 관리자
 - FAQ CMS
 - 오픈매트 전체 관리자 목록
+
+주의:
+
+- 아래 사용자 관리 / 제재 섹션은 현재 백엔드 구현 기준의 계약이다.
+- 관리자 웹 화면은 이 계약을 기준으로 별도 프론트에서 연결한다.
+- 실제 제재 정책과 제한 모드는 `docs/ADMIN_USER_SANCTION_PLAN.md`를 기준으로 맞춘다.
 
 ---
 
@@ -748,9 +754,96 @@ Request:
 
 ---
 
-## 7. 대회 운영
+## 7. 사용자 관리 / 제재
 
-## 7.1 대회 목록
+> 이 섹션은 현재 구현된 관리자 사용자 운영 계약이다.
+
+### 7.1 목적
+
+- 관리자에게 사용자 목록과 상세를 보여준다.
+- 사용자 계정 상태를 확인하고 제재 이력을 조회할 수 있게 한다.
+- 일시정지 상태에서는 로그인은 허용하되 제한 모드만 허용한다.
+- 영구정지 상태에서는 기본적으로 로그인을 차단한다.
+
+### 7.2 관리자 사용자 목록
+
+`GET /api/v1/admin/users`
+
+응답 필드:
+
+- `id`
+- `nickname`
+- `email`
+- `affiliation`
+- `createdAt`
+- `accountStatus`
+- `lastSanctionAt`
+
+### 7.3 관리자 사용자 상세
+
+`GET /api/v1/admin/users/{id}`
+
+상세 필드:
+
+- `id`
+- `nickname`
+- `email`
+- `phone`
+- `affiliation`
+- `createdAt`
+- `accountStatus`
+- `suspensionUntil`
+- `isWithdrawn`
+
+### 7.4 제재 이력
+
+`GET /api/v1/admin/users/{id}/sanctions`
+
+이력 필드:
+
+- `id`
+- `type`
+- `reason`
+- `memo`
+- `startsAt`
+- `endsAt`
+- `createdBy`
+- `createdAt`
+- `releasedBy`
+- `releasedAt`
+
+### 7.5 제재 생성 / 해제
+
+`POST /api/v1/admin/users/{id}/sanctions`
+
+`DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}`
+
+상태 값:
+
+- `WARNING`
+- `TEMP_SUSPEND`
+- `PERMANENT_BAN`
+- `RELEASE`
+
+제한 모드에서 허용할 기능:
+
+- 문의하기 작성
+- 도움말 조회
+- 알림 on/off
+- 차단한 사용자 관리
+- 로그아웃
+
+제한 모드에서 차단할 기능:
+
+- 사용자 정보 수정
+- 탈퇴하기
+- 오픈매트 / 대회 / 신고 생성
+
+---
+
+## 8. 대회 운영
+
+## 8.1 대회 목록
 
 `GET /api/v1/tournaments`
 
@@ -792,7 +885,7 @@ Response item 필드:
 
 - 목록 정렬은 서버가 `접수 가능한 대회 우선`으로 정렬한다.
 
-## 7.2 대회 상세
+## 8.2 대회 상세
 
 `GET /api/v1/tournaments/{id}`
 
@@ -813,7 +906,7 @@ Response item 필드:
 - 따라서 React는 수정/삭제 가능 여부를 사전 판별할 수 없다.
 - 수정/삭제 시도 후 `403`을 처리해야 한다.
 
-## 7.3 대회 수동 등록
+## 8.3 대회 수동 등록
 
 `POST /api/v1/tournaments`
 
@@ -835,7 +928,7 @@ Request:
 
 - 생성 시 `source`는 서버에서 자동으로 `MANUAL` 저장
 
-## 7.4 대회 수정
+## 8.4 대회 수정
 
 `PUT /api/v1/tournaments/{id}`
 
@@ -848,7 +941,7 @@ Request는 생성과 동일 필드, 모두 optional.
 - 작성자 본인만 수정 가능
 - 관리자 화면이어도 `403` 가능
 
-## 7.5 대회 삭제
+## 8.5 대회 삭제
 
 `DELETE /api/v1/tournaments/{id}`
 
@@ -858,7 +951,7 @@ Request는 생성과 동일 필드, 모두 optional.
 - 관리자 화면이어도 `403` 가능
 - 삭제 전 확인 모달 필수
 
-## 7.6 대회 크롤링 수동 실행
+## 8.6 대회 크롤링 수동 실행
 
 `POST /api/v1/tournaments/crawl`
 
@@ -896,14 +989,14 @@ React UX:
 
 ---
 
-## 8. 상태 화면 설계 시 API 연결 기준
+## 9. 상태 화면 설계 시 API 연결 기준
 
-### 8.1 loading
+### 9.1 loading
 
 - 모든 페이지 최초 진입 시 스켈레톤 또는 로딩 행 표시
 - 상세 패널은 선택 row 변경 시 별도 로딩 가능
 
-### 8.2 empty
+### 9.2 empty
 
 - 서버 `content.length === 0` 이고 필터 미적용 상태
 
@@ -912,7 +1005,7 @@ React UX:
 - 등록된 공지 없음
 - 노출 기준을 만족하는 신고 없음
 
-### 8.3 no-result
+### 9.3 no-result
 
 - 필터 적용 후 `content.length === 0`
 
@@ -921,14 +1014,14 @@ React UX:
 - 기간 필터 결과 없음
 - 특정 상태 결과 없음
 
-### 8.4 error
+### 9.4 error
 
 - `400/403/404/500` 또는 네트워크 실패
 - 상세 패널과 목록 영역을 분리해 부분 에러 처리 가능
 
 ---
 
-## 9. React 구현 시 바로 체크할 제약
+## 10. React 구현 시 바로 체크할 제약
 
 - 관리자 홈은 전용 집계 API가 없으므로 목록 API 조합으로 구현
 - 공지 수정 폼은 기존 `createdBy` 값을 API로 다시 받을 수 없음
@@ -942,7 +1035,7 @@ React UX:
 
 ---
 
-## 10. React 화면별 최소 연결 목록
+## 11. React 화면별 최소 연결 목록
 
 ### 로그인
 
@@ -989,7 +1082,7 @@ React UX:
 
 ---
 
-## 11. 소스 오브 트루스
+## 12. 소스 오브 트루스
 
 - 인증: `src/main/java/com/rolling/api/domain/auth/controller`
 - 사용자: `src/main/java/com/rolling/api/domain/user/controller`

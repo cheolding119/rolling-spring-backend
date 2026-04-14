@@ -1,0 +1,4 @@
+cloud:
+  aws:
+    s3:
+      public-base-url: https://cdn.test.rolling.local
