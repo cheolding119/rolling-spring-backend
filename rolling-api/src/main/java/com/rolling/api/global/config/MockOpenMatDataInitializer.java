@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MockOpenMatDataInitializer implements CommandLineRunner {
 
-    private static final LocalDate MOCK_BASE_DATE = LocalDate.of(2026, 4, 6);
+    private static final LocalDate MOCK_BASE_DATE = LocalDate.of(2026, 5, 1);
 
     private final UserRepository userRepository;
     private final OpenMatRepository openMatRepository;
@@ -363,7 +363,8 @@ public class MockOpenMatDataInitializer implements CommandLineRunner {
     }
 
     private LocalDateTime at(int dayOffset, int hour, int minute) {
-        return MOCK_BASE_DATE.plusDays(dayOffset).atTime(hour, minute);
+        // Keep every mock open-mat date inside May so seeded data stays in the future.
+        return MOCK_BASE_DATE.withDayOfMonth(Math.floorMod(dayOffset - 1, 31) + 1).atTime(hour, minute);
     }
 
     private OpenMat newOpenMat(

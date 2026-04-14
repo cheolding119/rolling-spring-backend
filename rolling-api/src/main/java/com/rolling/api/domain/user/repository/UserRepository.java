@@ -3,6 +3,8 @@ package com.rolling.api.domain.user.repository;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.time.LocalDateTime;
@@ -24,6 +26,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByIdAndIsWithdrawnFalse(Long id);
 
     List<User> findAllByIdInAndIsWithdrawnFalse(Collection<Long> ids);
+
+    @Query("""
+            select blocked.id
+            from User user
+            join user.blockedUsers blocked
+            where user.id = :userId
+              and blocked.isWithdrawn = false
+            """)
+    List<Long> findBlockedUserIdsByUserId(@Param("userId") Long userId);
 
     List<User> findAllByIsWithdrawnFalseAndWithdrawalPendingTrueAndWithdrawalScheduledAtLessThanEqual(LocalDateTime targetTime);
 }

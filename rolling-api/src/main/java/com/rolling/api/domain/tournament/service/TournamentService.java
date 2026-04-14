@@ -43,8 +43,15 @@ public class TournamentService {
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
+        return findAll(pageable, source, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, Long viewerUserId) {
+        List<Long> blockedUserIds = getBlockedUserIds(viewerUserId);
         List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
                 .filter(tournament -> matchesSource(tournament, source))
+                .filter(tournament -> !isBlockedHostTournament(tournament, blockedUserIds))
                 .map(this::toResponse)
                 .sorted(
                         Comparator.comparing(TournamentResponse::isRegistrationClosed)
@@ -65,8 +72,16 @@ public class TournamentService {
 
     @Transactional(readOnly = true)
     public TournamentResponse findById(Long id) {
+        return findById(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TournamentResponse findById(Long id, Long viewerUserId) {
         Tournament tournament = tournamentRepository.findById(id)
                 .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
+        if (isBlockedHostTournament(tournament, getBlockedUserIds(viewerUserId))) {
+            throw BusinessException.notFound("대회를 찾을 수 없습니다");
+        }
         return toResponse(tournament);
     }
 
@@ -217,6 +232,18 @@ public class TournamentService {
 
     private boolean matchesSource(Tournament tournament, TournamentSource source) {
         return source == null || resolveSource(tournament) == source;
+    }
+
+    private boolean isBlockedHostTournament(Tournament tournament, List<Long> blockedUserIds) {
+        return tournament.getHostUserId() != null && blockedUserIds.contains(tournament.getHostUserId());
+    }
+
+    private List<Long> getBlockedUserIds(Long viewerUserId) {
+        if (viewerUserId == null) {
+            return List.of();
+        }
+        List<Long> blockedUserIds = userRepository.findBlockedUserIdsByUserId(viewerUserId);
+        return blockedUserIds != null ? blockedUserIds : List.of();
     }
 
     private TournamentSource resolveSource(Tournament tournament) {

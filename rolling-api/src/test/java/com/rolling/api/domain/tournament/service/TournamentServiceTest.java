@@ -94,6 +94,26 @@ class TournamentServiceTest {
     }
 
     @Test
+    @DisplayName("차단한 사용자가 등록한 대회는 목록에서 제외한다")
+    void findAll_excludesBlockedHosts() {
+        Tournament blocked = tournament(1L, 10L, TournamentSource.MANUAL, "blocked", "2026-04-10", "2999-04-01", "https://apply/blocked");
+        Tournament visible = tournament(2L, 11L, TournamentSource.MANUAL, "visible", "2026-05-10", "2999-05-01", "https://apply/visible");
+        when(tournamentRepository.findAll()).thenReturn(List.of(blocked, visible));
+        when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(10L));
+
+        TournamentService tournamentService = new TournamentService(
+                tournamentRepository,
+                userRepository,
+                reportService,
+                tournamentPosterService,
+                adminAccessConfig);
+
+        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10), null, 99L);
+
+        assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(2L);
+    }
+
+    @Test
     @DisplayName("수동 등록 대회와 크롤링 대회는 같은 응답 필드 구조를 가진다")
     void findAll_mapsManualAndCrawlerWithSameResponseShape() {
         Tournament manual = tournament(1L, 10L, TournamentSource.MANUAL, "manual", "2026-04-10", "2999-04-01", "https://apply/manual");
@@ -172,6 +192,25 @@ class TournamentServiceTest {
         TournamentResponse response = tournamentService.findById(77L);
 
         assertThat(response.getPosterUrl()).isEqualTo("https://cdn.rolling.com/posters/poster.jpg");
+    }
+
+    @Test
+    @DisplayName("차단한 사용자가 등록한 대회 상세는 찾을 수 없다")
+    void findById_whenHostBlocked_throwsNotFound() {
+        Tournament tournament = tournament(78L, 3L, TournamentSource.MANUAL, "blocked-detail", "2026-04-15", "2026-04-01", "https://apply/blocked-detail");
+        when(tournamentRepository.findById(78L)).thenReturn(Optional.of(tournament));
+        when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(3L));
+
+        TournamentService tournamentService = new TournamentService(
+                tournamentRepository,
+                userRepository,
+                reportService,
+                tournamentPosterService,
+                adminAccessConfig);
+
+        assertThatThrownBy(() -> tournamentService.findById(78L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("대회를 찾을 수 없습니다");
     }
 
     @Test

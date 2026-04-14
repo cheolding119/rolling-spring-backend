@@ -44,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -184,6 +185,29 @@ class OpenMatServiceTest {
         assertThat(response.getHostId()).isEqualTo(1L);
         assertThat(response.getHostNickname()).isEqualTo("rolling-host");
     }
+
+    @Test
+    @DisplayName("차단한 사용자가 개최한 오픈매트 상세는 찾을 수 없다")
+    void findById_whenHostBlocked_throwsNotFound() {
+        User blockedHost = createUser(1L, "blocked-host-detail", "blocked-host");
+        OpenMat openMat = createOpenMat(
+                50L,
+                blockedHost,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(50L)).thenReturn(java.util.Optional.of(openMat));
+        when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(1L));
+
+        assertThatThrownBy(() -> openMatService.findById(50L, 99L, false))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("오픈매트를 찾을 수 없습니다");
+    }
+
     @Test
     @DisplayName("상세 조회 시 종료 시간이 지난 오픈매트는 FINISHED로 보정된다")
     void findById_whenExpired_returnsFinishedStatus() {
@@ -315,7 +339,7 @@ class OpenMatServiceTest {
                 eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
                 .thenReturn(List.of());
         when(openMatRepository.searchVisible(
-                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), any(Pageable.class)))
+                isNull(), eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(openMat)));
         when(openMatRepository.countParticipantsByOpenMatIds(List.of(16L)))
                 .thenReturn(List.of(participantCount(16L, 1L)));
@@ -331,11 +355,85 @@ class OpenMatServiceTest {
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(openMatRepository).searchVisible(
-                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
+                isNull(), eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt")).isNotNull();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("id")).isNotNull();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("id").isDescending()).isTrue();
+    }
+
+    @Test
+    @DisplayName("차단한 사용자가 개최한 오픈매트는 검색 결과에서도 제외한다")
+    void findAll_withKeyword_andBlockedHost_excludesBlockedHosts() {
+        User blockedHost = createUser(1L, "blocked-host-search", "blocked-host");
+        OpenMat visibleOpenMat = createOpenMat(
+                17L,
+                blockedHost,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L
+        );
+
+        when(openMatRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
+                eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(1L));
+        when(openMatRepository.searchVisibleExcludingBlocked(
+                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), eq(List.of(1L)), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(visibleOpenMat)));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(17L)))
+                .thenReturn(List.of(participantCount(17L, 1L)));
+
+        Page<OpenMatResponse> page = openMatService.findAll(
+                Region.SEOUL,
+                OpenMatStatus.RECRUITING,
+                "  강남   오픈매트  ",
+                PageRequest.of(0, 20),
+                99L
+        );
+
+        assertThat(page.getContent()).extracting(OpenMatResponse::getId).containsExactly(17L);
+        verify(openMatRepository).searchVisibleExcludingBlocked(
+                eq(Region.SEOUL), eq(OpenMatStatus.RECRUITING), eq("강남 오픈매트"), eq(List.of(1L)), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("차단한 사용자가 개최한 오픈매트는 목록에서 제외한다")
+    void findAll_whenViewerBlockedHost_excludesBlockedHosts() {
+        User visibleHost = createUser(2L, "visible-host-list", "visible-host");
+        OpenMat visibleOpenMat = createOpenMat(
+                51L,
+                visibleHost,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                3L
+        );
+
+        when(openMatRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
+                eq(OpenMatStatus.FINISHED), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(1L));
+        when(openMatRepository.findByIsHiddenFalseAndStatusAndHost_IdNotIn(
+                eq(OpenMatStatus.RECRUITING), eq(List.of(1L)), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(visibleOpenMat)));
+        when(openMatRepository.countParticipantsByOpenMatIds(List.of(51L)))
+                .thenReturn(List.of(participantCount(51L, 1L)));
+
+        Page<OpenMatResponse> page = openMatService.findAll(
+                null,
+                OpenMatStatus.RECRUITING,
+                null,
+                PageRequest.of(0, 20),
+                99L
+        );
+
+        assertThat(page.getContent()).extracting(OpenMatResponse::getId).containsExactly(51L);
+        verify(openMatRepository).findByIsHiddenFalseAndStatusAndHost_IdNotIn(
+                eq(OpenMatStatus.RECRUITING), eq(List.of(1L)), any(Pageable.class));
     }
 
     @Test

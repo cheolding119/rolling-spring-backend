@@ -47,10 +47,12 @@ public class TournamentController {
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<TournamentResponse>>> list(
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "출처 필터 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, MANUAL)")
             @RequestParam(required = false) TournamentSource source,
             @PageableDefault(size = 20) Pageable pageable) {
-        Page<TournamentResponse> response = tournamentService.findAll(pageable, source);
+        Long userId = principal != null ? principal.getUserId() : null;
+        Page<TournamentResponse> response = tournamentService.findAll(pageable, source, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -60,8 +62,11 @@ public class TournamentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대회 없음")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<TournamentResponse>> findById(@PathVariable Long id) {
-        TournamentResponse response = tournamentService.findById(id);
+    public ResponseEntity<ApiResponse<TournamentResponse>> findById(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        Long userId = principal != null ? principal.getUserId() : null;
+        TournamentResponse response = tournamentService.findById(id, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
