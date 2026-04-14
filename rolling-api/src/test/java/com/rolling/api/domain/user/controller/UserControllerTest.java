@@ -1,6 +1,7 @@
 package com.rolling.api.domain.user.controller;
 
 import com.rolling.api.domain.user.dto.UserResponse;
+import com.rolling.api.domain.user.dto.BlockedUserResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.service.UserService;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -24,6 +25,7 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,6 +172,25 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    @DisplayName("차단한 사용자 목록 조회는 인증 사용자면 성공한다")
+    void getBlockedUsers_withUserToken_returnsBlockedUsers() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.getBlockedUsers(2L)).willReturn(List.of(blockedUserResponse()));
+
+        mockMvc.perform(get("/api/v1/users/blocks")
+                        .header("Authorization", "Bearer user-token")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].userId").value(12))
+                .andExpect(jsonPath("$.data[0].nickname").value("blocked-user"))
+                .andExpect(jsonPath("$.data[0].blockedAt").value("2026-04-14T13:00:00"));
+    }
+
     private UserResponse userResponse(boolean pushNotificationEnabled) {
         return UserResponse.builder()
                 .id(2L)
@@ -186,6 +207,16 @@ class UserControllerTest {
                 .settings(UserSettingsResponse.builder()
                         .pushNotificationEnabled(pushNotificationEnabled)
                         .build())
+                .build();
+    }
+
+    private BlockedUserResponse blockedUserResponse() {
+        return BlockedUserResponse.builder()
+                .userId(12L)
+                .nickname("blocked-user")
+                .affiliation("blocked-gym")
+                .beltColor("BLUE")
+                .blockedAt(LocalDateTime.of(2026, 4, 14, 13, 0))
                 .build();
     }
 

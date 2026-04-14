@@ -28,11 +28,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByIdInAndIsWithdrawnFalse(Collection<Long> ids);
 
     @Query("""
-            select blocked.id
+            select blocked.blockedUser.id
             from User user
-            join user.blockedUsers blocked
+            join user.blockedUserLinks blocked
             where user.id = :userId
-              and blocked.isWithdrawn = false
+              and blocked.blockedUser.isWithdrawn = false
             """)
     List<Long> findBlockedUserIdsByUserId(@Param("userId") Long userId);
 

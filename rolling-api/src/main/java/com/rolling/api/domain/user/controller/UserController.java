@@ -2,6 +2,7 @@ package com.rolling.api.domain.user.controller;
 
 import com.rolling.api.domain.user.dto.UserFcmTokenDeleteRequest;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
+import com.rolling.api.domain.user.dto.BlockedUserResponse;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Tag(name = "User", description = "사용자 API")
 @RestController
@@ -120,6 +123,22 @@ public class UserController {
             @Valid @RequestBody UserFcmTokenDeleteRequest request) {
         userService.unregisterFcmToken(requireUserId(principal), request.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
+            summary = "차단한 사용자 목록 조회",
+            description = "현재 로그인한 사용자가 차단한 사용자 목록을 차단 시각과 함께 조회합니다."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/blocks")
+    public ResponseEntity<ApiResponse<List<BlockedUserResponse>>> getBlockedUsers(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<BlockedUserResponse> response = userService.getBlockedUsers(requireUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(

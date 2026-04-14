@@ -1,6 +1,7 @@
 package com.rolling.api.domain.user.service;
 
 import com.rolling.api.domain.user.dto.UserResponse;
+import com.rolling.api.domain.user.dto.BlockedUserResponse;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
@@ -9,6 +10,8 @@ import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
+import com.rolling.api.domain.user.entity.UserBlock;
+import com.rolling.api.domain.user.repository.UserBlockRepository;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.security.AdminAccessConfig;
@@ -20,7 +23,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +41,9 @@ class UserServiceTest {
 
     @Mock
     private UserDeviceRepository userDeviceRepository;
+
+    @Mock
+    private UserBlockRepository userBlockRepository;
 
     @Mock
     private AdminAccessConfig adminAccessConfig;
@@ -410,6 +418,43 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("차단한 사용자 목록 조회는 차단 시각과 사용자 정보를 반환한다")
+    void getBlockedUsers_returnsBlockedUsersWithBlockedAt() {
+        User viewer = User.builder()
+                .socialId("social-11")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("viewer")
+                .email("viewer@test.com")
+                .affiliation("viewer-gym")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(viewer, "id", 11L);
+
+        User blockedUser = User.builder()
+                .socialId("social-12")
+                .socialProvider(SocialProvider.KAKAO)
+                .nickname("blocked")
+                .email("blocked@test.com")
+                .affiliation("blocked-gym")
+                .beltColor(BeltColor.BLUE)
+                .build();
+        ReflectionTestUtils.setField(blockedUser, "id", 12L);
+
+        UserBlock userBlock = new UserBlock(viewer, blockedUser, LocalDateTime.of(2026, 4, 14, 13, 0));
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(11L)).thenReturn(Optional.of(viewer));
+        when(userBlockRepository.findAllByUser_IdAndBlockedUser_IsWithdrawnFalseOrderByBlockedAtDesc(11L))
+                .thenReturn(List.of(userBlock));
+
+        List<BlockedUserResponse> response = userService.getBlockedUsers(11L);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getUserId()).isEqualTo(12L);
+        assertThat(response.get(0).getNickname()).isEqualTo("blocked");
+        assertThat(response.get(0).getBlockedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("자기 자신은 차단할 수 없다")
     void blockUser_rejectsSelfBlock() {
         assertThatThrownBy(() -> userService.blockUser(7L, 7L))
@@ -424,6 +469,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(request, "appVersion", appVersion);
         return request;
     }
+
 }
 
 

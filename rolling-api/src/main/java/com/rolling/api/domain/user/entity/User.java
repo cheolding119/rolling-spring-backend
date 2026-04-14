@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Entity
@@ -63,11 +64,8 @@ public class User extends BaseTimeEntity {
 
     private LocalDateTime withdrawalScheduledAt;
 
-    @ManyToMany
-    @JoinTable(name = "user_blocked_users",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "blocked_user_id"))
-    private Set<User> blockedUsers = new HashSet<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserBlock> blockedUserLinks = new HashSet<>();
 
     @Builder
     public User(String socialId,
@@ -142,11 +140,20 @@ public class User extends BaseTimeEntity {
     }
 
     public void blockUser(User user) {
-        this.blockedUsers.add(user);
+        if (user == null || isBlocked(user)) {
+            return;
+        }
+        this.blockedUserLinks.add(new UserBlock(this, user, LocalDateTime.now()));
     }
 
     public void unblockUser(User user) {
-        this.blockedUsers.remove(user);
+        this.blockedUserLinks.removeIf(link -> link.isBlockedUser(user));
+    }
+
+    public Set<User> getBlockedUsers() {
+        return blockedUserLinks.stream()
+                .map(UserBlock::getBlockedUser)
+                .collect(Collectors.toSet());
     }
 
     public void requestWithdrawal(LocalDateTime requestedAt, LocalDateTime scheduledAt) {
@@ -172,6 +179,10 @@ public class User extends BaseTimeEntity {
         this.withdrawalRequestedAt = null;
         this.withdrawalScheduledAt = null;
         this.isWithdrawn = true;
-        this.blockedUsers.clear();
+        this.blockedUserLinks.clear();
+    }
+
+    private boolean isBlocked(User user) {
+        return blockedUserLinks.stream().anyMatch(link -> link.isBlockedUser(user));
     }
 }

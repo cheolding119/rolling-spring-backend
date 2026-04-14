@@ -3,6 +3,8 @@ package com.rolling.api.domain.user.repository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.entity.UserBlock;
+import com.rolling.api.domain.user.repository.UserBlockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +41,9 @@ class UserRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private UserBlockRepository userBlockRepository;
+
     @Test
     @DisplayName("차단 사용자 ID 조회는 탈퇴하지 않은 사용자만 반환한다")
     void findBlockedUserIdsByUserId_returnsOnlyActiveBlockedUsers() {
@@ -57,6 +62,10 @@ class UserRepositoryTest {
         List<Long> blockedUserIds = userRepository.findBlockedUserIdsByUserId(viewer.getId());
 
         assertThat(blockedUserIds).containsExactly(activeBlockedUser.getId());
+
+        UserBlock storedBlock = userBlockRepository.findByUser_IdAndBlockedUser_Id(viewer.getId(), activeBlockedUser.getId())
+                .orElseThrow();
+        assertThat(storedBlock.getBlockedAt()).isNotNull();
     }
 
     private User createUser(String socialId) {
