@@ -93,6 +93,17 @@ public class OpenMatService {
 
     @Transactional
     public Page<OpenMatResponse> findAll(Region region, OpenMatStatus status, String keyword, Pageable pageable) {
+        return findAll(region, status, keyword, pageable, null);
+    }
+
+    @Transactional
+    public Page<OpenMatResponse> findAll(
+            Region region,
+            OpenMatStatus status,
+            String keyword,
+            Pageable pageable,
+            Long viewerUserId
+    ) {
         syncExpiredOpenMats();
 
         Pageable pageableWithSort = pageable.getSort().isSorted()
@@ -103,7 +114,8 @@ public class OpenMatService {
                         Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
                 );
 
-        Page<OpenMat> page = findOpenMats(region, status, normalizeKeyword(keyword), pageableWithSort);
+        List<Long> blockedUserIds = getBlockedUserIds(viewerUserId);
+        Page<OpenMat> page = findOpenMats(region, status, normalizeKeyword(keyword), blockedUserIds, pageableWithSort);
         return toOpenMatResponsePage(page);
     }
 
@@ -117,6 +129,8 @@ public class OpenMatService {
         OpenMat openMat = openMatRepository.findByIdAndIsHiddenFalse(id)
                 .orElseGet(() -> openMatRepository.findById(id)
                         .orElseThrow(() -> BusinessException.notFound("오픈매트를 찾을 수 없습니다")));
+
+        validateNotBlockedHost(requesterUserId, openMat.getHost().getId());
 
         if (Boolean.TRUE.equals(openMat.getIsHidden()) && !canViewDeletedOpenMat(openMat, requesterUserId, requesterIsAdmin)) {
             throw BusinessException.notFound("오픈매트를 찾을 수 없습니다");
@@ -466,20 +480,65 @@ public class OpenMatService {
         return newValue != null && !Objects.equals(currentValue, newValue);
     }
 
-    private Page<OpenMat> findOpenMats(Region region, OpenMatStatus status, String keyword, Pageable pageable) {
+    private Page<OpenMat> findOpenMats(
+            Region region,
+            OpenMatStatus status,
+            String keyword,
+            List<Long> blockedUserIds,
+            Pageable pageable
+    ) {
+        boolean hasBlockedUsers = blockedUserIds != null && !blockedUserIds.isEmpty();
+
         if (keyword != null) {
-            return openMatRepository.searchVisible(region, status, keyword, pageable);
+            if (hasBlockedUsers) {
+                return openMatRepository.searchVisibleExcludingBlocked(region, status, keyword, blockedUserIds, pageable);
+            }
+            return openMatRepository.searchVisible(null, region, status, keyword, pageable);
         }
         if (region != null && status != null) {
+            if (hasBlockedUsers) {
+                return openMatRepository.findByIsHiddenFalseAndRegionAndStatusAndHost_IdNotIn(
+                        region,
+                        status,
+                        blockedUserIds,
+                        pageable
+                );
+            }
             return openMatRepository.findByIsHiddenFalseAndRegionAndStatus(region, status, pageable);
         }
         if (region != null) {
+            if (hasBlockedUsers) {
+                return openMatRepository.findByIsHiddenFalseAndRegionAndHost_IdNotIn(region, blockedUserIds, pageable);
+            }
             return openMatRepository.findByIsHiddenFalseAndRegion(region, pageable);
         }
         if (status != null) {
+            if (hasBlockedUsers) {
+                return openMatRepository.findByIsHiddenFalseAndStatusAndHost_IdNotIn(status, blockedUserIds, pageable);
+            }
             return openMatRepository.findByIsHiddenFalseAndStatus(status, pageable);
         }
+        if (hasBlockedUsers) {
+            return openMatRepository.findByIsHiddenFalseAndHost_IdNotIn(blockedUserIds, pageable);
+        }
         return openMatRepository.findByIsHiddenFalse(pageable);
+    }
+
+    private void validateNotBlockedHost(Long requesterUserId, Long hostUserId) {
+        if (requesterUserId == null) {
+            return;
+        }
+        if (getBlockedUserIds(requesterUserId).contains(hostUserId)) {
+            throw BusinessException.notFound("오픈매트를 찾을 수 없습니다");
+        }
+    }
+
+    private List<Long> getBlockedUserIds(Long viewerUserId) {
+        if (viewerUserId == null) {
+            return List.of();
+        }
+        List<Long> blockedUserIds = userRepository.findBlockedUserIdsByUserId(viewerUserId);
+        return blockedUserIds != null ? blockedUserIds : List.of();
     }
 
     private Page<OpenMatResponse> toOpenMatResponsePage(Page<OpenMat> page) {

@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,13 +23,30 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
     Page<OpenMat> findByIsHiddenFalse(Pageable pageable);
 
     @EntityGraph(attributePaths = "host")
+    Page<OpenMat> findByIsHiddenFalseAndHost_IdNotIn(Collection<Long> hostIds, Pageable pageable);
+
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndRegion(Region region, Pageable pageable);
+
+    @EntityGraph(attributePaths = "host")
+    Page<OpenMat> findByIsHiddenFalseAndRegionAndHost_IdNotIn(Region region, Collection<Long> hostIds, Pageable pageable);
 
     @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndStatus(OpenMatStatus status, Pageable pageable);
 
     @EntityGraph(attributePaths = "host")
+    Page<OpenMat> findByIsHiddenFalseAndStatusAndHost_IdNotIn(OpenMatStatus status, Collection<Long> hostIds, Pageable pageable);
+
+    @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByIsHiddenFalseAndRegionAndStatus(Region region, OpenMatStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = "host")
+    Page<OpenMat> findByIsHiddenFalseAndRegionAndStatusAndHost_IdNotIn(
+            Region region,
+            OpenMatStatus status,
+            Collection<Long> hostIds,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = "host")
     Page<OpenMat> findByHost_IdAndIsHiddenFalse(Long hostId, Pageable pageable);
@@ -38,6 +56,16 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
             value = """
                     SELECT o FROM OpenMat o
                     WHERE o.isHidden = false
+                      AND (
+                            :viewerUserId IS NULL
+                            OR o.host.id NOT IN (
+                                SELECT blocked.id
+                                FROM User viewer
+                                JOIN viewer.blockedUsers blocked
+                                WHERE viewer.id = :viewerUserId
+                                  AND blocked.isWithdrawn = false
+                            )
+                      )
                       AND (:region IS NULL OR o.region = :region)
                       AND (:status IS NULL OR o.status = :status)
                       AND (
@@ -50,6 +78,16 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
             countQuery = """
                     SELECT COUNT(o) FROM OpenMat o
                     WHERE o.isHidden = false
+                      AND (
+                            :viewerUserId IS NULL
+                            OR o.host.id NOT IN (
+                                SELECT blocked.id
+                                FROM User viewer
+                                JOIN viewer.blockedUsers blocked
+                                WHERE viewer.id = :viewerUserId
+                                  AND blocked.isWithdrawn = false
+                            )
+                      )
                       AND (:region IS NULL OR o.region = :region)
                       AND (:status IS NULL OR o.status = :status)
                       AND (
@@ -61,9 +99,47 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
                     """
     )
     Page<OpenMat> searchVisible(
+            @Param("viewerUserId") Long viewerUserId,
             @Param("region") Region region,
             @Param("status") OpenMatStatus status,
             @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = "host")
+    @Query(
+            value = """
+                    SELECT o FROM OpenMat o
+                    WHERE o.isHidden = false
+                      AND o.host.id NOT IN :blockedHostIds
+                      AND (:region IS NULL OR o.region = :region)
+                      AND (:status IS NULL OR o.status = :status)
+                      AND (
+                            :keyword IS NULL
+                            OR LOWER(o.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.locationName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.address, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      )
+                    """,
+            countQuery = """
+                    SELECT COUNT(o) FROM OpenMat o
+                    WHERE o.isHidden = false
+                      AND o.host.id NOT IN :blockedHostIds
+                      AND (:region IS NULL OR o.region = :region)
+                      AND (:status IS NULL OR o.status = :status)
+                      AND (
+                            :keyword IS NULL
+                            OR LOWER(o.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.locationName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(COALESCE(o.address, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      )
+                    """
+    )
+    Page<OpenMat> searchVisibleExcludingBlocked(
+            @Param("region") Region region,
+            @Param("status") OpenMatStatus status,
+            @Param("keyword") String keyword,
+            @Param("blockedHostIds") Collection<Long> blockedHostIds,
             Pageable pageable
     );
 

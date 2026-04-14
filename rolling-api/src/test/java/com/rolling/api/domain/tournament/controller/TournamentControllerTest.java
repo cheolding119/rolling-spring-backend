@@ -9,6 +9,7 @@ import com.rolling.api.global.config.SecurityConfig;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.exception.GlobalExceptionHandler;
 import com.rolling.api.global.security.AdminAccessConfig;
+import com.rolling.api.global.security.UserPrincipal;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,9 @@ import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.test.web.servlet.MockMvc;
@@ -80,7 +84,7 @@ class TournamentControllerTest {
     @Test
     @DisplayName("대회 상세 조회는 인증 없이 접근할 수 있다")
     void findById_isPublic() throws Exception {
-        given(tournamentService.findById(10L)).willReturn(response(10L));
+        given(tournamentService.findById(10L, null)).willReturn(response(10L));
 
         mockMvc.perform(get("/api/v1/tournaments/10").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -93,6 +97,7 @@ class TournamentControllerTest {
         given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
         given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
         given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(tournamentService.findById(10L, 2L)).willReturn(response(10L));
 
         mockMvc.perform(get("/api/v1/tournaments/10")
                         .header("Authorization", "Bearer user-token")
@@ -101,6 +106,19 @@ class TournamentControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(10))
                 .andExpect(jsonPath("$.data.posterUrl").value("https://cdn.rolling.com/posters/10.jpg"));
+    }
+
+    @Test
+    @DisplayName("대회 목록 조회는 인증 사용자의 viewer id를 서비스에 전달한다")
+    void list_withUserToken_passesViewerId() {
+        TournamentController controller = new TournamentController(tournamentService);
+        PageRequest pageable = PageRequest.of(0, 20);
+        given(tournamentService.findAll(pageable, TournamentSource.MANUAL, 2L))
+                .willReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(response(10L))));
+
+        controller.list(new UserPrincipal(2L), TournamentSource.MANUAL, pageable);
+
+        verify(tournamentService).findAll(pageable, TournamentSource.MANUAL, 2L);
     }
 
     @Test

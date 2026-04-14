@@ -17,8 +17,10 @@ class S3PublicBaseUrlValidatorTest {
         contextRunner
                 .withPropertyValues("spring.profiles.active=prod")
                 .run(context -> {
-                    org.springframework.boot.test.context.assertj.ApplicationContextAssert.assertThat(context).hasFailed();
+                    context.assertThat().hasFailed();
                     assertThat(context.getStartupFailure())
+                            .isInstanceOf(org.springframework.beans.factory.BeanCreationException.class);
+                    assertThat(context.getStartupFailure().getCause())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessageContaining("AWS_S3_PUBLIC_BASE_URL");
                 });
@@ -32,6 +34,6 @@ class S3PublicBaseUrlValidatorTest {
                         "spring.profiles.active=prod",
                         "cloud.aws.s3.public-base-url=https://cdn.rolling.com"
                 )
-                .run(context -> org.springframework.boot.test.context.assertj.ApplicationContextAssert.assertThat(context).hasNotFailed());
+                .run(context -> context.assertThat().hasNotFailed());
     }
 }

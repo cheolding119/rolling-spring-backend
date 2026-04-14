@@ -94,11 +94,13 @@ public class OpenMatController {
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OpenMatResponse>>> list(
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "지역 필터 (예: SEOUL, BUSAN)") @RequestParam(required = false) Region region,
             @Parameter(description = "상태 필터 (RECRUITING, CLOSED, FINISHED)") @RequestParam(required = false) OpenMatStatus status,
             @Parameter(description = "검색어 (제목, 장소명, 주소)") @RequestParam(required = false, name = "q") String keyword,
             @PageableDefault(size = 20, sort = {"createdAt", "id"}, direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<OpenMatResponse> response = openMatService.findAll(region, status, keyword, pageable);
+        Long userId = principal != null ? principal.getUserId() : null;
+        Page<OpenMatResponse> response = openMatService.findAll(region, status, keyword, pageable, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
