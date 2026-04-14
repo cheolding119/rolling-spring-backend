@@ -203,20 +203,17 @@ Google Play는 UGC(사용자 생성 콘텐츠) 앱에 대해 다음을 요구한
 
 ### 8.1 현재 데이터
 
-현재는 `User.blockedUsers` 관계가 이미 있다.
+현재는 `User.blockedUserLinks` / `UserBlock` 관계가 이미 있다.
 
 이 구조는 사용자 A가 사용자 B를 차단했다는 정보를 저장하기에 충분하다.
 
 ### 8.2 권장 저장 방식
 
-현재 조인 테이블을 그대로 사용한다.
+현재 조인 테이블 `user_blocked_users`를 그대로 사용한다.
 
-추가로 고려할 수 있는 값:
+차단 시각은 `blockedAt`으로 저장한다.
 
-- `blockedAt`
-- `updatedAt`
-
-다만 App Review(앱 심사) 대응만 놓고 보면, `blockedAt`은 필수는 아니다.
+App Review(앱 심사) 대응만 놓고 보면 `updatedAt` 같은 추가 메타데이터는 필수는 아니다.
 
 ### 8.3 조회 방법
 
@@ -235,11 +232,10 @@ Google Play는 UGC(사용자 생성 콘텐츠) 앱에 대해 다음을 요구한
 
 - `POST /api/v1/users/{id}/block`
 - `DELETE /api/v1/users/{id}/block`
+- `GET /api/v1/users/blocks`
 
 ### 9.2 추가 권장 API
 
-- `GET /api/v1/users/blocks`
-  - 차단한 사용자 목록 조회
 - `GET /api/v1/users/blocks/{id}`
   - 차단 여부 단건 확인
 
@@ -351,8 +347,8 @@ Apple과 Google이 요구하는 것도 결국 `report + block + moderation`(신�
 ### Phase 2. 데이터 / API 설계
 
 - [x] 현재 `user_blocked_users` 조인 테이블을 그대로 사용할지 확정한다.
-- [ ] 차단 시각(`blockedAt`) 저장이 필요한지 확정한다.
-- [ ] `GET /api/v1/users/blocks` 같은 조회 API가 필요한지 확정한다.
+- [x] 차단 시각(`blockedAt`) 저장이 필요한지 확정한다.
+- [x] `GET /api/v1/users/blocks` 같은 조회 API가 필요한지 확정한다.
 - [ ] 차단 여부 단건 확인 API가 필요한지 확정한다.
 - [x] 차단 저장과 차단 해제의 응답 규약을 정한다.
 
@@ -376,7 +372,8 @@ Apple과 Google이 요구하는 것도 결국 `report + block + moderation`(신�
 ### Phase 5. 테스트 / 검증
 
 - [x] 사용자 차단 서비스 단위 테스트를 작성한다.
-- [ ] 차단 저장과 해제의 controller test를 작성한다.
+- [x] 차단 저장과 해제의 controller test를 작성한다.
+- [x] 차단한 사용자 목록 조회 controller test를 작성한다.
 - [x] 오픈매트/대회 조회에서 차단 필터가 적용되는지 통합 테스트를 작성한다.
 - [x] 차단이 중복 저장되지 않거나 멱등하게 동작하는지 검증한다.
 - [x] 차단 후 차단 대상의 콘텐츠가 조회되지 않는지 회귀 테스트를 추가한다.
@@ -395,13 +392,6 @@ Apple과 Google이 요구하는 것도 결국 `report + block + moderation`(신�
 - [x] 대회 목록/검색 요청에 로그인 상태면 `accessToken`을 함께 보내도록 정책을 정한다.
 - [x] 비로그인 조회와 차단 필터의 우선순위를 `로그인 시 차단 적용, 비로그인 시 공개 조회`로 확정한다.
 - [x] 차단한 사용자의 상세 조회는 `404`로 유지한다.
-
-### Phase 7. 프론트 연동 보완
-
-- [ ] 목록 조회 화면에서 `Authorization: Bearer {accessToken}` 헤더를 항상 포함하도록 수정한다.
-- [ ] 검색 화면에서도 `Authorization: Bearer {accessToken}` 헤더를 항상 포함하도록 수정한다.
-- [ ] 차단 대상 상세 진입 시 안내 화면으로 대체한다.
-- [ ] 차단 안내 화면에서 차단 해제 동선을 연결한다.
 
 ### Phase 8. 회귀 검증
 

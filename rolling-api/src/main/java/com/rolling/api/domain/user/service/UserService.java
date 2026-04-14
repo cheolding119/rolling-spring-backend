@@ -1,12 +1,14 @@
 package com.rolling.api.domain.user.service;
 
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
+import com.rolling.api.domain.user.dto.BlockedUserResponse;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
+import com.rolling.api.domain.user.repository.UserBlockRepository;
 import com.rolling.api.domain.user.repository.UserDeviceRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
@@ -16,12 +18,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final UserDeviceRepository userDeviceRepository;
+    private final UserBlockRepository userBlockRepository;
     private final AdminAccessConfig adminAccessConfig;
 
     @Transactional(readOnly = true)
@@ -97,6 +102,15 @@ public class UserService {
         User user = getActiveUser(userId);
         User blockedUser = getActiveUser(blockedUserId);
         user.unblockUser(blockedUser);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BlockedUserResponse> getBlockedUsers(Long userId) {
+        getActiveUser(userId);
+        return userBlockRepository.findAllByUser_IdAndBlockedUser_IsWithdrawnFalseOrderByBlockedAtDesc(userId)
+                .stream()
+                .map(BlockedUserResponse::from)
+                .toList();
     }
 
     private User getActiveUser(Long userId) {

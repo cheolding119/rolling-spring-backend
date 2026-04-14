@@ -59,11 +59,11 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
                       AND (
                             :viewerUserId IS NULL
                             OR o.host.id NOT IN (
-                                SELECT blocked.id
+                                SELECT blocked.blockedUser.id
                                 FROM User viewer
-                                JOIN viewer.blockedUsers blocked
+                                JOIN viewer.blockedUserLinks blocked
                                 WHERE viewer.id = :viewerUserId
-                                  AND blocked.isWithdrawn = false
+                                  AND blocked.blockedUser.isWithdrawn = false
                             )
                       )
                       AND (:region IS NULL OR o.region = :region)
@@ -81,11 +81,11 @@ public interface OpenMatRepository extends JpaRepository<OpenMat, Long> {
                       AND (
                             :viewerUserId IS NULL
                             OR o.host.id NOT IN (
-                                SELECT blocked.id
+                                SELECT blocked.blockedUser.id
                                 FROM User viewer
-                                JOIN viewer.blockedUsers blocked
+                                JOIN viewer.blockedUserLinks blocked
                                 WHERE viewer.id = :viewerUserId
-                                  AND blocked.isWithdrawn = false
+                                  AND blocked.blockedUser.isWithdrawn = false
                             )
                       )
                       AND (:region IS NULL OR o.region = :region)
