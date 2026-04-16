@@ -22,6 +22,8 @@ public class UserSanctionAccessFilter extends OncePerRequestFilter {
     private static final List<RouteRule> TEMP_SUSPEND_ALLOWED_ROUTES = List.of(
             new RouteRule("POST", "/api/v1/auth/logout"),
             new RouteRule("POST", "/api/v1/auth/refresh"),
+            new RouteRule("DELETE", "/api/v1/auth/withdraw"),
+            new RouteRule("POST", "/api/v1/auth/withdraw/cancel"),
             new RouteRule("GET", "/api/v1/users/me"),
             new RouteRule("PATCH", "/api/v1/users/me/settings"),
             new RouteRule("GET", "/api/v1/users/blocks"),
@@ -45,7 +47,7 @@ public class UserSanctionAccessFilter extends OncePerRequestFilter {
         if (principal.isAdmin()) {
             return false;
         }
-        return !principal.isSuspended() && !principal.isBanned();
+        return !principal.isSuspended();
     }
 
     @Override
@@ -55,15 +57,6 @@ public class UserSanctionAccessFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
             filterChain.doFilter(request, response);
-            return;
-        }
-
-        if (principal.isBanned()) {
-            if (isLogoutRequest(request)) {
-                filterChain.doFilter(request, response);
-                return;
-            }
-            writeForbiddenResponse(response, "이용이 정지된 계정입니다");
             return;
         }
 
@@ -80,11 +73,6 @@ public class UserSanctionAccessFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return TEMP_SUSPEND_ALLOWED_ROUTES.stream()
                 .anyMatch(route -> route.matches(method, path, pathMatcher));
-    }
-
-    private boolean isLogoutRequest(HttpServletRequest request) {
-        return "POST".equalsIgnoreCase(request.getMethod())
-                && "/api/v1/auth/logout".equals(request.getRequestURI());
     }
 
     private void writeForbiddenResponse(HttpServletResponse response, String message) throws IOException {

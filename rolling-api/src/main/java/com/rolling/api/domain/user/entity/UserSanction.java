@@ -76,6 +76,14 @@ public class UserSanction extends BaseTimeEntity {
         return sanctionType == null ? null : UserSanctionType.valueOf(sanctionType);
     }
 
+    public UserSanctionType getPolicySanctionTypeEnum() {
+        UserSanctionType type = getSanctionTypeEnum();
+        if (type == UserSanctionType.PERMANENT_BAN) {
+            return UserSanctionType.TEMP_SUSPEND;
+        }
+        return type;
+    }
+
     public boolean isReleased() {
         return releasedAt != null;
     }

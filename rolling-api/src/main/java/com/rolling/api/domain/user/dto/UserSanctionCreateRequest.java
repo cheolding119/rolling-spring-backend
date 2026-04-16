@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class UserSanctionCreateRequest {
 
     @NotNull
-    @Schema(description = "제재 타입", example = "TEMP_SUSPEND")
+    @Schema(description = "제재 타입", example = "TEMP_SUSPEND", allowableValues = {"WARNING", "TEMP_SUSPEND"})
     private UserSanctionType type;
 
     @Schema(description = "제재 사유", example = "반복적인 욕설", nullable = true)

@@ -46,7 +46,7 @@ public class UserSanctionResponse {
     public static UserSanctionResponse from(UserSanction sanction) {
         return UserSanctionResponse.builder()
                 .id(sanction.getId())
-                .type(sanction.getSanctionTypeEnum())
+                .type(sanction.getPolicySanctionTypeEnum())
                 .reason(sanction.getReason())
                 .memo(sanction.getMemo())
                 .startsAt(sanction.getStartsAt())

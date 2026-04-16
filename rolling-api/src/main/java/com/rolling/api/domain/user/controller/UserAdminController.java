@@ -52,7 +52,7 @@ public class UserAdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "닉네임/이메일/소속/전화/ID 검색어")
             @RequestParam(required = false) String q,
-            @Parameter(description = "계정 상태 필터 (ACTIVE, WARNING, SUSPENDED, BANNED, WITHDRAWN)")
+            @Parameter(description = "계정 상태 필터 (ACTIVE, WARNING, SUSPENDED, WITHDRAWN)")
             @RequestParam(required = false) AccountStatus status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         requireAdmin(principal);
@@ -91,7 +91,7 @@ public class UserAdminController {
         return ResponseEntity.ok(ApiResponse.success(userAdminService.findSanctions(id)));
     }
 
-    @Operation(summary = "사용자 제재 생성", description = "ADMIN 권한 사용자가 경고, 일시정지, 영구정지를 부여합니다.")
+    @Operation(summary = "사용자 제재 생성", description = "ADMIN 권한 사용자가 경고 또는 일시정지를 부여합니다. 강한 제재도 장기 일시정지로 처리합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "생성 성공"),

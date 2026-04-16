@@ -152,7 +152,12 @@ public class UserAdminService {
             List<Predicate> predicates = new ArrayList<>();
 
             if (status != null) {
-                predicates.add(cb.equal(root.get("accountStatus"), status));
+                AccountStatus normalizedStatus = normalizePolicyStatus(status);
+                if (normalizedStatus == AccountStatus.SUSPENDED) {
+                    predicates.add(root.get("accountStatus").in(AccountStatus.SUSPENDED, AccountStatus.BANNED));
+                } else {
+                    predicates.add(cb.equal(root.get("accountStatus"), normalizedStatus));
+                }
             }
 
             if (StringUtils.hasText(query)) {
@@ -181,7 +186,7 @@ public class UserAdminService {
         switch (type) {
             case WARNING -> user.warn(reason);
             case TEMP_SUSPEND -> user.suspend(endsAt, reason);
-            case PERMANENT_BAN -> user.ban(reason);
+            case PERMANENT_BAN -> throw BusinessException.badRequest("영구정지는 더 이상 지원하지 않습니다");
         }
     }
 
@@ -201,8 +206,12 @@ public class UserAdminService {
             return;
         }
 
+        if (type == UserSanctionType.PERMANENT_BAN) {
+            throw BusinessException.badRequest("영구정지는 더 이상 지원하지 않습니다");
+        }
+
         if (endsAt != null) {
-            throw BusinessException.badRequest("경고와 영구정지는 종료 시각을 사용할 수 없습니다");
+            throw BusinessException.badRequest("경고는 종료 시각을 사용할 수 없습니다");
         }
     }
 
@@ -222,6 +231,13 @@ public class UserAdminService {
 
     private String normalizeText(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private AccountStatus normalizePolicyStatus(AccountStatus status) {
+        if (status == AccountStatus.BANNED) {
+            return AccountStatus.SUSPENDED;
+        }
+        return status;
     }
 
     private User getUser(Long userId) {

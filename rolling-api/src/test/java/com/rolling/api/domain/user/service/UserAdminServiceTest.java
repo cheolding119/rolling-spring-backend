@@ -26,6 +26,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -109,6 +110,46 @@ class UserAdminServiceTest {
         assertThat(user.getSanctionReasonSummary()).isNull();
         assertThat(response.getReleasedByUserId()).isEqualTo(1L);
         assertThat(response.getReleasedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("영구정지 요청은 현재 정책에서 허용되지 않는다")
+    void createSanction_permanentBanRejected() {
+        User user = user(7L);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        UserSanctionCreateRequest request = new UserSanctionCreateRequest();
+        ReflectionTestUtils.setField(request, "type", UserSanctionType.PERMANENT_BAN);
+        ReflectionTestUtils.setField(request, "reason", "중대한 운영 위반");
+
+        assertThatThrownBy(() -> userAdminService.createSanction(1L, 7L, request))
+                .hasMessage("영구정지는 더 이상 지원하지 않습니다");
+    }
+
+    @Test
+    @DisplayName("기존 영구정지 이력은 관리자 응답에서 장기 일시정지로 노출된다")
+    void findSanctions_legacyPermanentBanNormalizedToTempSuspend() {
+        User user = user(7L);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        UserSanction sanction = UserSanction.builder()
+                .user(user)
+                .sanctionType(UserSanctionType.PERMANENT_BAN)
+                .reason("중대한 운영 위반")
+                .memo("legacy data")
+                .startsAt(LocalDateTime.of(2026, 4, 1, 12, 0))
+                .endsAt(null)
+                .createdByUserId(1L)
+                .build();
+        ReflectionTestUtils.setField(sanction, "id", 300L);
+        ReflectionTestUtils.setField(sanction, "createdAt", LocalDateTime.of(2026, 4, 1, 12, 0));
+        when(userSanctionRepository.findAllByUser_IdOrderByCreatedAtDesc(7L)).thenReturn(java.util.List.of(sanction));
+
+        java.util.List<UserSanctionResponse> responses = userAdminService.findSanctions(7L);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getType()).isEqualTo(UserSanctionType.TEMP_SUSPEND);
+        assertThat(responses.get(0).getReason()).isEqualTo("중대한 운영 위반");
     }
 
     private User user(Long id) {

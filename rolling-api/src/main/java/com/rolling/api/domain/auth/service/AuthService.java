@@ -344,7 +344,7 @@ public class AuthService {
 
     private void ensureLoginAllowed(User user, LocalDateTime now) {
         AccountStatus effectiveStatus = user.getEffectiveAccountStatus(now);
-        if (effectiveStatus == AccountStatus.BANNED || effectiveStatus == AccountStatus.WITHDRAWN) {
+        if (effectiveStatus == AccountStatus.WITHDRAWN) {
             throw BusinessException.forbidden("이용이 정지된 계정입니다");
         }
     }

@@ -133,6 +133,9 @@ public class User extends BaseTimeEntity {
     }
 
     public AccountStatus getEffectiveAccountStatus(LocalDateTime now) {
+        if (accountStatus == AccountStatus.BANNED) {
+            return AccountStatus.SUSPENDED;
+        }
         if (accountStatus == AccountStatus.SUSPENDED && suspensionUntil != null && !now.isBefore(suspensionUntil)) {
             return AccountStatus.ACTIVE;
         }
@@ -170,6 +173,7 @@ public class User extends BaseTimeEntity {
         this.sanctionReasonSummary = normalizeSummary(reasonSummary);
     }
 
+    @Deprecated(forRemoval = false)
     public void ban(String reasonSummary) {
         this.accountStatus = AccountStatus.BANNED;
         this.suspensionUntil = null;
