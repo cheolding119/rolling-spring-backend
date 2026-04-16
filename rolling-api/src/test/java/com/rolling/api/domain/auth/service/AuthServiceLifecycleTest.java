@@ -6,6 +6,7 @@ import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
 import com.rolling.api.domain.auth.entity.RefreshToken;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
+import com.rolling.api.domain.user.entity.AccountStatus;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
@@ -208,5 +209,43 @@ class AuthServiceLifecycleTest {
         verify(userDeviceRepository).findByUser_IdAndFcmToken(52L, "missing-token");
         verify(userDeviceRepository, never()).delete(org.mockito.ArgumentMatchers.any(UserDevice.class));
         verify(refreshTokenRepository).deleteByUserId(52L);
+    }
+
+    @Test
+    @DisplayName("장기 일시정지 사용자도 로그인할 수 있고 제재 상태를 응답으로 받는다")
+    void login_suspendedUserReturnsRestrictedStatus() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "GOOGLE");
+        ReflectionTestUtils.setField(request, "accessToken", "google-token");
+
+        GoogleUserResponse googleUserResponse = new GoogleUserResponse();
+        ReflectionTestUtils.setField(googleUserResponse, "sub", "social-suspended");
+        ReflectionTestUtils.setField(googleUserResponse, "name", "정지사용자");
+        ReflectionTestUtils.setField(googleUserResponse, "email", "suspended@example.com");
+
+        User user = User.builder()
+                .socialId("social-suspended")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("정지사용자")
+                .email("suspended@example.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 3L);
+        user.suspend(LocalDateTime.of(2126, 4, 20, 0, 0), "중대한 운영 위반");
+
+        ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
+        when(googleClient.getUserInfo("google-token")).thenReturn(googleUserResponse);
+        when(userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse("social-suspended", SocialProvider.GOOGLE))
+                .thenReturn(Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(3L)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(3L)).thenReturn("refresh-token");
+        when(adminAccessConfig.isAdmin(3L)).thenReturn(false);
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response.getAccountStatus()).isEqualTo(AccountStatus.SUSPENDED.name());
+        assertThat(response.getSuspensionUntil()).isEqualTo(LocalDateTime.of(2126, 4, 20, 0, 0));
+        assertThat(response.getSanctionReasonSummary()).isEqualTo("중대한 운영 위반");
     }
 }

@@ -50,8 +50,8 @@ public class UserPrincipal implements UserDetails {
         return accountStatus == AccountStatus.SUSPENDED;
     }
 
-    public boolean isBanned() {
-        return accountStatus == AccountStatus.BANNED || accountStatus == AccountStatus.WITHDRAWN;
+    public boolean isWithdrawn() {
+        return accountStatus == AccountStatus.WITHDRAWN;
     }
 
     @Override
@@ -89,6 +89,6 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return !isBanned();
+        return !isWithdrawn();
     }
 }

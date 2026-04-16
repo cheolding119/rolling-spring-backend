@@ -10,7 +10,7 @@
 - 호스트는 자신이 주최한 오픈매트에 신청할 수 없다.
 - 사용자 차단은 조회자 기준 개인화 필터이며, 차단한 작성자의 오픈매트/대회는 목록과 상세에서 숨긴다.
 - 관리자 사용자 제재는 별도 운영 상태로 관리하며, `user_sanctions` 이력 테이블과 `users`의 상태 캐시를 분리해서 다룬다.
-- 일시정지(`TEMP_SUSPEND`)는 로그인 허용 + 제한 모드로, 영구정지(`PERMANENT_BAN`)는 기본 로그인 차단으로 다룬다.
+- 강한 제재는 별도 상태 추가 없이 장기 `TEMP_SUSPEND`로 운영한다.
 - 로그인 사용자의 오픈매트/대회 목록·검색 요청은 `Authorization: Bearer {accessToken}`을 함께 보내야 차단 필터가 적용된다.
 - 알림의 source of truth는 FCM 성공 여부가 아니라 백엔드 `Notification` 저장 데이터다.
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
@@ -86,6 +86,9 @@ Response data:
 | `email` | `String` | 사용자 이메일 |
 | `name` | `String` | 사용자 이름 |
 | `isAdmin` | `Boolean` | 관리자 여부 |
+| `accountStatus` | `String` | 현재 계정 상태 |
+| `suspensionUntil` | `DateTime?` | 정지 종료 시각 |
+| `sanctionReasonSummary` | `String?` | 제재 사유 요약 |
 
 에러:
 
@@ -98,6 +101,7 @@ Response data:
 
 - Apple 로그인은 아직 서버 미구현이다.
 - 로그인 응답에는 현재 사용자 기준 `isAdmin`이 포함된다.
+- 로그인 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
 
 ### 5.1.2 토큰 갱신
 
@@ -118,6 +122,9 @@ Response data:
 - `tokenType`
 - `expiresIn`
 - `isAdmin`
+- `accountStatus`
+- `suspensionUntil`
+- `sanctionReasonSummary`
 
 에러:
 
@@ -129,6 +136,7 @@ Response data:
 현재 구현 메모:
 
 - 토큰 갱신 응답에도 현재 사용자 기준 `isAdmin`이 포함된다.
+- 토큰 갱신 응답에도 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
 
 ### 5.1.3 로그아웃
 
@@ -167,6 +175,7 @@ Response data:
 
 - 탈퇴는 즉시 실행되지 않는다.
 - 요청 다음 날 `21:00` (`Asia/Seoul`)에 실행된다.
+- `SUSPENDED` 상태에서도 탈퇴 요청은 허용된다.
 
 ### 5.1.5 회원 탈퇴 취소
 
@@ -180,6 +189,10 @@ Response data:
 | --- | --- |
 | `withdrawalPending` | `Boolean` |
 | `scheduledAt` | `DateTime?` |
+
+현재 구현 메모:
+
+- `SUSPENDED` 상태에서도 탈퇴 취소는 허용된다.
 
 에러:
 
@@ -207,6 +220,9 @@ Response data:
 | `createdAt` | `DateTime` |
 | `withdrawalPending` | `Boolean` |
 | `withdrawalScheduledAt` | `DateTime?` |
+| `accountStatus` | `String` |
+| `suspensionUntil` | `DateTime?` |
+| `sanctionReasonSummary` | `String?` |
 | `isAdmin` | `Boolean` |
 | `settings` | `Object` |
 | `settings.pushNotificationEnabled` | `Boolean` |
@@ -215,6 +231,7 @@ Response data:
 
 - `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
 - `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`와 소속 `affiliation`이 포함된다.
+- `/users/me` 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
 - 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
 - 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
 - 서버는 accessToken에서 확인한 `userId`와 `admin.user-ids` 설정값으로 `ROLE_USER`/`ROLE_ADMIN`을 내부 판단한다.
@@ -346,9 +363,10 @@ Response data: `null`
 
 - 제재 이력은 `user_sanctions` 테이블에 저장한다.
 - `users`에는 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`를 두어 현재 상태를 빠르게 보여준다.
-- 상태 예시: `ACTIVE`, `WARNING`, `SUSPENDED`, `BANNED`, `WITHDRAWN`
+- 상태 예시: `ACTIVE`, `WARNING`, `SUSPENDED`, `WITHDRAWN`
 - `TEMP_SUSPEND`는 로그인 허용 + 제한 모드다.
-- `PERMANENT_BAN`은 기본 로그인 차단이다.
+- 무기한 정지도 별도 상태가 아니라 장기 `TEMP_SUSPEND`로 처리한다.
+- `RELEASE`는 제재 타입이 아니라 해제 동작이다.
 
 현재 관리자 API:
 
@@ -358,12 +376,71 @@ Response data: `null`
 - `POST /api/v1/admin/users/{id}/sanctions`
 - `DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}`
 
+`GET /api/v1/admin/users` 응답 필드:
+
+- `id`
+- `nickname`
+- `email`
+- `affiliation`
+- `createdAt`
+- `accountStatus`
+- `suspensionUntil`
+- `lastSanctionAt`
+
+`GET /api/v1/admin/users/{id}` 응답 필드:
+
+- `id`
+- `nickname`
+- `email`
+- `phone`
+- `affiliation`
+- `socialProvider`
+- `beltColor`
+- `createdAt`
+- `accountStatus`
+- `suspensionUntil`
+- `sanctionReasonSummary`
+- `isWithdrawn`
+- `withdrawalPending`
+- `withdrawalScheduledAt`
+- `lastSanctionAt`
+
+`GET /api/v1/admin/users/{id}/sanctions` 응답 필드:
+
+- `id`
+- `type`
+- `reason`
+- `memo`
+- `startsAt`
+- `endsAt`
+- `createdByUserId`
+- `createdAt`
+- `releasedByUserId`
+- `releasedAt`
+
+`POST /api/v1/admin/users/{id}/sanctions` 요청 body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `type` | `String` | O | `WARNING`, `TEMP_SUSPEND` |
+| `reason` | `String` | O | 제재 사유 |
+| `memo` | `String` | - | 운영 메모 |
+| `endsAt` | `DateTime` | - | `TEMP_SUSPEND`일 때만 필요 |
+
+`POST /api/v1/admin/users/{id}/sanctions` 응답:
+
+- `UserSanctionResponse`
+
+`DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}` 응답:
+
+- `null`
+
 제한 모드 메모:
 
-- 허용 범위는 문의, 도움말, 알림 on/off, 차단한 사용자 관리, 로그아웃으로 최소화한다.
-- 사용자 정보 수정과 탈퇴는 기본 차단한다.
+- 허용 범위는 문의, 도움말, 알림 on/off, 차단한 사용자 관리, 탈퇴 요청/취소, 로그아웃으로 최소화한다.
+- 사용자 정보 수정은 기본 차단한다.
 - 제재 만료는 스케줄러가 자동 해제한다.
-- 영구정지 사용자는 기본적으로 로그인할 수 없다.
+- 장기 정지도 제한 모드에서 문의와 탈퇴 경로를 유지한다.
 
 ## 5.3 알림 API
 

@@ -62,20 +62,20 @@ class UserSanctionAccessFilterTest {
     }
 
     @Test
-    @DisplayName("영구정지 사용자는 로그아웃만 허용된다")
-    void bannedUser_canOnlyLogout() throws Exception {
-        UserPrincipal principal = new UserPrincipal(2L, false, AccountStatus.BANNED, null);
+    @DisplayName("일시정지 사용자는 회원 탈퇴 요청 경로에 접근할 수 있다")
+    void suspendedUser_canAccessWithdrawRoute() throws Exception {
+        UserPrincipal principal = new UserPrincipal(2L, false, AccountStatus.SUSPENDED, LocalDateTime.of(2126, 4, 20, 0, 0));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities())
         );
 
-        MockHttpServletRequest logoutRequest = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
-        MockHttpServletResponse logoutResponse = new MockHttpServletResponse();
+        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/auth/withdraw");
+        MockHttpServletResponse response = new MockHttpServletResponse();
         var chain = mock(jakarta.servlet.FilterChain.class);
 
-        filter.doFilter(logoutRequest, logoutResponse, chain);
+        filter.doFilter(request, response, chain);
 
-        verify(chain).doFilter(logoutRequest, logoutResponse);
-        assertThat(logoutResponse.getStatus()).isEqualTo(200);
+        verify(chain).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(200);
     }
 }
