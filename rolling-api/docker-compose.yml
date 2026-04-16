@@ -7,7 +7,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M
           cpus: '0.5'
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -42,7 +42,7 @@ services:
       SLACK_ALERT_READ_TIMEOUT_MS: ${SLACK_ALERT_READ_TIMEOUT_MS:-3000}
       SLACK_ALERT_DEFAULT_COOLDOWN_SECONDS: ${SLACK_ALERT_DEFAULT_COOLDOWN_SECONDS:-300}
       SLACK_ALERT_SCHEDULER_COOLDOWN_SECONDS: ${SLACK_ALERT_SCHEDULER_COOLDOWN_SECONDS:-600}
-      JAVA_OPTS: ${JAVA_OPTS:- -Xmx256m -Xms256m}
+      JAVA_OPTS: ${JAVA_OPTS:- -Xmx384m -Xms256m}
 
   nginx:
     # 💡 Nginx 역시 미리 빌드된 이미지를 사용합니다.
