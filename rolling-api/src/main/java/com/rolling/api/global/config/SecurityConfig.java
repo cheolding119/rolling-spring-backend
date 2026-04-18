@@ -28,7 +28,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.time.Clock;
 import java.time.ZoneId;
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -140,9 +139,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedOrigins(List.of(
+                "https://admin.rolling-app.com",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173"
+        ));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                RequestTrackingFilter.REQUEST_ID_HEADER,
+                RequestTrackingFilter.TRACE_ID_HEADER,
+                "X-Correlation-Id",
+                "traceparent"
+        ));
         configuration.setExposedHeaders(List.of(RequestTrackingFilter.REQUEST_ID_HEADER, RequestTrackingFilter.TRACE_ID_HEADER));
         configuration.setMaxAge(3600L);
 
