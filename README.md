@@ -73,34 +73,34 @@ Rolling은 이런 비효율을 줄이기 위해 오픈매트와 대회 정보를
 
 | 로그인 | 메인 페이지 | 오픈매트 목록 |
 | :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-login"><img src="assets/images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="assets/images/users/main_page.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="assets/images/users/openmat_list.jpg" width="250" alt="오픈매트 목록"></a> |
+| <a href="./docs/screenshots.md#user-login"><img src="images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="images/users/main_page.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="images/users/openmat_list.jpg" width="250" alt="오픈매트 목록"></a> |
 
 | 오픈매트 신청 | 개최한 오픈매트 | 대회 목록 |
 | :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="assets/images/users/openmat_sign_up.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-subject-open-mat"><img src="assets/images/users/subject_open_mat.jpg" width="250" alt="개최한 오픈매트"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="assets/images/users/tournaments_list.jpg" width="250" alt="대회 목록"></a> |
+| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="images/users/openmat_sign_up.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-subject-open-mat"><img src="images/users/subject_open_mat.jpg" width="250" alt="개최한 오픈매트"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="images/users/tournaments_list.jpg" width="250" alt="대회 목록"></a> |
 
 ### 관리자 주요 화면
 
 
 | 운영 대시보드 | 신고 관리 |
 | :---: | :---: |
-| <a href="./docs/screenshots.md#admin-dashboard"><img src="assets/images/admin/메인%20대시보드.jpg" width="420" alt="운영 대시보드"></a> | <a href="./docs/screenshots.md#admin-reports"><img src="assets/images/admin/신고%20관리.jpg" width="420" alt="신고 관리"></a> |
+| <a href="./docs/screenshots.md#admin-dashboard"><img src="images/admin/메인%20대시보드.jpg" width="420" alt="운영 대시보드"></a> | <a href="./docs/screenshots.md#admin-reports"><img src="images/admin/신고%20관리.jpg" width="420" alt="신고 관리"></a> |
 
 | 문의 관리 | 문의 답변 |
 | :---: | :---: |
-| <a href="./docs/screenshots.md#admin-inquiries"><img src="assets/images/admin/문의%20관리.jpg" width="420" alt="문의 관리"></a> | <a href="./docs/screenshots.md#admin-inquiry-reply"><img src="assets/images/admin/문의%20답변.jpg" width="420" alt="문의 답변"></a> |
+| <a href="./docs/screenshots.md#admin-inquiries"><img src="images/admin/문의%20관리.jpg" width="420" alt="문의 관리"></a> | <a href="./docs/screenshots.md#admin-inquiry-reply"><img src="images/admin/문의%20답변.jpg" width="420" alt="문의 답변"></a> |
 
 | 공지사항 관리 | 공지사항 작성 |
 | :---: | :---: |
-| <a href="./docs/screenshots.md#admin-notices"><img src="assets/images/admin/공지사항%20관리.jpg" width="420" alt="공지사항 관리"></a> | <a href="./docs/screenshots.md#admin-notice-create"><img src="assets/images/admin/공지사항%20작성.jpg" width="420" alt="공지사항 작성"></a> |
+| <a href="./docs/screenshots.md#admin-notices"><img src="images/admin/공지사항%20관리.jpg" width="420" alt="공지사항 관리"></a> | <a href="./docs/screenshots.md#admin-notice-create"><img src="images/admin/공지사항%20작성.jpg" width="420" alt="공지사항 작성"></a> |
 
 | 대회 운영 | 대회 수동 등록 |
 | :---: | :---: |
-| <a href="./docs/screenshots.md#admin-tournaments"><img src="assets/images/admin/대회%20운영.jpg" width="420" alt="대회 운영"></a> | <a href="./docs/screenshots.md#admin-tournament-create"><img src="assets/images/admin/대회%20수동%20등록.jpg" width="420" alt="대회 수동 등록"></a> |
+| <a href="./docs/screenshots.md#admin-tournaments"><img src="images/admin/대회%20운영.jpg" width="420" alt="대회 운영"></a> | <a href="./docs/screenshots.md#admin-tournament-create"><img src="images/admin/대회%20수동%20등록.jpg" width="420" alt="대회 수동 등록"></a> |
 
 | 대회 크롤링 실행 |  |
 | :---: | :---: |
-| <a href="./docs/screenshots.md#admin-tournament-crawling"><img src="assets/images/admin/대회%20운영%20크롤링%20실행.jpg" width="420" alt="대회 크롤링 실행"></a> |  |
+| <a href="./docs/screenshots.md#admin-tournament-crawling"><img src="images/admin/대회%20운영%20크롤링%20실행.jpg" width="420" alt="대회 크롤링 실행"></a> |  |
 
 ## 기술 스택
 
@@ -198,7 +198,7 @@ Rolling은 이런 비효율을 줄이기 위해 오픈매트와 대회 정보를
 
 포트폴리오 관점에서 서비스의 전체 흐름과 운영 구조를 한눈에 보여주기 위해 아키텍처 다이어그램을 함께 정리했습니다.
 
-![롤링 시스템 아키텍처](assets/images/architecture/롤링_아키텍처_다이어그램.png)
+![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)
 
 
 ## 프로젝트 구조
