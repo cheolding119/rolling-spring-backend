@@ -1,6 +1,0 @@
-[GET] https://www.heroesofsports.kr/api/auth/session => [200] 
-[POST] https://www.heroesofsports.kr/events/application => [200] 
-[POST] https://www.heroesofsports.kr/events/application => [200] 
-[GET] https://www.heroesofsports.kr/?_rsc=vgkch => [200] 
-[GET] https://www.heroesofsports.kr/auth/signin?_rsc=vgkch => [200] 
-[GET] https://www.heroesofsports.kr/events/application/240?_rsc=vgkch => [200] 

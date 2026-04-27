@@ -1,4 +1,4 @@
-# Environment
+# Environment and secrets
 .env
 .env.*
 secrets/
@@ -9,12 +9,6 @@ firebase-service-key.json
 *.jks
 *.keystore
 
-# Gradle
-.gradle/
-.gradle-local/
-.gradle-test/
-build/
-
 # IDE and local agent settings
 .idea/
 .vscode/
@@ -22,18 +16,20 @@ build/
 .ai/
 *.iml
 
-# Build output
+# Gradle and build outputs
+.gradle/
+.gradle-local/
+.gradle-test/
+build/
 out/
 
 # Codex/local worktrees and temporary files
+.codex-tmp/
 .wt-heap/
 .codex_tmp_*
-heroes-network.txt
 *.tmp
 *.log
 
 # OS
 .DS_Store
 Thumbs.db
-
-

@@ -1,5 +1,8 @@
 name: Deploy Spring, Nginx, and Monitoring to Lightsail
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -8,6 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout code
