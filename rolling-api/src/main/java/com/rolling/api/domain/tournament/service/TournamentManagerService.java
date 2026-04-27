@@ -273,10 +273,14 @@ public class TournamentManagerService {
 
         boolean isNew = tournament.getId() == null;
         tournament.assignSourceIfAbsent(normalizedTournament.source());
+        String effectivePosterUrl = normalizedTournament.posterUrl() != null
+                ? normalizedTournament.posterUrl()
+                : tournament.getPosterUrl();
+
         tournament.updateFromCrawler(
                 normalizedTournament.title(),
                 normalizedTournament.organizer(),
-                normalizedTournament.posterUrl(),
+                effectivePosterUrl,
                 normalizedTournament.competitionDate(),
                 normalizedTournament.registrationDeadline(),
                 normalizedTournament.location(),

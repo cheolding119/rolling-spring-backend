@@ -806,7 +806,7 @@ Response: `TournamentResponse`
 
 현재 개편 메모:
 
-- 대회 생성/상세/신고 개편 기준 문서는 [BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md](/C:/rolling/rolling-spring-backend/rolling-api/docs/BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md)다.
+- 대회 생성/상세/신고 개편 기준 문서는 [BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md](/C:/rolling/rolling-spring-backend/rolling-api/docs/tournaments/BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md)다.
 - 대회 생성은 `POST /api/v1/tournaments/poster-upload-url`로 받은 `posterKey`를 사용한다.
 - 응답의 `posterUrl`은 `posterKey`를 기반으로 조립된 공개 URL이다.
 - 프론트는 `poster-upload-url` 응답의 `uploadUrl`로 S3에 PUT 업로드를 수행하고, 그 다음 생성 API를 호출해야 한다.

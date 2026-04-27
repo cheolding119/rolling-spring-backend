@@ -290,6 +290,45 @@ class TournamentManagerServiceTest {
         assertThat(savedTournament.get().getPosterUrl()).isEqualTo(uploadedPosterUrl);
         verify(s3Uploader).uploadImageFromUrl("https://static.example.com/poster.jpg");
     }
+
+    @Test
+    @DisplayName("크롤링 데이터의 포스터가 null이면 기존 포스터를 유지한다")
+    void crawlAndSaveAll_keepsExistingPosterWhenCrawledPosterIsNull() {
+        TournamentModel model = validModel(
+                "스포트라이트 접수중 대회",
+                "2099-09-01",
+                "서울 체육관",
+                "https://spotlite.co.kr/jiujitsu/415"
+        );
+        model.setSource(TournamentSource.SPOTLITE);
+        model.setPosterUrl(null);
+
+        Tournament existing = Tournament.builder()
+                .source(TournamentSource.SPOTLITE)
+                .title("기존 제목")
+                .organizer("기존 주최")
+                .posterUrl("https://rolling.example.com/default-existing.jpg")
+                .competitionDate("2099-08-01")
+                .registrationDeadline("2099-07-01")
+                .location("기존 장소")
+                .applyLink(model.getApplyLink())
+                .build();
+        ReflectionTestUtils.setField(existing, "id", 20L);
+
+        when(successCrawler.getSource()).thenReturn(TournamentSource.SPOTLITE);
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.of(existing));
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TournamentManagerService managerService = managerService(successCrawler);
+
+        TournamentCrawlResult result = managerService.crawlAndSaveAll();
+
+        assertThat(result.getUpdatedCount()).isEqualTo(1);
+        assertThat(existing.getPosterUrl()).isEqualTo("https://rolling.example.com/default-existing.jpg");
+        verify(s3Uploader, never()).uploadImageFromUrl(anyString());
+    }
+
     @Test
     @DisplayName("대회일이 오늘보다 과거면 저장하지 않고 스킵한다")
     void crawlAndSaveAll_skipsPastCompetitionDate() {

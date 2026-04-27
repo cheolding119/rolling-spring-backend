@@ -34,7 +34,7 @@ public class TournamentCrawlerController {
     })
     @PostMapping("/crawl")
     public ResponseEntity<ApiResponse<TournamentCrawlResult>> crawlAndSave(
-            @Parameter(description = "실행할 출처 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU)")
+            @Parameter(description = "실행할 출처 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, SPOTLITE)")
             @RequestParam(required = false) TournamentSource source) {
         TournamentCrawlResult response = source == null
                 ? tournamentManagerService.crawlAndSaveAll()

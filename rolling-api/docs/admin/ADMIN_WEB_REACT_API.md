@@ -849,7 +849,7 @@ Request:
 
 Query:
 
-- `source`: `STREET_JIU_JITSU | KOREA_JIU | HEROES_OF_JIU_JITSU | MANUAL`
+- `source`: `STREET_JIU_JITSU | KOREA_JIU | HEROES_OF_JIU_JITSU | SPOTLITE | MANUAL`
 - `page`
 - `size`
 
@@ -977,9 +977,10 @@ Response:
 중요 제약:
 
 - 크롤링 실행용 source selector에는 아래만 노출한다.
-  - `STREET_JIU_JITSU`
-  - `KOREA_JIU`
-  - `HEROES_OF_JIU_JITSU`
+- `STREET_JIU_JITSU`
+- `KOREA_JIU`
+- `HEROES_OF_JIU_JITSU`
+- `SPOTLITE`
 - `MANUAL`은 목록 필터용 값이지 크롤링 실행용 값이 아니다.
 
 React UX:

@@ -10,6 +10,7 @@
 - 매니저: `TournamentManagerService`가 `List<TournamentCrawler>`를 순회하며 실패 크롤러를 건너뛰고 계속 진행
 - 모델: `TournamentModel` 필드 사용
 - 필드 목록: `title`, `organizer`, `posterUrl`, `competitionDate`, `registrationDeadline`, `location`, `applyLink`
+- Spotlite는 접수중 목록 카드에서 최소 사실 정보만 수집하며 `posterUrl`은 저장하지 않는다.
 
 ## 3) 리그별 우선순위
 1. 리그로얄 (League Royale): 신뢰도/인지도 핵심 데이터
@@ -101,6 +102,16 @@
 - 목표: 초보자 유입용 대회 정보 노출
 - beginner/novice 등 초보자 문구는 우선 탐지
 - 1차 스코프에서는 태그 저장 필드가 없으므로 파싱 규칙만 유지
+
+### 5.6 Spotlite
+- 목표: Spotlite에서 실제 접수중인 주짓수 대회를 Rolling 탐색 목록에 연결한다.
+- 수집 범위는 `https://spotlite.co.kr/jiujitsu/` 목록 페이지로 제한한다.
+- `data-status="registration_open"` 카드만 저장 후보로 본다.
+- 우선 수집 필드: `title`, `organizer`, `competitionDate`, `registrationDeadline`, `location`, `applyLink`
+- `competitionDate`는 카드의 `data-end`, `registrationDeadline`은 카드의 `data-reg-end`를 사용한다.
+- `applyLink`는 Spotlite 상세 URL(`/jiujitsu/{id}`)을 사용한다.
+- 포스터, 상세 본문, 환불 규정, 참가자 명단, 대진표, 결과 데이터는 수집하지 않는다.
+- `posterUrl`은 `null`로 두고 프론트 기본 이미지를 사용한다.
 
 ## 6) 구현 체크리스트 (리그 1개당)
 1. `XXCrawler`, `XXCrawlerService` 클래스 생성
