@@ -1,4 +1,4 @@
-## 안드로이드 콘솔 비공개 테스트 진행 후 프로덕션 준비중
+## 안드로이드 : https://play.google.com/store/apps/details?id=com.rolling.jiujits
 ## IOS 출시 준비중 
 ---
 
