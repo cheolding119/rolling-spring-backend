@@ -24,6 +24,10 @@ public class AuthException extends RuntimeException {
         return new AuthException("GOOGLE_API_ERROR", message);
     }
 
+    public static AuthException appleApiError(String message) {
+        return new AuthException("APPLE_API_ERROR", message);
+    }
+
     public static AuthException unsupportedProvider(String provider) {
         return new AuthException("UNSUPPORTED_PROVIDER", "지원하지 않는 소셜 로그인 provider입니다: " + provider);
     }

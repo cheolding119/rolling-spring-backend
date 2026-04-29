@@ -21,6 +21,8 @@ import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import com.rolling.api.infra.apple.AppleTokenVerifier;
+import com.rolling.api.infra.apple.dto.AppleUserResponse;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
@@ -52,6 +54,7 @@ public class AuthService {
 
     private final KakaoClient kakaoClient;
     private final GoogleClient googleClient;
+    private final AppleTokenVerifier appleTokenVerifier;
     private final UserRepository userRepository;
     private final UserDeviceRepository userDeviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
@@ -89,6 +92,13 @@ public class AuthService {
                 socialId = googleUser.getSocialId();
                 nickname = googleUser.getNickname();
                 email = googleUser.getEmail();
+            }
+            case APPLE -> {
+                AppleUserResponse appleUser = appleTokenVerifier.verify(request.getAccessToken());
+                log.debug("Apple user info received - sub: {}", appleUser.getSocialId());
+                socialId = appleUser.getSocialId();
+                nickname = appleUser.getNickname();
+                email = appleUser.getEmail();
             }
             default -> throw AuthException.unsupportedProvider(provider.name());
         }
@@ -294,6 +304,7 @@ public class AuthService {
         return switch (provider) {
             case KAKAO -> AuthException.kakaoApiError(message);
             case GOOGLE -> AuthException.googleApiError(message);
+            case APPLE -> AuthException.appleApiError(message);
         };
     }
 
@@ -329,10 +340,11 @@ public class AuthService {
                 })
                 .orElseGet(() -> {
                     isNewUser[0] = true;
+                    String newUserNickname = StringUtils.hasText(nickname) ? nickname : "Unknown";
                     User newUser = User.builder()
                             .socialId(socialId)
                             .socialProvider(provider)
-                            .nickname(nickname)
+                            .nickname(newUserNickname)
                             .email(email)
                             .beltColor(BeltColor.WHITE)
                             .build();

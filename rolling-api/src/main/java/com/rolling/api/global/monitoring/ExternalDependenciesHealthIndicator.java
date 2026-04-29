@@ -2,6 +2,8 @@ package com.rolling.api.global.monitoring;
 
 import com.google.firebase.FirebaseApp;
 import com.rolling.api.global.config.FirebaseProperties;
+import com.rolling.api.infra.apple.AppleAuthProperties;
+import com.rolling.api.infra.apple.AppleTokenVerifier;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.kakao.KakaoClient;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,6 +26,8 @@ public class ExternalDependenciesHealthIndicator implements HealthIndicator {
     private final ObjectProvider<S3Client> s3ClientProvider;
     private final ObjectProvider<GoogleClient> googleClientProvider;
     private final ObjectProvider<KakaoClient> kakaoClientProvider;
+    private final ObjectProvider<AppleTokenVerifier> appleTokenVerifierProvider;
+    private final AppleAuthProperties appleAuthProperties;
     private final String awsBucketName;
     private final List<String> crawlerUrls;
 
@@ -33,6 +37,8 @@ public class ExternalDependenciesHealthIndicator implements HealthIndicator {
             ObjectProvider<S3Client> s3ClientProvider,
             ObjectProvider<GoogleClient> googleClientProvider,
             ObjectProvider<KakaoClient> kakaoClientProvider,
+            ObjectProvider<AppleTokenVerifier> appleTokenVerifierProvider,
+            AppleAuthProperties appleAuthProperties,
             @Value("${cloud.aws.s3.bucket:}") String awsBucketName,
             @Value("${tournament.crawler.street-jiujitsu.list-page-urls:}") List<String> crawlerUrls
     ) {
@@ -41,6 +47,8 @@ public class ExternalDependenciesHealthIndicator implements HealthIndicator {
         this.s3ClientProvider = s3ClientProvider;
         this.googleClientProvider = googleClientProvider;
         this.kakaoClientProvider = kakaoClientProvider;
+        this.appleTokenVerifierProvider = appleTokenVerifierProvider;
+        this.appleAuthProperties = appleAuthProperties;
         this.awsBucketName = awsBucketName;
         this.crawlerUrls = crawlerUrls;
     }
@@ -88,9 +96,13 @@ public class ExternalDependenciesHealthIndicator implements HealthIndicator {
         Map<String, Object> detail = new LinkedHashMap<>();
         boolean googleReady = googleClientProvider.getIfAvailable() != null;
         boolean kakaoReady = kakaoClientProvider.getIfAvailable() != null;
+        boolean appleVerifierReady = appleTokenVerifierProvider.getIfAvailable() != null;
+        boolean appleClientIdConfigured = StringUtils.hasText(appleAuthProperties.getClientId());
         detail.put("googleClientInitialized", googleReady);
         detail.put("kakaoClientInitialized", kakaoReady);
-        detail.put("status", googleReady && kakaoReady ? "UP" : "DOWN");
+        detail.put("appleTokenVerifierInitialized", appleVerifierReady);
+        detail.put("appleClientIdConfigured", appleClientIdConfigured);
+        detail.put("status", googleReady && kakaoReady && appleVerifierReady && appleClientIdConfigured ? "UP" : "DOWN");
         return detail;
     }
 

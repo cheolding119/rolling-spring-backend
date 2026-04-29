@@ -17,6 +17,8 @@ import com.rolling.api.global.alert.OperationalAlertPublisher;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import com.rolling.api.infra.apple.AppleTokenVerifier;
+import com.rolling.api.infra.apple.dto.AppleUserResponse;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
@@ -50,6 +52,9 @@ class AuthServiceLifecycleTest {
 
     @Mock
     private GoogleClient googleClient;
+
+    @Mock
+    private AppleTokenVerifier appleTokenVerifier;
 
     @Mock
     private UserRepository userRepository;
@@ -121,6 +126,80 @@ class AuthServiceLifecycleTest {
         assertThat(response.getName()).isEqualTo("관리자");
         verify(refreshTokenRepository).deleteByUserId(1L);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("Apple 로그인은 identityToken 검증 결과로 신규 사용자를 생성하고 JWT를 발급한다")
+    void login_appleCreatesNewUser() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "APPLE");
+        ReflectionTestUtils.setField(request, "accessToken", "apple-identity-token");
+
+        ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
+
+        AppleUserResponse appleUserResponse = new AppleUserResponse("apple-sub-1", "apple@example.com");
+        User savedUser = User.builder()
+                .socialId("apple-sub-1")
+                .socialProvider(SocialProvider.APPLE)
+                .nickname("Unknown")
+                .email("apple@example.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(savedUser, "id", 70L);
+
+        when(appleTokenVerifier.verify("apple-identity-token")).thenReturn(appleUserResponse);
+        when(userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse("apple-sub-1", SocialProvider.APPLE))
+                .thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(jwtTokenProvider.createAccessToken(70L)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(70L)).thenReturn("refresh-token");
+        when(adminAccessConfig.isAdmin(70L)).thenReturn(false);
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response.getUserId()).isEqualTo(70L);
+        assertThat(response.getEmail()).isEqualTo("apple@example.com");
+        assertThat(response.getName()).isEqualTo("Unknown");
+        assertThat(response.isNewUser()).isTrue();
+        verify(refreshTokenRepository).deleteByUserId(70L);
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("동일한 Apple sub 재로그인은 기존 사용자를 반환한다")
+    void login_appleExistingUser() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "APPLE");
+        ReflectionTestUtils.setField(request, "accessToken", "apple-identity-token");
+
+        ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
+
+        User existingUser = User.builder()
+                .socialId("apple-sub-existing")
+                .socialProvider(SocialProvider.APPLE)
+                .nickname("Old Apple User")
+                .email("old@example.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(existingUser, "id", 71L);
+
+        when(appleTokenVerifier.verify("apple-identity-token"))
+                .thenReturn(new AppleUserResponse("apple-sub-existing", "new@example.com"));
+        when(userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse("apple-sub-existing", SocialProvider.APPLE))
+                .thenReturn(Optional.of(existingUser));
+        when(jwtTokenProvider.createAccessToken(71L)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(71L)).thenReturn("refresh-token");
+        when(adminAccessConfig.isAdmin(71L)).thenReturn(false);
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response.isNewUser()).isFalse();
+        assertThat(response.getUserId()).isEqualTo(71L);
+        assertThat(response.getName()).isEqualTo("Old Apple User");
+        assertThat(response.getEmail()).isEqualTo("new@example.com");
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

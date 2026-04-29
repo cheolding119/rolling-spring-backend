@@ -15,6 +15,10 @@ jwt:
   access-token-expiry: 1800000
   refresh-token-expiry: 1209600000
 
+apple:
+  auth:
+    client-id: com.rolling.jiujits.test
+
 firebase:
   enabled: false
 
