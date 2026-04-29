@@ -85,3 +85,99 @@
 - 실제 iOS 실기기에서 신규 가입, 재로그인, 이메일 공개/비공개 케이스를 검증한다.
 - 운영 배포 전 GitHub Actions Secret `APPLE_CLIENT_ID`가 `com.rolling.jiujits`로 등록되어 있는지 확인한다.
 - Apple token revoke 또는 authorization code 교환이 필요해질 때 `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `.p8` private key 사용 범위를 다시 연다.
+
+## 8. Flutter 구현 메모
+
+이 섹션은 Flutter 앱 담당자가 Apple 로그인을 붙일 때 필요한 최소 계약만 정리한다. 전체 API 원문은 `docs/AGENTS.md`와 `C:\rolling\.codex-shared\api-spec.md`를 기준으로 본다.
+
+### 8.1 백엔드 요청 계약
+
+기존 소셜 로그인 API를 그대로 사용한다.
+
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
+```
+
+Apple 로그인 요청 body:
+
+```json
+{
+  "provider": "APPLE",
+  "accessToken": "{Apple identityToken}"
+}
+```
+
+주의:
+
+- `accessToken` 필드 이름은 기존 Google/Kakao 계약을 유지하기 위한 이름이다.
+- `provider=APPLE`일 때 `accessToken`에는 Apple access token이 아니라 Apple `identityToken`을 넣는다.
+- `authorizationCode`, `.p8`, `Key ID`, `Team ID`는 이번 MVP 앱 요청에 보내지 않는다.
+- nonce는 이번 MVP 백엔드에서 검증하지 않는다.
+
+### 8.2 Flutter에서 확보해야 하는 값
+
+Apple 로그인 성공 후 앱이 백엔드에 전달해야 하는 값은 하나다.
+
+```dart
+final identityToken = credential.identityToken;
+```
+
+`identityToken`이 `null`이거나 빈 문자열이면 백엔드 로그인 API를 호출하지 말고 앱에서 Apple 로그인 실패로 처리한다.
+
+로그 정책:
+
+- `identityToken` 전체를 로그에 남기지 않는다.
+- 디버깅이 필요하면 null 여부만 확인한다.
+- 토큰 앞자리 일부도 운영 로그에는 남기지 않는다.
+
+### 8.3 응답 처리
+
+응답 형식은 기존 Google/Kakao 로그인과 동일하다.
+
+앱은 기존 소셜 로그인 성공 처리와 같은 방식으로 아래 값을 저장/반영하면 된다.
+
+- `accessToken`
+- `refreshToken`
+- `tokenType`
+- `expiresIn`
+- `newUser`
+- `userId`
+- `email`
+- `name`
+- `isAdmin`
+- `accountStatus`
+- `suspensionUntil`
+- `sanctionReasonSummary`
+
+Apple 로그인 특성:
+
+- Apple이 이메일을 주지 않으면 `email`은 null일 수 있다.
+- Apple은 사용자 이름을 항상 주지 않는다.
+- 이번 백엔드는 Apple 이름을 별도 요청 필드로 받지 않으므로 신규 Apple 사용자의 기본 이름은 `Unknown`일 수 있다.
+- 기존 Apple 사용자가 재로그인할 때 Apple 이름이 없어도 기존 닉네임을 `Unknown`으로 덮어쓰지 않는다.
+
+### 8.4 에러 처리
+
+Apple 로그인에서 앱이 주로 처리해야 하는 서버 에러 code:
+
+- `APPLE_API_ERROR`: Apple `identityToken`이 없거나, 유효하지 않거나, 서버 설정의 `APPLE_CLIENT_ID`와 토큰 audience가 맞지 않는 경우
+- `UNSUPPORTED_PROVIDER`: `provider` 값 오타 또는 서버 미지원 provider
+- `VALIDATION_ERROR`: `provider` 또는 `accessToken` 누락
+
+권장 UX:
+
+- `APPLE_API_ERROR`는 "Apple 로그인 정보를 확인할 수 없습니다. 다시 시도해 주세요." 수준의 재시도 가능한 메시지로 처리한다.
+- `VALIDATION_ERROR`는 앱 요청 생성 문제이므로 배포 전 QA에서 잡아야 한다.
+- 동일한 Apple 계정 재로그인은 `newUser=false`로 내려오는지 확인한다.
+
+### 8.5 실기기 QA 체크리스트
+
+- [ ] iOS 실기기에서 Apple 로그인 버튼이 표시된다.
+- [ ] Apple 로그인 성공 후 `identityToken`이 null이 아니다.
+- [ ] `provider=APPLE`, `accessToken=identityToken`으로 백엔드 로그인이 성공한다.
+- [ ] 신규 Apple 계정 로그인 시 `newUser=true`가 내려온다.
+- [ ] 같은 Apple 계정 재로그인 시 `newUser=false`가 내려온다.
+- [ ] 이메일 공개 선택 시 응답 `email`이 내려오는지 확인한다.
+- [ ] 이메일 비공개 선택 시 Apple relay email 또는 null 가능성을 앱이 허용한다.
+- [ ] Apple 로그인 성공 후 Google/Kakao와 동일하게 토큰 저장, 자동 로그인, refresh, logout 흐름이 동작한다.
