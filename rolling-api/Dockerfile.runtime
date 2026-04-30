@@ -1,0 +1,12 @@
+FROM eclipse-temurin:17-jre-jammy
+
+WORKDIR /app
+
+ENV JAVA_OPTS="-Xmx384m -Xms256m"
+ENV SPRING_PROFILES_ACTIVE=prod
+
+COPY docker-build/app.jar /app/app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

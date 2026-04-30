@@ -17,17 +17,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Build Spring Jar
+        working-directory: ./rolling-api
+        run: |
+          ./gradlew --no-daemon clean bootJar -x test
+          mkdir -p docker-build
+          cp build/libs/*.jar docker-build/app.jar
+
       - name: Build and Push Spring Image
         uses: docker/build-push-action@v5
         with:
           context: ./rolling-api
-          file: ./rolling-api/Dockerfile
+          file: ./rolling-api/Dockerfile.runtime
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/rolling-backend:latest
