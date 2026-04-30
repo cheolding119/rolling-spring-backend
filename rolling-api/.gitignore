@@ -8,6 +8,8 @@ firebase-service-key.json
 *.p12
 *.jks
 *.keystore
+apple-auth-key.p8
+**/apple-auth-key.p8
 
 # Gradle
 .gradle/

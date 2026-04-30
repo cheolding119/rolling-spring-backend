@@ -13,6 +13,7 @@ import com.rolling.api.global.monitoring.ScheduledTaskSnapshot;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import com.rolling.api.infra.apple.AppleTokenVerifier;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.kakao.KakaoClient;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +47,9 @@ class AuthServiceWithdrawTest {
 
     @Mock
     private GoogleClient googleClient;
+
+    @Mock
+    private AppleTokenVerifier appleTokenVerifier;
 
     @Mock
     private UserRepository userRepository;

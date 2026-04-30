@@ -9,6 +9,8 @@ import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.monitoring.ScheduledTaskTracker;
 import com.rolling.api.global.security.AdminAccessConfig;
 import com.rolling.api.global.security.jwt.JwtTokenProvider;
+import com.rolling.api.infra.apple.AppleTokenVerifier;
+import com.rolling.api.infra.apple.dto.AppleUserResponse;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
@@ -40,6 +42,9 @@ class AuthServiceLoginValidationTest {
 
     @Mock
     private GoogleClient googleClient;
+
+    @Mock
+    private AppleTokenVerifier appleTokenVerifier;
 
     @Mock
     private UserRepository userRepository;
@@ -92,6 +97,41 @@ class AuthServiceLoginValidationTest {
                 .isInstanceOf(AuthException.class)
                 .extracting("code")
                 .isEqualTo("GOOGLE_API_ERROR");
+
+        verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("Apple socialId(sub)가 없으면 APPLE_API_ERROR를 반환한다")
+    void login_appleMissingSocialId() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "APPLE");
+        ReflectionTestUtils.setField(request, "accessToken", "apple-token");
+
+        when(appleTokenVerifier.verify("apple-token")).thenReturn(new AppleUserResponse(null, "apple@example.com"));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .extracting("code")
+                .isEqualTo("APPLE_API_ERROR");
+
+        verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("Apple identityToken 검증 실패는 APPLE_API_ERROR를 반환한다")
+    void login_appleInvalidToken() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "APPLE");
+        ReflectionTestUtils.setField(request, "accessToken", "invalid-apple-token");
+
+        when(appleTokenVerifier.verify("invalid-apple-token"))
+                .thenThrow(AuthException.appleApiError("유효하지 않은 Apple identityToken입니다"));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .extracting("code")
+                .isEqualTo("APPLE_API_ERROR");
 
         verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }

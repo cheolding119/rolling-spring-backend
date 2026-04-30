@@ -36,7 +36,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "소셜 로그인", description = "카카오/구글 소셜 로그인을 처리합니다. Flutter에서 받은 accessToken과 provider를 전달하면 JWT를 발급합니다.")
+    @Operation(summary = "소셜 로그인", description = "카카오/구글/애플 소셜 로그인을 처리합니다. Flutter에서 받은 provider와 토큰을 전달하면 JWT를 발급합니다. APPLE은 identityToken을 accessToken 필드로 전달합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청",

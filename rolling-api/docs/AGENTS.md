@@ -50,7 +50,7 @@
 - 작성자 전용 관리 범위는 `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
 - 현재 클라이언트는 작성자 권한을 상세 응답의 `hostId == 현재 사용자 id`로 판단한다.
 - 다만 작성자 관리 API는 아직 `api-spec.json`에 정식 반영되지 않았다. 프론트는 현재 연결 기준으로 선반영했고, 최종 완료 판단은 백엔드 계약/실서버 검증 후 닫는다.
-- 현재 로그인 API 요청 허용값은 `GOOGLE`, `KAKAO`다. `APPLE` 버튼을 노출하더라도 실제 호출 가능 여부는 출시 정책 확정 후 다시 맞춘다.
+- 현재 로그인 API 요청 허용값은 `GOOGLE`, `KAKAO`, `APPLE`이다. `APPLE`은 iOS 네이티브 로그인에서 받은 `identityToken`을 `accessToken` 필드로 전달한다.
 - 현재 FCM은 서버 저장 데이터 기반 알림함과 함께 동작한다. 다만 실제 릴리스 전에는 iOS 실기기 수신, 권한 거부 상태 UX, 리뷰어 안내 문구까지 별도 확인이 필요하다.
 - 현재 사용자 전역 푸시 설정은 `/users/me.settings.pushNotificationEnabled`와 `PATCH /api/v1/users/me/settings`로 관리한다.
 - 알림 권한을 거부해도 오픈매트/대회/공지 핵심 조회와 신청 흐름은 막히지 않게 설계한다.
@@ -70,8 +70,8 @@ Request body:
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
-| `provider` | `String` | O | 현재 구현 허용값 `GOOGLE`, `KAKAO` |
-| `accessToken` | `String` | O | 소셜 제공자 access token |
+| `provider` | `String` | O | 현재 구현 허용값 `GOOGLE`, `KAKAO`, `APPLE` |
+| `accessToken` | `String` | O | 소셜 제공자 access token. `APPLE`은 identity token |
 
 Response data:
 
@@ -95,11 +95,13 @@ Response data:
 - `UNSUPPORTED_PROVIDER`
 - `KAKAO_API_ERROR`
 - `GOOGLE_API_ERROR`
+- `APPLE_API_ERROR`
 - `VALIDATION_ERROR`
 
 현재 구현 메모:
 
-- Apple 로그인은 아직 서버 미구현이다.
+- Apple 로그인은 iOS 네이티브 `identityToken` 검증 방식으로 지원한다.
+- Apple 로그인 계약은 `C:\rolling\.codex-shared\api-spec.md`와 `C:\rolling\.codex-shared\domain-models.md`에도 반영되어 있다.
 - 로그인 응답에는 현재 사용자 기준 `isAdmin`이 포함된다.
 - 로그인 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
 
