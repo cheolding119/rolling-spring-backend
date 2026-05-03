@@ -12,6 +12,8 @@
 - 관리자 사용자 제재는 별도 운영 상태로 관리하며, `user_sanctions` 이력 테이블과 `users`의 상태 캐시를 분리해서 다룬다.
 - 강한 제재는 별도 상태 추가 없이 장기 `TEMP_SUSPEND`로 운영한다.
 - 로그인 사용자의 오픈매트/대회 목록·검색 요청은 `Authorization: Bearer {accessToken}`을 함께 보내야 차단 필터가 적용된다.
+- 비회원/App Review 둘러보기 모드의 공개 조회 요청은 `Authorization` 헤더 없이 호출한다. 대상은 `GET /api/v1/open-mats`, `GET /api/v1/open-mats/{id}`, `GET /api/v1/tournaments`, `GET /api/v1/tournaments/{id}`, `GET /api/v1/notices`, `GET /api/v1/notices/{id}`다.
+- 오픈매트 신청/작성/수정/삭제/신고, 대회 작성/수정/삭제/신고, 알림, 마이페이지, 문의는 계속 계정 기반 기능이며 비회원 UI에서는 로그인 필요 안내로 처리한다.
 - 알림의 source of truth는 FCM 성공 여부가 아니라 백엔드 `Notification` 저장 데이터다.
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
 - 문의 도메인 명칭은 `Inquiry`로 통일하며, 첫 답변 완료 시 `INQUIRY_ANSWERED` 알림을 저장한다.
@@ -508,6 +510,7 @@ Response: 페이징된 `OpenMatModel`
 
 - 로그인 사용자가 차단한 작성자의 오픈매트는 목록과 검색 결과에서 제외된다.
 - 비로그인 사용자는 기존 공개 목록과 동일하게 조회된다.
+- App Review 비회원 둘러보기에서는 저장된 토큰이 있더라도 이 공개 조회 요청에 `Authorization` 헤더를 붙이지 않는다.
 - 로그인한 앱 클라이언트는 목록·검색 요청에 `Authorization` 헤더를 포함해야 차단 필터가 적용된다.
 
 ### 5.4.2 오픈매트 상세 조회
@@ -521,6 +524,7 @@ Response: 페이징된 `OpenMatModel`
 
 - 현재 상세 응답 모델은 `OpenMatModel`이며 `hostNickname`을 포함한다.
 - 프론트 상세 화면은 별도 생성자 조회 API 없이 상세 응답의 `hostNickname`을 그대로 사용하면 된다.
+- 비회원 상세 조회는 `Authorization` 헤더 없이 호출해야 App Review 공개 조회 계약과 일치한다.
 - soft delete된 오픈매트는 비로그인 사용자에게는 `NOT_FOUND`다.
 - 삭제 알림을 받은 신청자, 호스트, 관리자에게는 `deleted=true`, `deletedAt`이 포함된 상세 응답을 반환한다.
 - 로그인 사용자가 차단한 작성자의 오픈매트는 상세 조회에서 `NOT_FOUND`로 처리한다.
@@ -759,6 +763,7 @@ Response data: `null`
 
 - 로그인 사용자가 차단한 작성자의 대회는 목록에서 제외된다.
 - 비로그인 사용자는 기존 공개 목록과 동일하게 조회된다.
+- App Review 비회원 둘러보기에서는 저장된 토큰이 있더라도 이 공개 조회 요청에 `Authorization` 헤더를 붙이지 않는다.
 - 로그인한 앱 클라이언트는 목록·검색 요청에 `Authorization` 헤더를 포함해야 차단 필터가 적용된다.
 
 Query parameters:
@@ -778,6 +783,7 @@ Query parameters:
 - 작성자 포함 모든 사용자가 동일한 응답을 받는다.
 - 상세 응답에도 `posterKey`는 없고, `posterUrl`만 사용한다.
 - 상세의 `posterUrl` 역시 브라우저에서 직접 열 수 있는 공개 URL이어야 한다.
+- 비회원 상세 조회는 `Authorization` 헤더 없이 호출해야 App Review 공개 조회 계약과 일치한다.
 - 로그인 사용자가 차단한 작성자의 대회는 상세 조회에서 `NOT_FOUND`로 처리한다.
 
 ### 5.5.3 대회 등록

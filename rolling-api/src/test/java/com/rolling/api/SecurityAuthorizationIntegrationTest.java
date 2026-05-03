@@ -2,6 +2,7 @@ package com.rolling.api.global.security;
 
 import com.rolling.api.domain.notice.controller.NoticeAdminController;
 import com.rolling.api.domain.notice.controller.NoticeController;
+import com.rolling.api.domain.notice.dto.NoticeListItemResponse;
 import com.rolling.api.domain.notice.dto.NoticeResponse;
 import com.rolling.api.domain.notice.service.NoticeService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
@@ -9,9 +10,13 @@ import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatService;
+import com.rolling.api.domain.tournament.controller.TournamentController;
 import com.rolling.api.domain.tournament.controller.TournamentCrawlerController;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
+import com.rolling.api.domain.tournament.dto.TournamentResponse;
+import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.service.TournamentManagerService;
+import com.rolling.api.domain.tournament.service.TournamentService;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
 import com.rolling.api.global.exception.GlobalExceptionHandler;
@@ -25,6 +30,10 @@ import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.hamcrest.Matchers.isEmptyOrNullString;
 import static org.hamcrest.Matchers.not;
@@ -60,6 +71,7 @@ class SecurityAuthorizationIntegrationTest {
     private MockMvc mockMvc;
     private OpenMatService openMatService;
     private NoticeService noticeService;
+    private TournamentService tournamentService;
     private TournamentManagerService tournamentManagerService;
     private UserRepository userRepository;
     private JwtTokenProvider jwtTokenProvider;
@@ -79,6 +91,7 @@ class SecurityAuthorizationIntegrationTest {
 
         openMatService = context.getBean(OpenMatService.class);
         noticeService = context.getBean(NoticeService.class);
+        tournamentService = context.getBean(TournamentService.class);
         tournamentManagerService = context.getBean(TournamentManagerService.class);
         userRepository = context.getBean(UserRepository.class);
         jwtTokenProvider = context.getBean(JwtTokenProvider.class);
@@ -98,36 +111,38 @@ class SecurityAuthorizationIntegrationTest {
     }
 
     @Test
-    @DisplayName("공개 엔드포인트는 accessToken 없이 접근할 수 있다")
+    @DisplayName("공개 조회 엔드포인트는 accessToken 없이 접근할 수 있다")
     void publicEndpoints_areAccessibleWithoutToken() throws Exception {
-        stubNoticeResponse();
-        given(openMatService.findById(eq(1L), isNull(), eq(false))).willReturn(
-                OpenMatResponse.builder()
-                        .id(1L)
-                        .title("주말 오픈매트")
-                        .description("오픈")
-                        .startDateTime(LocalDateTime.of(2026, 3, 22, 14, 0))
-                        .endDateTime(LocalDateTime.of(2026, 3, 22, 16, 0))
-                        .locationName("Rolling Gym")
-                        .address("Seoul")
-                        .region(Region.SEOUL)
-                        .maxCapacity(10)
-                        .currentParticipants(2)
-                        .status(OpenMatStatus.RECRUITING)
-                        .reported(false)
-                        .hostId(1L)
-                        .hostNickname("host")
-                        .deleted(false)
-                        .createdAt(LocalDateTime.of(2026, 3, 20, 9, 0))
-                        .build()
-        );
+        stubOpenMatResponses();
+        stubTournamentResponses();
+        stubNoticeResponses();
 
-        mockMvc.perform(get("/api/v1/notices/1"))
+        mockMvc.perform(get("/api/v1/open-mats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(1));
+
+        mockMvc.perform(get("/api/v1/open-mats/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1));
 
-        mockMvc.perform(get("/api/v1/open-mats/1"))
+        mockMvc.perform(get("/api/v1/tournaments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(1));
+
+        mockMvc.perform(get("/api/v1/tournaments/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(1));
+
+        mockMvc.perform(get("/api/v1/notices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(1));
+
+        mockMvc.perform(get("/api/v1/notices/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1));
@@ -179,7 +194,7 @@ class SecurityAuthorizationIntegrationTest {
     @Test
     @DisplayName("requestId 헤더가 없으면 서버가 새 값을 발급한다")
     void requestId_isGeneratedWhenMissing() throws Exception {
-        stubNoticeResponse();
+        stubNoticeResponses();
 
         mockMvc.perform(get("/api/v1/notices/1"))
                 .andExpect(status().isOk())
@@ -190,7 +205,7 @@ class SecurityAuthorizationIntegrationTest {
     @Test
     @DisplayName("외부 requestId 헤더가 있으면 같은 값을 응답 헤더로 유지한다")
     void requestId_reusesIncomingHeader() throws Exception {
-        stubNoticeResponse();
+        stubNoticeResponses();
 
         mockMvc.perform(get("/api/v1/notices/1")
                         .header(RequestTrackingFilter.REQUEST_ID_HEADER, "client-trace-001"))
@@ -203,6 +218,37 @@ class SecurityAuthorizationIntegrationTest {
     @DisplayName("내 오픈매트 목록은 공개 상세 경로보다 우선해 인증을 요구한다")
     void myOpenMats_requiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/open-mats/my"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("계정 기반 액션은 accessToken 없이 접근할 수 없다")
+    void accountBasedActions_requireAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/open-mats/11/apply"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/open-mats/11/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/tournaments/11/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
@@ -275,7 +321,61 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.data.id").value(9));
     }
 
-    private void stubNoticeResponse() {
+    private void stubOpenMatResponses() {
+        OpenMatResponse response = OpenMatResponse.builder()
+                .id(1L)
+                .title("주말 오픈매트")
+                .description("오픈")
+                .startDateTime(LocalDateTime.of(2026, 3, 22, 14, 0))
+                .endDateTime(LocalDateTime.of(2026, 3, 22, 16, 0))
+                .locationName("Rolling Gym")
+                .address("Seoul")
+                .region(Region.SEOUL)
+                .maxCapacity(10)
+                .currentParticipants(2)
+                .status(OpenMatStatus.RECRUITING)
+                .reported(false)
+                .hostId(1L)
+                .hostNickname("host")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 3, 20, 9, 0))
+                .build();
+
+        given(openMatService.findAll(isNull(), isNull(), isNull(), any(Pageable.class), isNull()))
+                .willReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 20), 1));
+        given(openMatService.findById(eq(1L), isNull(), eq(false))).willReturn(response);
+    }
+
+    private void stubTournamentResponses() {
+        TournamentResponse response = TournamentResponse.builder()
+                .id(1L)
+                .source(TournamentSource.MANUAL)
+                .title("국내 대회")
+                .organizer("Rolling")
+                .posterUrl("https://cdn.example.com/tournaments/1.jpg")
+                .competitionDate(LocalDate.of(2026, 4, 5))
+                .registrationDeadline(LocalDate.of(2026, 3, 31))
+                .location("Seoul")
+                .applyLink("https://example.com/apply")
+                .registrationClosed(false)
+                .createdAt(LocalDateTime.of(2026, 3, 20, 9, 0))
+                .build();
+
+        given(tournamentService.findAll(any(Pageable.class), isNull(), isNull()))
+                .willReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 20), 1));
+        given(tournamentService.findById(eq(1L), isNull())).willReturn(response);
+    }
+
+    private void stubNoticeResponses() {
+        given(noticeService.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(
+                NoticeListItemResponse.builder()
+                        .id(1L)
+                        .title("공지")
+                        .content("본문")
+                        .authorName("Rolling Admin")
+                        .createdAt(LocalDateTime.of(2026, 3, 20, 10, 0))
+                        .build()
+        ), PageRequest.of(0, 20), 1));
         given(noticeService.findById(1L)).willReturn(NoticeResponse.builder()
                 .id(1L)
                 .title("공지")
@@ -292,12 +392,14 @@ class SecurityAuthorizationIntegrationTest {
 
     @Configuration
     @EnableWebMvc
+    @EnableSpringDataWebSupport
     @Import({
             SecurityConfig.class,
             GlobalExceptionHandler.class,
             JwtTokenProvider.class,
             AdminAccessConfig.class,
             OpenMatController.class,
+            TournamentController.class,
             NoticeController.class,
             NoticeAdminController.class,
             TournamentCrawlerController.class,
@@ -313,6 +415,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         NoticeService noticeService() {
             return mock(NoticeService.class);
+        }
+
+        @Bean
+        TournamentService tournamentService() {
+            return mock(TournamentService.class);
         }
 
         @Bean
