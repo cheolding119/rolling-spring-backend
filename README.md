@@ -1,5 +1,5 @@
 ## 안드로이드 : https://play.google.com/store/apps/details?id=com.rolling.jiujits
-## IOS 출시 준비중 
+## IOS 출시 준비중  (심사중)
 ---
 
 ## 서비스 소개 
