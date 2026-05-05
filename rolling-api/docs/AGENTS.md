@@ -13,6 +13,7 @@
 - 강한 제재는 별도 상태 추가 없이 장기 `TEMP_SUSPEND`로 운영한다.
 - 로그인 사용자의 오픈매트/대회 목록·검색 요청은 `Authorization: Bearer {accessToken}`을 함께 보내야 차단 필터가 적용된다.
 - 비회원/App Review 둘러보기 모드의 공개 조회 요청은 `Authorization` 헤더 없이 호출한다. 대상은 `GET /api/v1/open-mats`, `GET /api/v1/open-mats/{id}`, `GET /api/v1/tournaments`, `GET /api/v1/tournaments/{id}`, `GET /api/v1/notices`, `GET /api/v1/notices/{id}`다.
+- 사용자 공유 링크는 API URL이 아니라 `https://rolling-app.com/open-mats/{id}`, `https://rolling-app.com/tournaments/{id}`를 사용한다. Flutter 앱은 딥링크 진입 후 공개 상세 API를 다시 조회한다.
 - 오픈매트 신청/작성/수정/삭제/신고, 대회 작성/수정/삭제/신고, 알림, 마이페이지, 문의는 계속 계정 기반 기능이며 비회원 UI에서는 로그인 필요 안내로 처리한다.
 - 알림의 source of truth는 FCM 성공 여부가 아니라 백엔드 `Notification` 저장 데이터다.
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
