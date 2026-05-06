@@ -5,6 +5,8 @@ import com.rolling.api.domain.notice.controller.NoticeController;
 import com.rolling.api.domain.notice.dto.NoticeListItemResponse;
 import com.rolling.api.domain.notice.dto.NoticeResponse;
 import com.rolling.api.domain.notice.service.NoticeService;
+import com.rolling.api.domain.map.controller.MapController;
+import com.rolling.api.domain.map.service.KakaoGeocodeService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
@@ -73,6 +75,7 @@ class SecurityAuthorizationIntegrationTest {
     private NoticeService noticeService;
     private TournamentService tournamentService;
     private TournamentManagerService tournamentManagerService;
+    private KakaoGeocodeService kakaoGeocodeService;
     private UserRepository userRepository;
     private JwtTokenProvider jwtTokenProvider;
 
@@ -93,6 +96,7 @@ class SecurityAuthorizationIntegrationTest {
         noticeService = context.getBean(NoticeService.class);
         tournamentService = context.getBean(TournamentService.class);
         tournamentManagerService = context.getBean(TournamentManagerService.class);
+        kakaoGeocodeService = context.getBean(KakaoGeocodeService.class);
         userRepository = context.getBean(UserRepository.class);
         jwtTokenProvider = context.getBean(JwtTokenProvider.class);
 
@@ -263,6 +267,12 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/maps/kakao/geocode")
+                        .param("address", "경남 창녕군 창녕읍 종로 2"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -273,6 +283,16 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("카카오 주소 좌표 변환은 인증 후 address 파라미터를 요구한다")
+    void geocode_withUserTokenAndMissingAddress_returnsValidationError() throws Exception {
+        mockMvc.perform(get("/api/v1/maps/kakao/geocode")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -413,6 +433,7 @@ class SecurityAuthorizationIntegrationTest {
             TournamentController.class,
             NoticeController.class,
             NoticeAdminController.class,
+            MapController.class,
             TournamentCrawlerController.class,
             TestActuatorController.class
     })
@@ -436,6 +457,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         TournamentManagerService tournamentManagerService() {
             return mock(TournamentManagerService.class);
+        }
+
+        @Bean
+        KakaoGeocodeService kakaoGeocodeService() {
+            return mock(KakaoGeocodeService.class);
         }
 
         @Bean

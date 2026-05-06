@@ -49,7 +49,8 @@
 - 현재 `/users/me` 수정 API는 `phone` 수정 미지원이다.
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
-- 현재 오픈매트 생성/수정 요청에는 `latitude`, `longitude`가 선택 필드로 포함된다. 좌표는 nullable이며 서버는 주소 기반 geocoding을 직접 수행하지 않는다.
+- 현재 오픈매트 생성/수정 요청에는 `latitude`, `longitude`가 선택 필드로 포함된다. 좌표는 nullable이며, 주소 기반 geocoding은 저장 API가 아니라 별도 지도 API에서 수행한다.
+- 현재 우편번호 WebView에서 선택한 주소의 좌표 변환은 인증 API `GET /api/v1/maps/kakao/geocode?address={address}`로 수행한다.
 - 오픈매트 작성자 관리 UI는 현재 상세 화면 안에서 바로 노출한다.
 - 작성자 전용 관리 범위는 `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
 - 현재 클라이언트는 작성자 권한을 상세 응답의 `hostId == 현재 사용자 id`로 판단한다.
@@ -561,7 +562,9 @@ Response: `OpenMatModel`
 - `maxCapacity`는 `-1` 또는 `1 이상`이어야 한다.
 - `latitude`는 값이 있으면 `-90..90` 범위여야 한다.
 - `longitude`는 값이 있으면 `-180..180` 범위여야 한다.
-- 서버는 좌표를 직접 변환하지 않고 클라이언트가 선택한 장소 검색 결과의 좌표만 저장한다.
+- `latitude`, `longitude`는 둘 다 없으면 좌표 없이 생성한다.
+- `latitude`, `longitude` 중 하나만 있으면 `VALIDATION_ERROR`다.
+- 좌표 변환은 `GET /api/v1/maps/kakao/geocode`가 카카오 Local API를 호출해 처리한다.
 
 ### 5.4.4 오픈매트 수정
 
@@ -591,7 +594,10 @@ Response: `OpenMatModel`
 
 - 작성자만 수정 가능
 - `latitude`, `longitude`는 값이 있으면 각각 `-90..90`, `-180..180` 범위여야 한다.
-- 수정 요청에서 좌표 필드가 `null`이면 기존 좌표를 유지한다.
+- 수정 요청에서 `latitude`, `longitude`가 둘 다 숫자면 기존 좌표를 새 좌표로 교체한다.
+- 수정 요청에서 `latitude`, `longitude`가 둘 다 `null`로 명시되면 기존 좌표를 제거한다.
+- 수정 요청에 좌표 필드가 없으면 기존 좌표를 유지한다.
+- 수정 요청에서 `latitude`, `longitude` 중 하나만 있으면 `VALIDATION_ERROR`다.
 - 참가자가 있고 일정/장소 필드가 바뀌면 수정 알림 저장 후 FCM 발송 시도
 - 수정은 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
 
@@ -758,6 +764,30 @@ Response data: `null`
 - `SELF_REPORT_NOT_ALLOWED`
 - `VALIDATION_ERROR`
 - `NOT_FOUND`
+
+### 5.4.14 카카오 주소 좌표 변환
+
+`GET /api/v1/maps/kakao/geocode?address={address}`
+
+- 인증: 필요
+- 용도: Flutter 카카오/다음 우편번호 WebView에서 선택한 주소를 위도/경도로 변환
+- 백엔드 설정: `KAKAO_REST_API_KEY` 필요
+
+Response data:
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `address` | `String` | 좌표 변환 기준 주소 |
+| `latitude` | `Decimal` | 위도. 카카오 Local API `y` |
+| `longitude` | `Decimal` | 경도. 카카오 Local API `x` |
+
+에러:
+
+- `VALIDATION_ERROR`: `address`가 비어 있거나 너무 짧은 경우
+- `GEOCODE_NOT_FOUND`: 카카오 Local API 결과가 없는 경우
+- `KAKAO_GEOCODE_FAILED`: 카카오 API 호출 실패 또는 응답 형식 오류
+- `KAKAO_GEOCODE_TIMEOUT`: 카카오 API timeout
+- `KAKAO_GEOCODE_RATE_LIMITED`: 카카오 API quota/rate limit
 
 ## 5.5 대회 API
 
