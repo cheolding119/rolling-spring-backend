@@ -328,7 +328,7 @@ MVP 지도 provider는 카카오맵으로 확정한다.
 - [ ] 백엔드 운영 환경변수에 `KAKAO_REST_API_KEY`를 등록한다.
 - [ ] 백엔드 개발/스테이징 환경변수에도 `KAKAO_REST_API_KEY`를 등록한다.
 - [ ] 랜딩 도메인에 카카오맵 WebView 페이지를 배포할 경로를 확정한다.
-  예: `https://rolling-app.com/maps/kakao/openmat`
+- [x] 카카오맵 WebView 페이지 경로를 `https://rolling-app.com/maps/kakao/openmat.html`로 확정한다.
 - [ ] 카카오맵 WebView 페이지에서 JavaScript Key를 사용해 좌표 기준 마커를 표시할 수 있게 준비한다.
 - [x] Flutter 내 WebView에서 JavaScriptChannel로 주소를 반환하는 방식으로 확정한다.
 
