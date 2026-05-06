@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,6 +44,12 @@ public class OpenMat extends BaseTimeEntity {
     private String locationName;
 
     private String address;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal longitude;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -81,6 +88,8 @@ public class OpenMat extends BaseTimeEntity {
                    LocalDateTime endDateTime,
                    String locationName,
                    String address,
+                   BigDecimal latitude,
+                   BigDecimal longitude,
                    Region region,
                    Integer maxCapacity,
                    String hostInstagramId,
@@ -93,6 +102,8 @@ public class OpenMat extends BaseTimeEntity {
         this.endDateTime = endDateTime;
         this.locationName = locationName;
         this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.region = region;
         if (maxCapacity != null) {
             this.maxCapacity = maxCapacity;
@@ -114,6 +125,8 @@ public class OpenMat extends BaseTimeEntity {
                        LocalDateTime endDateTime,
                        String locationName,
                        String address,
+                       BigDecimal latitude,
+                       BigDecimal longitude,
                        Region region,
                        Integer maxCapacity,
                        String hostInstagramId) {
@@ -123,6 +136,8 @@ public class OpenMat extends BaseTimeEntity {
         if (endDateTime != null) this.endDateTime = endDateTime;
         if (locationName != null) this.locationName = locationName;
         if (address != null) this.address = address;
+        if (latitude != null) this.latitude = latitude;
+        if (longitude != null) this.longitude = longitude;
         if (region != null) this.region = region;
         if (maxCapacity != null) this.maxCapacity = maxCapacity;
         if (hostInstagramId != null) this.hostInstagramId = hostInstagramId;

@@ -2,8 +2,11 @@ package com.rolling.api.domain.openmat.dto;
 
 import com.rolling.api.domain.openmat.entity.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -27,6 +30,16 @@ public class OpenMatUpdateRequest {
 
     @Schema(description = "주소", example = "서울시 강남구 역삼동 123-45")
     private String address;
+
+    @DecimalMin(value = "-90.0", message = "위도는 -90 이상이어야 합니다")
+    @DecimalMax(value = "90.0", message = "위도는 90 이하여야 합니다")
+    @Schema(description = "위도. null이면 기존 좌표를 유지", example = "37.5012345", nullable = true)
+    private BigDecimal latitude;
+
+    @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다")
+    @DecimalMax(value = "180.0", message = "경도는 180 이하여야 합니다")
+    @Schema(description = "경도. null이면 기존 좌표를 유지", example = "127.0398765", nullable = true)
+    private BigDecimal longitude;
 
     @Schema(description = "지역", example = "SEOUL")
     private Region region;

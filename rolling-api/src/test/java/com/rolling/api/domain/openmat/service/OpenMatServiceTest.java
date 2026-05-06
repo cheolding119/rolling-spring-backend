@@ -1,5 +1,6 @@
 package com.rolling.api.domain.openmat.service;
 
+import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatHostStatusUpdateRequest;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -85,6 +87,96 @@ class OpenMatServiceTest {
                 fixedClock,
                 applicationEventPublisher);
         ReflectionTestUtils.setField(openMatService, "meterRegistry", meterRegistry);
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 선택한 장소 좌표를 저장하고 응답에 포함한다")
+    void create_withCoordinates_savesAndReturnsCoordinates() {
+        User host = createUser(1L, "host-create-coordinate", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "latitude", new BigDecimal("37.5012345"));
+        ReflectionTestUtils.setField(request, "longitude", new BigDecimal("127.0398765"));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+        when(openMatRepository.save(any(OpenMat.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OpenMatResponse response = openMatService.create(1L, request);
+
+        ArgumentCaptor<OpenMat> openMatCaptor = ArgumentCaptor.forClass(OpenMat.class);
+        verify(openMatRepository).save(openMatCaptor.capture());
+        assertThat(openMatCaptor.getValue().getLatitude()).isEqualByComparingTo("37.5012345");
+        assertThat(openMatCaptor.getValue().getLongitude()).isEqualByComparingTo("127.0398765");
+        assertThat(response.getLatitude()).isEqualByComparingTo("37.5012345");
+        assertThat(response.getLongitude()).isEqualByComparingTo("127.0398765");
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 장소 좌표를 갱신하고 응답에 포함한다")
+    void update_withCoordinates_updatesAndReturnsCoordinates() {
+        User host = createUser(1L, "host-update-coordinate", "host");
+        OpenMat openMat = createOpenMat(
+                42L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "locationName", "Rolling BJJ Gangnam");
+        ReflectionTestUtils.setField(request, "address", "서울시 강남구 테헤란로 1");
+        ReflectionTestUtils.setField(request, "latitude", new BigDecimal("37.5000000"));
+        ReflectionTestUtils.setField(request, "longitude", new BigDecimal("127.0300000"));
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(42L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 42L, request);
+
+        assertThat(openMat.getLatitude()).isEqualByComparingTo("37.5000000");
+        assertThat(openMat.getLongitude()).isEqualByComparingTo("127.0300000");
+        assertThat(response.getLatitude()).isEqualByComparingTo("37.5000000");
+        assertThat(response.getLongitude()).isEqualByComparingTo("127.0300000");
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 위도 범위가 잘못되면 거부한다")
+    void create_whenLatitudeOutOfRange_throwsValidationError() {
+        User host = createUser(1L, "host-invalid-latitude", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "latitude", new BigDecimal("90.0000001"));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+
+        assertThatThrownBy(() -> openMatService.create(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("위도는 -90부터 90 사이여야 합니다");
+                });
+        verify(openMatRepository, never()).save(any(OpenMat.class));
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 경도 범위가 잘못되면 거부한다")
+    void update_whenLongitudeOutOfRange_throwsValidationError() {
+        User host = createUser(1L, "host-invalid-longitude", "host");
+        OpenMat openMat = createOpenMat(
+                43L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "longitude", new BigDecimal("-180.0000001"));
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(43L)).thenReturn(java.util.Optional.of(openMat));
+
+        assertThatThrownBy(() -> openMatService.update(1L, 43L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("경도는 -180부터 180 사이여야 합니다");
+                });
     }
 
     @Test
@@ -770,6 +862,37 @@ class OpenMatServiceTest {
     }
 
     @Test
+    @DisplayName("참가자가 있는 오픈매트의 좌표가 바뀌면 수정 알림 이벤트를 발행한다")
+    void update_whenCoordinatesChanged_publishesUpdatedEvent() {
+        User host = createUser(1L, "host-update-coordinate-notify", "host");
+        OpenMat openMat = createOpenMat(
+                44L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING,
+                2L,
+                3L
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "latitude", new BigDecimal("37.5012345"));
+        ReflectionTestUtils.setField(request, "longitude", new BigDecimal("127.0398765"));
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(44L)).thenReturn(java.util.Optional.of(openMat));
+
+        openMatService.update(1L, 44L, request);
+
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue()).isInstanceOf(OpenMatUpdatedEvent.class);
+
+        OpenMatUpdatedEvent event = (OpenMatUpdatedEvent) eventCaptor.getValue();
+        assertThat(event.openMatId()).isEqualTo(44L);
+        assertThat(event.participantUserIds()).containsExactly(2L, 3L);
+    }
+
+    @Test
     @DisplayName("참가자가 있어도 제목만 바뀌면 수정 알림 이벤트를 발행하지 않는다")
     void update_whenOnlyTitleChanged_doesNotPublishUpdatedEvent() {
         User host = createUser(1L, "host-update-title", "host");
@@ -854,6 +977,20 @@ class OpenMatServiceTest {
                 .build();
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private OpenMatCreateRequest createOpenMatCreateRequest() {
+        OpenMatCreateRequest request = new OpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "title", "test open mat");
+        ReflectionTestUtils.setField(request, "description", "description");
+        ReflectionTestUtils.setField(request, "startDateTime", LocalDateTime.of(2026, 3, 12, 19, 0));
+        ReflectionTestUtils.setField(request, "endDateTime", LocalDateTime.of(2026, 3, 12, 21, 0));
+        ReflectionTestUtils.setField(request, "locationName", "rolling gym");
+        ReflectionTestUtils.setField(request, "address", "seoul");
+        ReflectionTestUtils.setField(request, "region", Region.SEOUL);
+        ReflectionTestUtils.setField(request, "maxCapacity", 10);
+        ReflectionTestUtils.setField(request, "hostInstagramId", "rolling_bjj");
+        return request;
     }
 
     private OpenMat createOpenMat(

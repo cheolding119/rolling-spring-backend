@@ -32,6 +32,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -66,6 +67,7 @@ public class OpenMatService {
 
         validateDateRange(request.getStartDateTime(), request.getEndDateTime());
         validateCapacity(request.getMaxCapacity());
+        validateCoordinates(request.getLatitude(), request.getLongitude());
 
         OpenMat openMat = OpenMat.builder()
                 .host(host)
@@ -75,6 +77,8 @@ public class OpenMatService {
                 .endDateTime(request.getEndDateTime())
                 .locationName(request.getLocationName())
                 .address(request.getAddress())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
                 .region(request.getRegion())
                 .maxCapacity(request.getMaxCapacity())
                 .hostInstagramId(request.getHostInstagramId())
@@ -152,10 +156,13 @@ public class OpenMatService {
         boolean endDateTimeChanged = isChanged(openMat.getEndDateTime(), request.getEndDateTime());
         boolean locationNameChanged = isChanged(openMat.getLocationName(), request.getLocationName());
         boolean addressChanged = isChanged(openMat.getAddress(), request.getAddress());
+        boolean latitudeChanged = isChanged(openMat.getLatitude(), request.getLatitude());
+        boolean longitudeChanged = isChanged(openMat.getLongitude(), request.getLongitude());
         boolean regionChanged = isChanged(openMat.getRegion(), request.getRegion());
         boolean hasParticipants = openMat.hasParticipants();
         boolean shouldNotifyParticipants = hasParticipants
-                && (startDateTimeChanged || endDateTimeChanged || locationNameChanged || addressChanged || regionChanged);
+                && (startDateTimeChanged || endDateTimeChanged || locationNameChanged || addressChanged
+                || latitudeChanged || longitudeChanged || regionChanged);
         List<Long> participantUserIds = List.copyOf(openMat.getParticipantUids());
 
         LocalDateTime effectiveStart = request.getStartDateTime() != null ? request.getStartDateTime() : openMat.getStartDateTime();
@@ -163,6 +170,7 @@ public class OpenMatService {
         validateDateRange(effectiveStart, effectiveEnd);
 
         validateCapacity(request.getMaxCapacity());
+        validateCoordinates(request.getLatitude(), request.getLongitude());
 
         if (request.getMaxCapacity() != null && request.getMaxCapacity() != -1
                 && request.getMaxCapacity() < openMat.getParticipantUids().size()) {
@@ -177,6 +185,8 @@ public class OpenMatService {
                 request.getEndDateTime(),
                 request.getLocationName(),
                 request.getAddress(),
+                request.getLatitude(),
+                request.getLongitude(),
                 request.getRegion(),
                 request.getMaxCapacity(),
                 request.getHostInstagramId()
@@ -184,7 +194,7 @@ public class OpenMatService {
         openMat.synchronizeStatus(now());
 
         log.info(
-                "OpenMat update notification check. openMatId={}, participantUserIds={}, hasParticipants={}, startDateTimeChanged={}, endDateTimeChanged={}, locationNameChanged={}, addressChanged={}, regionChanged={}, shouldNotifyParticipants={}",
+                "OpenMat update notification check. openMatId={}, participantUserIds={}, hasParticipants={}, startDateTimeChanged={}, endDateTimeChanged={}, locationNameChanged={}, addressChanged={}, latitudeChanged={}, longitudeChanged={}, regionChanged={}, shouldNotifyParticipants={}",
                 openMat.getId(),
                 participantUserIds,
                 hasParticipants,
@@ -192,6 +202,8 @@ public class OpenMatService {
                 endDateTimeChanged,
                 locationNameChanged,
                 addressChanged,
+                latitudeChanged,
+                longitudeChanged,
                 regionChanged,
                 shouldNotifyParticipants
         );
@@ -468,11 +480,24 @@ public class OpenMatService {
         }
     }
 
+    private void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
+        if (latitude != null && (latitude.compareTo(BigDecimal.valueOf(-90)) < 0
+                || latitude.compareTo(BigDecimal.valueOf(90)) > 0)) {
+            throw BusinessException.badRequest("위도는 -90부터 90 사이여야 합니다");
+        }
+        if (longitude != null && (longitude.compareTo(BigDecimal.valueOf(-180)) < 0
+                || longitude.compareTo(BigDecimal.valueOf(180)) > 0)) {
+            throw BusinessException.badRequest("경도는 -180부터 180 사이여야 합니다");
+        }
+    }
+
     private boolean hasScheduleOrLocationChanged(OpenMat openMat, OpenMatUpdateRequest request) {
         return isChanged(openMat.getStartDateTime(), request.getStartDateTime())
                 || isChanged(openMat.getEndDateTime(), request.getEndDateTime())
                 || isChanged(openMat.getLocationName(), request.getLocationName())
                 || isChanged(openMat.getAddress(), request.getAddress())
+                || isChanged(openMat.getLatitude(), request.getLatitude())
+                || isChanged(openMat.getLongitude(), request.getLongitude())
                 || isChanged(openMat.getRegion(), request.getRegion());
     }
 
