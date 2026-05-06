@@ -144,6 +144,7 @@ class OpenMatServiceTest {
         User host = createUser(1L, "host-invalid-latitude", "host");
         OpenMatCreateRequest request = createOpenMatCreateRequest();
         ReflectionTestUtils.setField(request, "latitude", new BigDecimal("90.0000001"));
+        ReflectionTestUtils.setField(request, "longitude", new BigDecimal("127.0398765"));
 
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
 
@@ -151,6 +152,23 @@ class OpenMatServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
                     assertThat(exception).hasMessage("위도는 -90부터 90 사이여야 합니다");
+                });
+        verify(openMatRepository, never()).save(any(OpenMat.class));
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 위도와 경도 중 하나만 있으면 거부한다")
+    void create_whenOnlyOneCoordinateExists_throwsValidationError() {
+        User host = createUser(1L, "host-partial-coordinate", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        request.setLatitude(new BigDecimal("37.5012345"));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+
+        assertThatThrownBy(() -> openMatService.create(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("위도와 경도는 함께 전달해야 합니다");
                 });
         verify(openMatRepository, never()).save(any(OpenMat.class));
     }
@@ -168,6 +186,7 @@ class OpenMatServiceTest {
                 OpenMatStatus.RECRUITING
         );
         OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "latitude", new BigDecimal("37.5012345"));
         ReflectionTestUtils.setField(request, "longitude", new BigDecimal("-180.0000001"));
 
         when(openMatRepository.findByIdAndIsHiddenFalse(43L)).thenReturn(java.util.Optional.of(openMat));
@@ -177,6 +196,55 @@ class OpenMatServiceTest {
                     assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
                     assertThat(exception).hasMessage("경도는 -180부터 180 사이여야 합니다");
                 });
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 좌표 필드가 없으면 기존 좌표를 유지한다")
+    void update_whenCoordinateFieldsMissing_keepsExistingCoordinates() {
+        User host = createUser(1L, "host-coordinate-keep", "host");
+        OpenMat openMat = createOpenMat(
+                45L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        openMat.updateCoordinates(new BigDecimal("37.5012345"), new BigDecimal("127.0398765"));
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "title", "changed title");
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(45L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 45L, request);
+
+        assertThat(response.getLatitude()).isEqualByComparingTo("37.5012345");
+        assertThat(response.getLongitude()).isEqualByComparingTo("127.0398765");
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 좌표를 둘 다 null로 명시하면 기존 좌표를 제거한다")
+    void update_whenCoordinatesExplicitNull_clearsExistingCoordinates() {
+        User host = createUser(1L, "host-coordinate-clear", "host");
+        OpenMat openMat = createOpenMat(
+                46L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        openMat.updateCoordinates(new BigDecimal("37.5012345"), new BigDecimal("127.0398765"));
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        request.setLatitude(null);
+        request.setLongitude(null);
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(46L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 46L, request);
+
+        assertThat(response.getLatitude()).isNull();
+        assertThat(response.getLongitude()).isNull();
     }
 
     @Test

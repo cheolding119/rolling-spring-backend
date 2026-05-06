@@ -85,6 +85,7 @@ jobs:
             AWS_S3_PUBLIC_BASE_URL=${{ secrets.AWS_S3_PUBLIC_BASE_URL }}
             ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
             TOURNAMENT_CRAWLER_ADMIN_KEY=${{ secrets.TOURNAMENT_CRAWLER_ADMIN_KEY }}
+            KAKAO_REST_API_KEY=${{ secrets.KAKAO_REST_API_KEY }}
             FIREBASE_ENABLED=${{ secrets.FIREBASE_ENABLED }}
             FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
             FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}

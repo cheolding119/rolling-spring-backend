@@ -9,6 +9,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
@@ -60,6 +61,19 @@ public class GlobalExceptionHandler {
 
         applyErrorContext(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
         log.error("ValidationException: {}", message);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("VALIDATION_ERROR", message));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e
+    ) {
+        String message = e.getParameterName() + " 파라미터는 필수입니다";
+
+        applyErrorContext(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+        log.error("MissingServletRequestParameterException: {}", message);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("VALIDATION_ERROR", message));

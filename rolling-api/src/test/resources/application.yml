@@ -19,6 +19,13 @@ apple:
   auth:
     client-id: com.rolling.jiujits.test
 
+kakao:
+  map:
+    rest-api-key: test-kakao-rest-api-key
+    local-api-base-url: http://localhost
+    connect-timeout-ms: 1000
+    read-timeout-ms: 1000
+
 firebase:
   enabled: false
 

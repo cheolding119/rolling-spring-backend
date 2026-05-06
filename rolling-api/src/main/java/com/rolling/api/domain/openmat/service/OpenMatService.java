@@ -67,7 +67,7 @@ public class OpenMatService {
 
         validateDateRange(request.getStartDateTime(), request.getEndDateTime());
         validateCapacity(request.getMaxCapacity());
-        validateCoordinates(request.getLatitude(), request.getLongitude());
+        validateCreateCoordinates(request);
 
         OpenMat openMat = OpenMat.builder()
                 .host(host)
@@ -156,13 +156,12 @@ public class OpenMatService {
         boolean endDateTimeChanged = isChanged(openMat.getEndDateTime(), request.getEndDateTime());
         boolean locationNameChanged = isChanged(openMat.getLocationName(), request.getLocationName());
         boolean addressChanged = isChanged(openMat.getAddress(), request.getAddress());
-        boolean latitudeChanged = isChanged(openMat.getLatitude(), request.getLatitude());
-        boolean longitudeChanged = isChanged(openMat.getLongitude(), request.getLongitude());
+        boolean coordinatesChanged = willCoordinatesChange(openMat, request);
         boolean regionChanged = isChanged(openMat.getRegion(), request.getRegion());
         boolean hasParticipants = openMat.hasParticipants();
         boolean shouldNotifyParticipants = hasParticipants
                 && (startDateTimeChanged || endDateTimeChanged || locationNameChanged || addressChanged
-                || latitudeChanged || longitudeChanged || regionChanged);
+                || coordinatesChanged || regionChanged);
         List<Long> participantUserIds = List.copyOf(openMat.getParticipantUids());
 
         LocalDateTime effectiveStart = request.getStartDateTime() != null ? request.getStartDateTime() : openMat.getStartDateTime();
@@ -170,7 +169,7 @@ public class OpenMatService {
         validateDateRange(effectiveStart, effectiveEnd);
 
         validateCapacity(request.getMaxCapacity());
-        validateCoordinates(request.getLatitude(), request.getLongitude());
+        validateUpdateCoordinates(request);
 
         if (request.getMaxCapacity() != null && request.getMaxCapacity() != -1
                 && request.getMaxCapacity() < openMat.getParticipantUids().size()) {
@@ -185,16 +184,15 @@ public class OpenMatService {
                 request.getEndDateTime(),
                 request.getLocationName(),
                 request.getAddress(),
-                request.getLatitude(),
-                request.getLongitude(),
                 request.getRegion(),
                 request.getMaxCapacity(),
                 request.getHostInstagramId()
         );
+        applyCoordinateUpdate(openMat, request);
         openMat.synchronizeStatus(now());
 
         log.info(
-                "OpenMat update notification check. openMatId={}, participantUserIds={}, hasParticipants={}, startDateTimeChanged={}, endDateTimeChanged={}, locationNameChanged={}, addressChanged={}, latitudeChanged={}, longitudeChanged={}, regionChanged={}, shouldNotifyParticipants={}",
+                "OpenMat update notification check. openMatId={}, participantUserIds={}, hasParticipants={}, startDateTimeChanged={}, endDateTimeChanged={}, locationNameChanged={}, addressChanged={}, coordinatesChanged={}, regionChanged={}, shouldNotifyParticipants={}",
                 openMat.getId(),
                 participantUserIds,
                 hasParticipants,
@@ -202,8 +200,7 @@ public class OpenMatService {
                 endDateTimeChanged,
                 locationNameChanged,
                 addressChanged,
-                latitudeChanged,
-                longitudeChanged,
+                coordinatesChanged,
                 regionChanged,
                 shouldNotifyParticipants
         );
@@ -480,6 +477,26 @@ public class OpenMatService {
         }
     }
 
+    private void validateCreateCoordinates(OpenMatCreateRequest request) {
+        boolean hasLatitude = request.hasLatitudeField();
+        boolean hasLongitude = request.hasLongitudeField();
+        validateCoordinatePairPresence(hasLatitude, hasLongitude);
+        validateCoordinates(request.getLatitude(), request.getLongitude());
+    }
+
+    private void validateUpdateCoordinates(OpenMatUpdateRequest request) {
+        boolean hasLatitude = request.hasLatitudeField();
+        boolean hasLongitude = request.hasLongitudeField();
+        validateCoordinatePairPresence(hasLatitude, hasLongitude);
+        validateCoordinates(request.getLatitude(), request.getLongitude());
+    }
+
+    private void validateCoordinatePairPresence(boolean hasLatitude, boolean hasLongitude) {
+        if (hasLatitude != hasLongitude) {
+            throw BusinessException.badRequest("위도와 경도는 함께 전달해야 합니다");
+        }
+    }
+
     private void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
         if (latitude != null && (latitude.compareTo(BigDecimal.valueOf(-90)) < 0
                 || latitude.compareTo(BigDecimal.valueOf(90)) > 0)) {
@@ -491,13 +508,27 @@ public class OpenMatService {
         }
     }
 
+    private void applyCoordinateUpdate(OpenMat openMat, OpenMatUpdateRequest request) {
+        if (!request.hasLatitudeField() && !request.hasLongitudeField()) {
+            return;
+        }
+        openMat.updateCoordinates(request.getLatitude(), request.getLongitude());
+    }
+
+    private boolean willCoordinatesChange(OpenMat openMat, OpenMatUpdateRequest request) {
+        if (!request.hasLatitudeField() && !request.hasLongitudeField()) {
+            return false;
+        }
+        return !Objects.equals(openMat.getLatitude(), request.getLatitude())
+                || !Objects.equals(openMat.getLongitude(), request.getLongitude());
+    }
+
     private boolean hasScheduleOrLocationChanged(OpenMat openMat, OpenMatUpdateRequest request) {
         return isChanged(openMat.getStartDateTime(), request.getStartDateTime())
                 || isChanged(openMat.getEndDateTime(), request.getEndDateTime())
                 || isChanged(openMat.getLocationName(), request.getLocationName())
                 || isChanged(openMat.getAddress(), request.getAddress())
-                || isChanged(openMat.getLatitude(), request.getLatitude())
-                || isChanged(openMat.getLongitude(), request.getLongitude())
+                || willCoordinatesChange(openMat, request)
                 || isChanged(openMat.getRegion(), request.getRegion());
     }
 

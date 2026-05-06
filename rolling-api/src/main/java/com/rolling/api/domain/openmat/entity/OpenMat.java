@@ -8,8 +8,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -125,8 +125,6 @@ public class OpenMat extends BaseTimeEntity {
                        LocalDateTime endDateTime,
                        String locationName,
                        String address,
-                       BigDecimal latitude,
-                       BigDecimal longitude,
                        Region region,
                        Integer maxCapacity,
                        String hostInstagramId) {
@@ -136,11 +134,14 @@ public class OpenMat extends BaseTimeEntity {
         if (endDateTime != null) this.endDateTime = endDateTime;
         if (locationName != null) this.locationName = locationName;
         if (address != null) this.address = address;
-        if (latitude != null) this.latitude = latitude;
-        if (longitude != null) this.longitude = longitude;
         if (region != null) this.region = region;
         if (maxCapacity != null) this.maxCapacity = maxCapacity;
         if (hostInstagramId != null) this.hostInstagramId = hostInstagramId;
+    }
+
+    public void updateCoordinates(BigDecimal latitude, BigDecimal longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
     }
 
     public boolean hasParticipants() {
