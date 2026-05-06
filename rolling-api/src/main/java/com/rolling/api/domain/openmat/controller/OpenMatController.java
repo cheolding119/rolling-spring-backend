@@ -130,7 +130,7 @@ public class OpenMatController {
     public ResponseEntity<ApiResponse<OpenMatResponse>> update(
             @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(description = "오픈매트 ID") @PathVariable Long id,
-            @RequestBody OpenMatUpdateRequest request) {
+            @Valid @RequestBody OpenMatUpdateRequest request) {
         Long userId = principal != null ? principal.getUserId() : null;
         OpenMatResponse response = openMatService.update(userId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));

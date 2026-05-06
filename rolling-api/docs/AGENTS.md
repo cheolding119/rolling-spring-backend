@@ -13,6 +13,7 @@
 - 강한 제재는 별도 상태 추가 없이 장기 `TEMP_SUSPEND`로 운영한다.
 - 로그인 사용자의 오픈매트/대회 목록·검색 요청은 `Authorization: Bearer {accessToken}`을 함께 보내야 차단 필터가 적용된다.
 - 비회원/App Review 둘러보기 모드의 공개 조회 요청은 `Authorization` 헤더 없이 호출한다. 대상은 `GET /api/v1/open-mats`, `GET /api/v1/open-mats/{id}`, `GET /api/v1/tournaments`, `GET /api/v1/tournaments/{id}`, `GET /api/v1/notices`, `GET /api/v1/notices/{id}`다.
+- 사용자 공유 링크는 API URL이 아니라 `https://rolling-app.com/open-mats/{id}`, `https://rolling-app.com/tournaments/{id}`를 사용한다. Flutter 앱은 딥링크 진입 후 공개 상세 API를 다시 조회한다.
 - 오픈매트 신청/작성/수정/삭제/신고, 대회 작성/수정/삭제/신고, 알림, 마이페이지, 문의는 계속 계정 기반 기능이며 비회원 UI에서는 로그인 필요 안내로 처리한다.
 - 알림의 source of truth는 FCM 성공 여부가 아니라 백엔드 `Notification` 저장 데이터다.
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
@@ -48,6 +49,7 @@
 - 현재 `/users/me` 수정 API는 `phone` 수정 미지원이다.
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
+- 현재 오픈매트 생성/수정 요청에는 `latitude`, `longitude`가 선택 필드로 포함된다. 좌표는 nullable이며 서버는 주소 기반 geocoding을 직접 수행하지 않는다.
 - 오픈매트 작성자 관리 UI는 현재 상세 화면 안에서 바로 노출한다.
 - 작성자 전용 관리 범위는 `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
 - 현재 클라이언트는 작성자 권한을 상세 응답의 `hostId == 현재 사용자 id`로 판단한다.
@@ -545,6 +547,8 @@ Request body:
 | `endDateTime` | `DateTime` | O |
 | `locationName` | `String` | O |
 | `address` | `String` | O |
+| `latitude` | `Decimal?` | - |
+| `longitude` | `Decimal?` | - |
 | `region` | `Region` | O |
 | `maxCapacity` | `Integer` | O |
 | `hostInstagramId` | `String?` | - |
@@ -555,6 +559,9 @@ Response: `OpenMatModel`
 
 - 종료 시간은 시작 시간보다 이후여야 한다.
 - `maxCapacity`는 `-1` 또는 `1 이상`이어야 한다.
+- `latitude`는 값이 있으면 `-90..90` 범위여야 한다.
+- `longitude`는 값이 있으면 `-180..180` 범위여야 한다.
+- 서버는 좌표를 직접 변환하지 않고 클라이언트가 선택한 장소 검색 결과의 좌표만 저장한다.
 
 ### 5.4.4 오픈매트 수정
 
@@ -572,6 +579,8 @@ Request body:
 | `endDateTime` | `DateTime?` | - |
 | `locationName` | `String?` | - |
 | `address` | `String?` | - |
+| `latitude` | `Decimal?` | - |
+| `longitude` | `Decimal?` | - |
 | `region` | `Region?` | - |
 | `maxCapacity` | `Integer?` | - |
 | `hostInstagramId` | `String?` | - |
@@ -581,6 +590,8 @@ Response: `OpenMatModel`
 현재 구현 메모:
 
 - 작성자만 수정 가능
+- `latitude`, `longitude`는 값이 있으면 각각 `-90..90`, `-180..180` 범위여야 한다.
+- 수정 요청에서 좌표 필드가 `null`이면 기존 좌표를 유지한다.
 - 참가자가 있고 일정/장소 필드가 바뀌면 수정 알림 저장 후 FCM 발송 시도
 - 수정은 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
 

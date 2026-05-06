@@ -125,7 +125,13 @@ class SecurityAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/open-mats/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.id").value(1));
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.title").value("주말 오픈매트"))
+                .andExpect(jsonPath("$.data.startDateTime").value("2026-03-22T14:00:00"))
+                .andExpect(jsonPath("$.data.locationName").value("Rolling Gym"))
+                .andExpect(jsonPath("$.data.address").value("Seoul"))
+                .andExpect(jsonPath("$.data.hostNickname").value("host"))
+                .andExpect(jsonPath("$.data.deleted").value(false));
 
         mockMvc.perform(get("/api/v1/tournaments"))
                 .andExpect(status().isOk())
@@ -135,7 +141,12 @@ class SecurityAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/tournaments/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.id").value(1));
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.title").value("국내 대회"))
+                .andExpect(jsonPath("$.data.competitionDate").value("2026-04-05"))
+                .andExpect(jsonPath("$.data.registrationDeadline").value("2026-03-31"))
+                .andExpect(jsonPath("$.data.location").value("Seoul"))
+                .andExpect(jsonPath("$.data.posterUrl").value("https://cdn.example.com/tournaments/1.jpg"));
 
         mockMvc.perform(get("/api/v1/notices"))
                 .andExpect(status().isOk())

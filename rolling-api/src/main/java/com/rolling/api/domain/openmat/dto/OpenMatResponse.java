@@ -6,6 +6,7 @@ import com.rolling.api.domain.openmat.entity.Region;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -19,6 +20,8 @@ public class OpenMatResponse {
     private LocalDateTime endDateTime;
     private String locationName;
     private String address;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
     private Region region;
     private Integer maxCapacity;
     private Integer currentParticipants;
@@ -44,6 +47,8 @@ public class OpenMatResponse {
                 .endDateTime(openMat.getEndDateTime())
                 .locationName(openMat.getLocationName())
                 .address(openMat.getAddress())
+                .latitude(openMat.getLatitude())
+                .longitude(openMat.getLongitude())
                 .region(openMat.getRegion())
                 .maxCapacity(openMat.getMaxCapacity())
                 .currentParticipants(currentParticipants)
