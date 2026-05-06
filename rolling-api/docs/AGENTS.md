@@ -51,6 +51,7 @@
 - 현재 오픈매트 생성/수정 요청에는 `region`이 포함된다.
 - 현재 오픈매트 생성/수정 요청에는 `latitude`, `longitude`가 선택 필드로 포함된다. 좌표는 nullable이며, 주소 기반 geocoding은 저장 API가 아니라 별도 지도 API에서 수행한다.
 - 현재 우편번호 WebView에서 선택한 주소의 좌표 변환은 인증 API `GET /api/v1/maps/kakao/geocode?address={address}`로 수행한다.
+- `https://rolling-app.com/maps/kakao/openmat.html`은 Nginx가 정적 HTML로 서빙하고 React SPA fallback 대상이 아니다.
 - 오픈매트 작성자 관리 UI는 현재 상세 화면 안에서 바로 노출한다.
 - 작성자 전용 관리 범위는 `참가자 강제 취소`, `모집 상태 수동 변경(RECRUITING, CLOSED)`이다.
 - 현재 클라이언트는 작성자 권한을 상세 응답의 `hostId == 현재 사용자 id`로 판단한다.
