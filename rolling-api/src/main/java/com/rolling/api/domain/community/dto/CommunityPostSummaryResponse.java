@@ -25,9 +25,6 @@ public class CommunityPostSummaryResponse {
     @Schema(description = "작성자 닉네임", example = "노기좋아하는거북이")
     private String authorNickname;
 
-    @Schema(description = "대표 이미지 URL", nullable = true)
-    private String thumbnailUrl;
-
     @Schema(description = "좋아요 수", example = "3")
     private Long likeCount;
 
@@ -46,7 +43,6 @@ public class CommunityPostSummaryResponse {
                 .category(post.getCategory())
                 .title(post.getTitle())
                 .authorNickname(post.getAuthor().getCommunityNickname())
-                .thumbnailUrl(post.getThumbnailUrl())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .viewCount(post.getViewCount())

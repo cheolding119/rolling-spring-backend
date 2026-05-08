@@ -96,7 +96,6 @@ MVP에서는 커뮤니티 프로필 엔티티를 별도로 만들지 않고 `use
 | `title` | `String` | 제목 |
 | `content` | `String` | 본문 |
 | `viewCount` | `Long` | 조회 수 |
-| `thumbnailUrl` | `String?` | 대표 이미지 URL |
 | `likeCount` | `Long` | 좋아요 수 캐시 |
 | `commentCount` | `Long` | 댓글 수 캐시 |
 | `reportCount` | `Long` | 신고 수 캐시 |
@@ -104,8 +103,6 @@ MVP에서는 커뮤니티 프로필 엔티티를 별도로 만들지 않고 `use
 | `createdAt` | `LocalDateTime` | 생성 시각 |
 | `updatedAt` | `LocalDateTime` | 수정 시각 |
 | `deletedAt` | `LocalDateTime?` | 삭제 시각 |
-
-실제 구현에서는 게시글이 `images` 목록을 가지며, 목록의 첫 번째 이미지를 `thumbnailUrl`로 사용한다.
 
 상태 enum 후보:
 
@@ -253,7 +250,6 @@ Response: 페이징된 `CommunityPostSummary`
 | `category` | `String` | 카테고리 |
 | `title` | `String` | 제목 |
 | `authorNickname` | `String` | 작성자의 `communityNickname` |
-| `thumbnailUrl` | `String?` | 첫 번째 이미지 URL |
 | `likeCount` | `Long` | 좋아요 수 |
 | `commentCount` | `Long` | 댓글 수 |
 | `viewCount` | `Long` | 조회 수 |
@@ -274,7 +270,6 @@ Response: `CommunityPostDetail`
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `content` | `String` | 본문 |
-| `thumbnailUrl` | `String?` | 대표 이미지 URL |
 | `images` | `List<CommunityPostImageResponse>` | 이미지 목록 |
 | `likeCount` | `Long` | 좋아요 수 |
 | `likedByMe` | `Boolean` | 로그인 사용자가 좋아요했는지 여부 |
@@ -513,7 +508,7 @@ Query parameters:
 - 이미지 URL은 `http` 또는 `https` 공개 URL이어야 한다.
 - 이미지 경로의 확장자는 `jpg`, `jpeg`, `png`, `webp`, `gif`, `bmp`, `svg`, `avif`, `ico`를 허용한다.
 - Rolling이 허용한 public base URL 설정이 있으면 해당 base URL로 시작하는지 추가 검증한다.
-- 이미지가 없으면 `thumbnailUrl`은 `null`, `images`는 빈 목록으로 응답한다.
+- 이미지는 상세 응답의 `images`에만 포함하고, 목록 응답에는 포함하지 않는다.
 
 ### 5.2 삭제 정책
 
@@ -644,7 +639,7 @@ MVP 사용자 앱 출시 전에 최소한 숨김 처리와 신고 확인 경로�
 - 작성자와 관리자가 아닌 사용자는 게시글과 댓글을 수정하거나 삭제할 수 없다.
 - 차단한 사용자의 게시글과 댓글은 로그인 사용자 기준으로 숨겨진다.
 - 삭제 또는 숨김 처리된 게시글은 일반 사용자에게 노출되지 않는다.
-- 게시글 목록 조회에서 작성자 커뮤니티 닉네임, 좋아요 수, 댓글 수, 썸네일이 일관되게 반환된다.
+- 게시글 목록 조회에서 작성자 커뮤니티 닉네임, 좋아요 수, 댓글 수가 일관되게 반환된다.
 - 커뮤니티 응답에는 소속, 이메일, 전화번호, 소셜 provider가 노출되지 않는다.
 
 ## 7. 성공 신호
@@ -791,13 +786,13 @@ MVP 사용자 앱 출시 전에 최소한 숨김 처리와 신고 확인 경로�
 - [x] 허용 확장자 검증 구현
 - [x] 허용 S3/CDN base URL 검증 구현
 - [x] 게시글 수정 시 이미지 목록 전체 교체 정책 구현
-- [x] 게시글 목록 썸네일 응답 구현
+- [x] 게시글 상세에서 이미지만 응답
 - [x] 이미지가 없는 게시글의 응답 fallback 정의
 
 완료 기준:
 
 - 게시글 작성/수정 시 이미지 URL 목록을 저장할 수 있다.
-- 목록에는 첫 번째 이미지가 썸네일로 내려간다.
+- 게시글 목록에는 이미지 URL이 내려가지 않는다.
 - 허용되지 않은 이미지 URL은 저장되지 않는다.
 
 ### Phase 6. 운영자 기능
