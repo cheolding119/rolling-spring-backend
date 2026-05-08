@@ -160,8 +160,8 @@ class CommunityServiceTest {
     }
 
     @Test
-    @DisplayName("이미지를 포함한 게시글 작성 시 thumbnailUrl과 이미지 목록이 반영된다")
-    void createPost_withImages_setsThumbnailAndImages() {
+    @DisplayName("이미지를 포함한 게시글 작성 시 이미지 목록이 반영된다")
+    void createPost_withImages_setsImages() {
         User author = createUser(2L, "social-3b", "open-mat", "rolling-community");
         CommunityPostCreateRequest request = new CommunityPostCreateRequest();
         ReflectionTestUtils.setField(request, "category", CommunityPostCategory.FREE);
@@ -174,7 +174,6 @@ class CommunityServiceTest {
 
         CommunityPostDetailResponse response = communityService.createPost(2L, request);
 
-        assertThat(response.getThumbnailUrl()).isEqualTo("https://cdn.rolling.com/community/1.jpg");
         assertThat(response.getImages()).hasSize(1);
         assertThat(response.getImages().get(0).getImageUrl()).isEqualTo("https://cdn.rolling.com/community/1.jpg");
     }

@@ -48,9 +48,6 @@ public class CommunityPost extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Column(length = 1000)
-    private String thumbnailUrl;
-
     @Column(nullable = false)
     private Long viewCount = 0L;
 
@@ -77,7 +74,6 @@ public class CommunityPost extends BaseTimeEntity {
                          CommunityPostCategory category,
                          String title,
                          String content,
-                         String thumbnailUrl,
                          Long viewCount,
                          Long likeCount,
                          Long commentCount,
@@ -88,7 +84,6 @@ public class CommunityPost extends BaseTimeEntity {
         this.category = category;
         this.title = title;
         this.content = content;
-        this.thumbnailUrl = thumbnailUrl;
         if (viewCount != null) {
             this.viewCount = viewCount;
         }
@@ -154,14 +149,12 @@ public class CommunityPost extends BaseTimeEntity {
     public void replaceImages(List<CommunityPostImage> newImages) {
         this.images.clear();
         if (newImages == null || newImages.isEmpty()) {
-            this.thumbnailUrl = null;
             return;
         }
         for (CommunityPostImage image : newImages) {
             image.assignPost(this);
             this.images.add(image);
         }
-        this.thumbnailUrl = this.images.get(0).getImageUrl();
     }
 
     public void delete(LocalDateTime deletedAt) {

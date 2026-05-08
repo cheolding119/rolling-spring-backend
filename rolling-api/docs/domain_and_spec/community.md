@@ -25,7 +25,6 @@
 | `title` | `String` | 제목 |
 | `content` | `String` | 본문 |
 | `viewCount` | `Long` | 조회 수 |
-| `thumbnailUrl` | `String?` | 대표 이미지 URL |
 | `likeCount` | `Long` | 좋아요 수 캐시 |
 | `commentCount` | `Long` | 댓글 수 캐시 |
 | `reportCount` | `Long` | 신고 수 캐시 |
@@ -189,7 +188,6 @@ Response item:
 | `category` | `CommunityPostCategory` | 카테고리 |
 | `title` | `String` | 제목 |
 | `authorNickname` | `String` | 작성자의 `communityNickname` |
-| `thumbnailUrl` | `String?` | 대표 이미지 URL |
 | `likeCount` | `Long` | 좋아요 수 |
 | `commentCount` | `Long` | 댓글 수 |
 | `viewCount` | `Long` | 조회 수 |
@@ -214,7 +212,6 @@ Response item:
 | `title` | `String` | 제목 |
 | `content` | `String` | 본문 |
 | `authorNickname` | `String` | 작성자의 `communityNickname` |
-| `thumbnailUrl` | `String?` | 대표 이미지 URL |
 | `commentCount` | `Long` | 댓글 수 |
 | `viewCount` | `Long` | 조회 수 |
 | `likeCount` | `Long` | 좋아요 수 |
