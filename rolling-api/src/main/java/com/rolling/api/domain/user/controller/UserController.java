@@ -3,6 +3,8 @@ package com.rolling.api.domain.user.controller;
 import com.rolling.api.domain.user.dto.UserFcmTokenDeleteRequest;
 import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.BlockedUserResponse;
+import com.rolling.api.domain.community.dto.CommunityProfileResponse;
+import com.rolling.api.domain.community.dto.CommunityProfileUpdateRequest;
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
@@ -55,6 +57,22 @@ public class UserController {
     }
 
     @Operation(
+            summary = "내 커뮤니티 닉네임 조회",
+            description = "현재 로그인한 사용자의 커뮤니티 전용 닉네임을 조회합니다"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/me/community-profile")
+    public ResponseEntity<ApiResponse<CommunityProfileResponse>> getCommunityProfile(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        CommunityProfileResponse response = userService.getCommunityProfile(requireUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "내 정보 수정",
             description = "닉네임, 소속 체육관, 벨트 색상을 수정합니다. 요청 검증은 수행하지 않습니다."
     )
@@ -68,6 +86,24 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody UserUpdateRequest request) {
         UserResponse response = userService.updateMe(requireUserId(principal), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "내 커뮤니티 닉네임 수정",
+            description = "현재 로그인한 사용자의 커뮤니티 전용 닉네임을 설정하거나 변경합니다"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 유효성 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PatchMapping("/me/community-profile")
+    public ResponseEntity<ApiResponse<CommunityProfileResponse>> updateCommunityProfile(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CommunityProfileUpdateRequest request) {
+        CommunityProfileResponse response = userService.updateCommunityProfile(requireUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

@@ -5,6 +5,12 @@ import com.rolling.api.domain.notice.controller.NoticeController;
 import com.rolling.api.domain.notice.dto.NoticeListItemResponse;
 import com.rolling.api.domain.notice.dto.NoticeResponse;
 import com.rolling.api.domain.notice.service.NoticeService;
+import com.rolling.api.domain.community.controller.CommunityController;
+import com.rolling.api.domain.community.dto.CommunityCommentResponse;
+import com.rolling.api.domain.community.dto.CommunityPostDetailResponse;
+import com.rolling.api.domain.community.dto.CommunityPostSummaryResponse;
+import com.rolling.api.domain.community.entity.CommunityPostCategory;
+import com.rolling.api.domain.community.service.CommunityService;
 import com.rolling.api.domain.map.controller.MapController;
 import com.rolling.api.domain.map.service.KakaoGeocodeService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
@@ -73,6 +79,7 @@ class SecurityAuthorizationIntegrationTest {
     private MockMvc mockMvc;
     private OpenMatService openMatService;
     private NoticeService noticeService;
+    private CommunityService communityService;
     private TournamentService tournamentService;
     private TournamentManagerService tournamentManagerService;
     private KakaoGeocodeService kakaoGeocodeService;
@@ -94,6 +101,7 @@ class SecurityAuthorizationIntegrationTest {
 
         openMatService = context.getBean(OpenMatService.class);
         noticeService = context.getBean(NoticeService.class);
+        communityService = context.getBean(CommunityService.class);
         tournamentService = context.getBean(TournamentService.class);
         tournamentManagerService = context.getBean(TournamentManagerService.class);
         kakaoGeocodeService = context.getBean(KakaoGeocodeService.class);
@@ -120,6 +128,7 @@ class SecurityAuthorizationIntegrationTest {
         stubOpenMatResponses();
         stubTournamentResponses();
         stubNoticeResponses();
+        stubCommunityResponses();
 
         mockMvc.perform(get("/api/v1/open-mats"))
                 .andExpect(status().isOk())
@@ -161,6 +170,22 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1));
+
+        mockMvc.perform(get("/api/v1/community/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(1));
+
+        mockMvc.perform(get("/api/v1/community/posts/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.authorNickname").value("community-user"));
+
+        mockMvc.perform(get("/api/v1/community/posts/1/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].postId").value(1));
     }
 
     @Test
@@ -273,6 +298,22 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/community/posts/11/like"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/community/posts/11/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -352,6 +393,37 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.data.id").value(9));
     }
 
+    @Test
+    @DisplayName("인증 사용자는 커뮤니티 좋아요와 신고 API에 접근할 수 있다")
+    void communityActions_withUserToken_returnsOk() throws Exception {
+        mockMvc.perform(post("/api/v1/community/posts/11/like")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(post("/api/v1/community/posts/11/report")
+                        .header("Authorization", bearerToken(2L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(post("/api/v1/community/comments/11/report")
+                        .header("Authorization", bearerToken(2L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"INAPPROPRIATE\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
     private void stubOpenMatResponses() {
         OpenMatResponse response = OpenMatResponse.builder()
                 .id(1L)
@@ -417,6 +489,44 @@ class SecurityAuthorizationIntegrationTest {
                 .build());
     }
 
+    private void stubCommunityResponses() {
+        given(communityService.findPosts(isNull(), isNull(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityPostSummaryResponse.builder()
+                                .id(1L)
+                                .category(CommunityPostCategory.FREE)
+                                .title("커뮤니티 글")
+                                .authorNickname("community-user")
+                                .commentCount(2L)
+                                .viewCount(10L)
+                                .createdAt(LocalDateTime.of(2026, 3, 20, 11, 0))
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(communityService.findPost(isNull(), eq(false), eq(1L))).willReturn(CommunityPostDetailResponse.builder()
+                .id(1L)
+                .category(CommunityPostCategory.FREE)
+                .title("커뮤니티 글")
+                .content("본문")
+                .authorNickname("community-user")
+                .commentCount(2L)
+                .viewCount(10L)
+                .editableByMe(false)
+                .createdAt(LocalDateTime.of(2026, 3, 20, 11, 0))
+                .updatedAt(LocalDateTime.of(2026, 3, 20, 11, 0))
+                .build());
+        given(communityService.findComments(isNull(), eq(false), eq(1L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityCommentResponse.builder()
+                                .id(1L)
+                                .postId(1L)
+                                .authorNickname("comment-user")
+                                .content("댓글")
+                                .createdAt(LocalDateTime.of(2026, 3, 20, 11, 30))
+                                .updatedAt(LocalDateTime.of(2026, 3, 20, 11, 30))
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+    }
+
     private String bearerToken(Long userId) {
         return "Bearer " + jwtTokenProvider.createAccessToken(userId);
     }
@@ -433,6 +543,7 @@ class SecurityAuthorizationIntegrationTest {
             TournamentController.class,
             NoticeController.class,
             NoticeAdminController.class,
+            CommunityController.class,
             MapController.class,
             TournamentCrawlerController.class,
             TestActuatorController.class
@@ -447,6 +558,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         NoticeService noticeService() {
             return mock(NoticeService.class);
+        }
+
+        @Bean
+        CommunityService communityService() {
+            return mock(CommunityService.class);
         }
 
         @Bean

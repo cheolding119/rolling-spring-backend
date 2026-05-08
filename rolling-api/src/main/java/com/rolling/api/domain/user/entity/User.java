@@ -30,6 +30,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private String nickname;
 
+    @Column(length = 50)
+    private String communityNickname;
+
     private String email;
 
     private String phone;
@@ -103,6 +106,12 @@ public class User extends BaseTimeEntity {
     public void updateNickname(String nickname) {
         if (nickname != null) {
             this.nickname = nickname;
+        }
+    }
+
+    public void updateCommunityNickname(String communityNickname) {
+        if (communityNickname != null) {
+            this.communityNickname = communityNickname;
         }
     }
 
@@ -234,6 +243,7 @@ public class User extends BaseTimeEntity {
 
     public void withdraw() {
         this.nickname = "withdrawn_user_" + this.id;
+        this.communityNickname = this.nickname;
         this.email = null;
         this.phone = null;
         this.affiliation = null;

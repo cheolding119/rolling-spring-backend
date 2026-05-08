@@ -2,6 +2,7 @@ package com.rolling.api.domain.user.controller;
 
 import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.BlockedUserResponse;
+import com.rolling.api.domain.community.dto.CommunityProfileResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.service.UserService;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -114,6 +115,49 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.affiliation").value("롤링짐 강남"));
+    }
+
+    @Test
+    @DisplayName("내 커뮤니티 닉네임 조회는 인증 사용자면 성공한다")
+    void getCommunityProfile_withUserToken_returnsCurrentNickname() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.getCommunityProfile(2L)).willReturn(CommunityProfileResponse.builder()
+                .communityNickname("community-user")
+                .build());
+
+        mockMvc.perform(get("/api/v1/users/me/community-profile")
+                        .header("Authorization", "Bearer user-token")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.communityNickname").value("community-user"));
+    }
+
+    @Test
+    @DisplayName("내 커뮤니티 닉네임 수정은 인증 사용자면 성공한다")
+    void updateCommunityProfile_withUserToken_returnsUpdatedNickname() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.updateCommunityProfile(eq(2L), any())).willReturn(CommunityProfileResponse.builder()
+                .communityNickname("community-user")
+                .build());
+
+        mockMvc.perform(patch("/api/v1/users/me/community-profile")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"communityNickname\": \" community-user \"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.communityNickname").value("community-user"));
     }
 
     @Test
