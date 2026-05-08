@@ -6,6 +6,8 @@ import com.rolling.api.domain.user.dto.UserFcmTokenRequest;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
+import com.rolling.api.domain.community.dto.CommunityProfileResponse;
+import com.rolling.api.domain.community.dto.CommunityProfileUpdateRequest;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
@@ -189,6 +191,49 @@ class UserServiceTest {
         assertThat(response.getNickname()).isEqualTo("nickname");
         assertThat(response.getAffiliation()).isEqualTo("new-gym");
         assertThat(response.getBeltColor()).isEqualTo("BROWN");
+    }
+
+    @Test
+    @DisplayName("커뮤니티 닉네임 조회 시 현재 값만 반환한다")
+    void getCommunityProfile_returnsCurrentNickname() {
+        User user = User.builder()
+                .socialId("social-community-get")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("open-mat-nickname")
+                .affiliation("community-gym")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 50L);
+        ReflectionTestUtils.setField(user, "communityNickname", "community-user");
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(50L)).thenReturn(Optional.of(user));
+
+        CommunityProfileResponse response = userService.getCommunityProfile(50L);
+
+        assertThat(response.getCommunityNickname()).isEqualTo("community-user");
+    }
+
+    @Test
+    @DisplayName("커뮤니티 닉네임 수정 시 trim된 값이 반영된다")
+    void updateCommunityProfile_trimsAndUpdatesNickname() {
+        User user = User.builder()
+                .socialId("social-community-update")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("open-mat-nickname")
+                .affiliation("community-gym")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 51L);
+
+        CommunityProfileUpdateRequest request = new CommunityProfileUpdateRequest();
+        ReflectionTestUtils.setField(request, "communityNickname", "  rolling-community  ");
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(51L)).thenReturn(Optional.of(user));
+
+        CommunityProfileResponse response = userService.updateCommunityProfile(51L, request);
+
+        assertThat(user.getCommunityNickname()).isEqualTo("rolling-community");
+        assertThat(response.getCommunityNickname()).isEqualTo("rolling-community");
     }
 
     @Test

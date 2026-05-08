@@ -6,6 +6,8 @@ import com.rolling.api.domain.user.dto.UserResponse;
 import com.rolling.api.domain.user.dto.UserSettingsResponse;
 import com.rolling.api.domain.user.dto.UserSettingsUpdateRequest;
 import com.rolling.api.domain.user.dto.UserUpdateRequest;
+import com.rolling.api.domain.community.dto.CommunityProfileResponse;
+import com.rolling.api.domain.community.dto.CommunityProfileUpdateRequest;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.entity.UserDevice;
 import com.rolling.api.domain.user.repository.UserBlockRepository;
@@ -37,6 +39,12 @@ public class UserService {
         return UserResponse.from(user, adminAccessConfig.isAdmin(userId), now());
     }
 
+    @Transactional(readOnly = true)
+    public CommunityProfileResponse getCommunityProfile(Long userId) {
+        User user = getActiveUser(userId);
+        return CommunityProfileResponse.from(user.getCommunityNickname());
+    }
+
     @Transactional
     public UserResponse updateMe(Long userId, UserUpdateRequest request) {
         User user = getActiveUser(userId);
@@ -46,6 +54,14 @@ public class UserService {
         user.updateBeltColor(request.getBeltColor());
 
         return UserResponse.from(user, adminAccessConfig.isAdmin(userId), now());
+    }
+
+    @Transactional
+    public CommunityProfileResponse updateCommunityProfile(Long userId, CommunityProfileUpdateRequest request) {
+        User user = getActiveUser(userId);
+        String communityNickname = normalizeCommunityNickname(request.getCommunityNickname());
+        user.updateCommunityNickname(communityNickname);
+        return CommunityProfileResponse.from(user.getCommunityNickname());
     }
 
     @Transactional
@@ -138,6 +154,19 @@ public class UserService {
 
     private String normalizeOptional(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizeCommunityNickname(String value) {
+        if (!StringUtils.hasText(value)) {
+            throw BusinessException.badRequest("communityNickname은 필수입니다");
+        }
+
+        String normalized = value.trim();
+        if (normalized.length() < 2 || normalized.length() > 20) {
+            throw BusinessException.badRequest("communityNickname은 2자 이상 20자 이하여야 합니다");
+        }
+
+        return normalized;
     }
 
     private java.time.LocalDateTime now() {

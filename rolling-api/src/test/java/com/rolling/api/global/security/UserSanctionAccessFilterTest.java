@@ -78,4 +78,40 @@ class UserSanctionAccessFilterTest {
         verify(chain).doFilter(request, response);
         assertThat(response.getStatus()).isEqualTo(200);
     }
+
+    @Test
+    @DisplayName("일시정지 사용자는 커뮤니티 읽기 전용 경로에 접근할 수 있다")
+    void suspendedUser_canAccessCommunityReadRoutes() throws Exception {
+        UserPrincipal principal = new UserPrincipal(2L, false, AccountStatus.SUSPENDED, LocalDateTime.of(2126, 4, 20, 0, 0));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities())
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/community/posts/123/comments");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        var chain = mock(jakarta.servlet.FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("일시정지 사용자는 커뮤니티 닉네임 조회 경로에 접근할 수 있다")
+    void suspendedUser_canAccessCommunityProfileRoute() throws Exception {
+        UserPrincipal principal = new UserPrincipal(2L, false, AccountStatus.SUSPENDED, LocalDateTime.of(2126, 4, 20, 0, 0));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities())
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me/community-profile");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        var chain = mock(jakarta.servlet.FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
 }

@@ -1,10 +1,118 @@
+# Rolling API Agent Guide
 
-## 1. 공용 도메인 참조
+## 역할
 
+- 이 문서는 Codex가 Rolling API 백엔드에서 개발할 때 따라야 하는 작업 기준을 정의한다.
+- 상세 API 계약과 도메인 규칙은 각 도메인 문서에 보존하고, 이 문서에는 작업 흐름과 개발 시 자주 확인해야 할 기준만 둔다.
+- 새 도메인을 추가할 때는 이 문서를 키우지 말고 새 도메인 문서를 추가한 뒤 문서 맵에만 연결한다.
+
+## 1. 작업 원칙
+
+- 기존 아키텍처를 유지하는 작고 안전한 변경을 우선한다.
+- 요구사항이 불명확하면 코드, 테스트, 도메인 문서 순서로 근거를 확인한다.
+- 도메인 문서와 코드가 충돌하면 임의로 추측하지 말고 충돌 지점을 명시한다.
+- API 계약을 바꾸면 DTO, controller/service 테스트, 도메인 문서를 함께 갱신한다.
+- 보안, 권한, 스케줄러, 외부 연동 변경은 정상 경로뿐 아니라 실패 경로도 확인한다.
+- 기존 사용자가 의존할 수 있는 응답 필드, enum raw value, paging 구조는 명시적 이유 없이 깨지 않는다.
+- unrelated 파일 변경, 포맷팅, 대규모 리팩터링은 요청 범위 밖이면 하지 않는다.
+
+## 2. 실행과 검증 명령
+
+작업 기준 디렉터리:
+
+```powershell
+cd C:\rolling\rolling-spring-backend\rolling-api
+```
+
+자주 쓰는 명령:
+
+```powershell
+.\gradlew.bat test
+.\gradlew.bat test --tests "com.rolling.api.domain.openmat.service.OpenMatServiceTest"
+.\gradlew.bat test --tests "com.rolling.api.global.security.SecurityAuthorizationIntegrationTest"
+.\gradlew.bat bootRun --args='--spring.profiles.active=local'
+```
+
+검증 기준:
+
+- 단순 문서 수정은 테스트를 생략할 수 있다.
+- 특정 도메인 로직을 바꾸면 해당 도메인의 service/controller 테스트를 우선 실행한다.
+- 보안 설정, 인증 principal, 관리자 권한, 제재 필터를 바꾸면 security 관련 테스트를 실행한다.
+- repository query, entity graph, paging, 목록 응답을 바꾸면 N+1 또는 정렬 안정성 영향을 확인한다.
+- scheduler, health, alert 경로를 바꾸면 tracker, health indicator, Slack alert 관련 테스트를 확인한다.
+- 공통 응답, 예외, 설정 파일을 바꾸면 영향 범위가 넓으므로 전체 테스트를 고려한다.
+
+## 3. 코드 구조
+
+- `src/main/java/com/rolling/api/domain/*`: 도메인별 controller, service, repository, dto, entity
+- `src/main/java/com/rolling/api/global/security`: Spring Security, JWT, 사용자 principal, 제재 접근 필터
+- `src/main/java/com/rolling/api/global/exception`: 공통 예외와 에러 응답
+- `src/main/java/com/rolling/api/global/response`: 공통 API 응답 포맷
+- `src/main/java/com/rolling/api/global/page`: paging 응답 모델
+- `src/main/java/com/rolling/api/global/monitoring`: actuator, scheduler health, 운영 지표
+- `src/main/java/com/rolling/api/global/alert`: Slack 운영 알림과 중복 방지
+- `src/main/java/com/rolling/api/infra/*`: Google, Kakao, Apple, S3 등 외부 연동
+- `src/test/java/com/rolling/api/domain/*`: 도메인별 테스트
+- `src/test/java/com/rolling/api/global/*`: 보안, 설정, 모니터링, 알림 테스트
+
+## 4. 백엔드 구현 규칙
+
+- Controller는 HTTP 요청/응답, validation, 인증 사용자 주입에 집중한다.
+- 비즈니스 규칙과 상태 전이는 Service에 둔다.
+- Repository 메서드는 조회 의도와 필터 기준이 드러나게 작성한다.
+- 상태 변경 로직은 transaction 경계, 동시성, idempotency를 함께 검토한다.
+- 목록 API는 paging, 정렬, soft delete, 차단 필터, 관리자/사용자 범위를 분리해서 확인한다.
+- DTO에는 API 계약상 필요한 필드만 노출하고 entity를 직접 응답으로 내보내지 않는다.
+- enum은 API raw value 호환성을 깨지 않도록 추가/변경 시 클라이언트 영향을 확인한다.
+- 외부 API 연동은 timeout, 실패 응답, null/빈 응답, 운영 알림 필요 여부를 함께 다룬다.
+- 운영 작업은 자동 실행과 수동 실행이 같은 service 로직을 재사용해야 한다.
+
+## 5. 보안 규칙
+
+- `.env`, Firebase service key, Apple key, AWS credential, Slack webhook은 출력하거나 커밋하지 않는다.
+- 관리자 API는 `ROLE_ADMIN` 또는 관리자 판정을 유지한다.
+- 관리자 판정은 이메일, 닉네임, provider가 아니라 서버 설정의 관리자 user id 기준을 따른다.
+- 공개 API와 인증 API 경계를 바꾸면 security 설정과 테스트를 함께 갱신한다.
+- `X-Test-User-Id` 같은 로컬 편의 인증은 local profile 밖으로 새지 않게 한다.
+- actuator 공개 범위는 health, health 하위 경로, prometheus 기준을 벗어나지 않게 검토한다.
+- CORS 운영 origin은 명시 허용 방식으로 유지하고 wildcard를 넣지 않는다.
+- 로그에는 access token, refresh token, webhook URL, AWS secret, Firebase key 원문을 남기지 않는다.
+
+## 6. 테스트 정책
+
+- 정상 경로 1개, 실패/validation 경로 1개, 권한 또는 통합 경계 1개를 우선 확인한다.
+- 버그 수정은 재발을 막는 회귀 테스트를 같이 추가하는 것을 기본값으로 한다.
+- 동시성 변경은 단일 요청 테스트만으로 충분하지 않으며 경합 상황을 검증한다.
+- 스케줄러 변경은 반복 실행 안전성, 실패 기록, health 상태를 확인한다.
+- notification 변경은 FCM 성공 여부와 DB 저장 알림의 책임을 분리해서 테스트한다.
+- crawler 변경은 외부 HTML 구조 변화와 중복 저장 방지 정책을 고려한다.
+- 테스트가 실행 불가하면 원인과 미검증 위험을 작업 결과에 명시한다.
+
+## 7. 문서 Source Of Truth
+
+- 도메인/API 공통: [domain_and_spec/shared/common-models.md](domain_and_spec/shared/common-models.md)
+- 오픈매트: [domain_and_spec/open-mat.md](domain_and_spec/open-mat.md)
+- 대회: [domain_and_spec/tournament.md](domain_and_spec/tournament.md)
+- 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
+- 커뮤니티: [domain_and_spec/community.md](domain_and_spec/community.md)
+- 인증 정책: [auth/AUTH_POLICY.md](auth/AUTH_POLICY.md)
+- 보안 정책: [security/SECURITY_POLICY.md](security/SECURITY_POLICY.md)
+- 운영 워크플로: [workflow/WORKFLOW_POLICY.md](workflow/WORKFLOW_POLICY.md)
+- 신고 운영: [report/REPORT_OPERATION_POLICY.md](report/REPORT_OPERATION_POLICY.md)
+- 사용자 제재: [usersanction/USER_SANCTION_POLICY.md](usersanction/USER_SANCTION_POLICY.md)
+- 관리자 정책: [rollingadmin/ROLLING_ADMIN_POLICY.md](rollingadmin/ROLLING_ADMIN_POLICY.md)
+- 커밋 규칙: [convention/COMMIT_CONVENTION.md](convention/COMMIT_CONVENTION.md)
 - 공용 enum, 공용 모델, 공용 도메인 규칙의 source of truth는 [domain-models.md](/C:/rolling/.codex-shared/domain-models.md)다.
-- 이 문서에서는 도메인 원문을 중복 정의하지 않고, 작업 중 자주 보는 포인트만 요약으로 남긴다.
 
-빠르게 보는 도메인 포인트:
+## 8. 문서 맵
+
+- [shared/common-models.md](domain_and_spec/shared/common-models.md): 공통 모델, 인증/사용자/알림/공지/문의 API, 날짜/시간 형식
+- [open-mat.md](domain_and_spec/open-mat.md): 오픈매트 도메인 모델 + API 스펙
+- [tournament.md](domain_and_spec/tournament.md): 대회 도메인 모델 + API 스펙
+- [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
+- [community.md](domain_and_spec/community.md): 커뮤니티 도메인 모델 + API 스펙
+
+## 9. 도메인 핵심 메모
 
 - 오픈매트는 정원이 차면 `CLOSED`, 종료 시점이 지나면 `FINISHED`가 되며, 신고 누적 3건 이상이면 신규 신청이 차단된다.
 - 호스트는 자신이 주최한 오픈매트에 신청할 수 없다.
@@ -19,9 +127,9 @@
 - 공지사항은 일반 사용자 앱에서 읽기 전용 기능으로 다룬다.
 - 문의 도메인 명칭은 `Inquiry`로 통일하며, 첫 답변 완료 시 `INQUIRY_ANSWERED` 알림을 저장한다.
 
-## 2. 프론트엔드 구현 원칙
+## 10. 프론트엔드 계약 메모
 
-### 4.1 기술 스택
+### 기술 스택
 
 - Framework: Flutter
 - Language: Dart
@@ -31,7 +139,7 @@
 - HTTP Client: `http`
 - Local Storage: `flutter_secure_storage`
 
-### 4.2 프론트 구현 메모
+### 구현 메모
 
 - 날짜/시간은 ISO 8601 문자열을 `DateTime`으로 파싱한다.
 - `Date` 타입 값은 `YYYY-MM-DD` 그대로 다룬다.
@@ -44,7 +152,7 @@
 - 공지사항 상세는 같은 필드를 그대로 사용해 상세 페이지를 구성하면 된다.
 - 문의는 인증 사용자 기준으로 `목록 -> 상세 -> 답변 확인` 흐름을 구현하면 된다.
 
-### 4.3 프론트 주의사항
+### 주의사항
 
 - 현재 `/users/me` 수정 API는 `phone` 수정 미지원이다.
 - 현재 `/open-mats/my`는 배열이 아니라 페이징 응답이다.
@@ -61,1139 +169,19 @@
 - 현재 사용자 전역 푸시 설정은 `/users/me.settings.pushNotificationEnabled`와 `PATCH /api/v1/users/me/settings`로 관리한다.
 - 알림 권한을 거부해도 오픈매트/대회/공지 핵심 조회와 신청 흐름은 막히지 않게 설계한다.
 
-
-## 3. Rolling API 명세서
-
-## 5.1 인증 API
-
-### 5.1.1 소셜 로그인
-
-`POST /api/v1/auth/login`
-
-- 인증: 불필요
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `provider` | `String` | O | 현재 구현 허용값 `GOOGLE`, `KAKAO`, `APPLE` |
-| `accessToken` | `String` | O | 소셜 제공자 access token. `APPLE`은 identity token |
-
-Response data:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `accessToken` | `String` | JWT access token |
-| `refreshToken` | `String` | JWT refresh token |
-| `tokenType` | `String` | 항상 `Bearer` |
-| `expiresIn` | `Long` | access token 만료 시간(초) |
-| `newUser` | `Boolean` | 신규 회원 여부 |
-| `userId` | `Long` | 사용자 ID |
-| `email` | `String` | 사용자 이메일 |
-| `name` | `String` | 사용자 이름 |
-| `isAdmin` | `Boolean` | 관리자 여부 |
-| `accountStatus` | `String` | 현재 계정 상태 |
-| `suspensionUntil` | `DateTime?` | 정지 종료 시각 |
-| `sanctionReasonSummary` | `String?` | 제재 사유 요약 |
-
-에러:
-
-- `UNSUPPORTED_PROVIDER`
-- `KAKAO_API_ERROR`
-- `GOOGLE_API_ERROR`
-- `APPLE_API_ERROR`
-- `VALIDATION_ERROR`
-
-현재 구현 메모:
-
-- Apple 로그인은 iOS 네이티브 `identityToken` 검증 방식으로 지원한다.
-- Apple 로그인 계약은 `C:\rolling\.codex-shared\api-spec.md`와 `C:\rolling\.codex-shared\domain-models.md`에도 반영되어 있다.
-- 로그인 응답에는 현재 사용자 기준 `isAdmin`이 포함된다.
-- 로그인 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
-
-### 5.1.2 토큰 갱신
-
-`POST /api/v1/auth/refresh`
-
-- 인증: 불필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `refreshToken` | `String` | O |
-
-Response data:
-
-- `accessToken`
-- `refreshToken`
-- `tokenType`
-- `expiresIn`
-- `isAdmin`
-- `accountStatus`
-- `suspensionUntil`
-- `sanctionReasonSummary`
-
-에러:
-
-- `INVALID_REFRESH_TOKEN`
-- `EXPIRED_REFRESH_TOKEN`
-- `VALIDATION_ERROR`
-
-
-현재 구현 메모:
-
-- 토큰 갱신 응답에도 현재 사용자 기준 `isAdmin`이 포함된다.
-- 토큰 갱신 응답에도 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
-
-### 5.1.3 로그아웃
-
-`POST /api/v1/auth/logout`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `fcmToken` | `String` | - | 현재 디바이스 토큰을 함께 제거할 때 전달 |
-
-- Response data: `null`
-
-현재 구현 메모:
-
-- 요청 본문에 `fcmToken`을 보내면 현재 사용자에게 연결된 해당 디바이스 토큰도 같이 제거한다.
-- `fcmToken` 없이 호출하면 Refresh Token만 무효화한다.
-- 로그아웃 시 토큰 제거와 `DELETE /api/v1/users/me/fcm`의 역할 분리는 현재 동작은 가능하지만, 운영 문서 기준으로는 한 번 더 정리할 예정이다.
-
-### 5.1.4 회원 탈퇴 요청
-
-`DELETE /api/v1/auth/withdraw`
-
-- 인증: 필요
-
-Response data:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `withdrawalPending` | `Boolean` | 탈퇴 예약 상태 |
-| `scheduledAt` | `DateTime` | 탈퇴 예정 시각 |
-
-현재 구현 메모:
-
-- 탈퇴는 즉시 실행되지 않는다.
-- 요청 다음 날 `21:00` (`Asia/Seoul`)에 실행된다.
-- `SUSPENDED` 상태에서도 탈퇴 요청은 허용된다.
-
-### 5.1.5 회원 탈퇴 취소
-
-`POST /api/v1/auth/withdraw/cancel`
-
-- 인증: 필요
-
-Response data:
-
-| 필드 | 타입 |
-| --- | --- |
-| `withdrawalPending` | `Boolean` |
-| `scheduledAt` | `DateTime?` |
-
-현재 구현 메모:
-
-- `SUSPENDED` 상태에서도 탈퇴 취소는 허용된다.
-
-에러:
-
-- `WITHDRAWAL_NOT_PENDING`
-
-## 5.2 사용자 API
-
-### 5.2.1 내 정보 조회
-
-`GET /api/v1/users/me`
-
-- 인증: 필요
-
-Response data:
-
-| 필드 | 타입 |
-| --- | --- |
-| `id` | `Long` |
-| `nickname` | `String` |
-| `email` | `String?` |
-| `phone` | `String?` |
-| `affiliation` | `String?` |
-| `socialProvider` | `String` |
-| `beltColor` | `String` |
-| `createdAt` | `DateTime` |
-| `withdrawalPending` | `Boolean` |
-| `withdrawalScheduledAt` | `DateTime?` |
-| `accountStatus` | `String` |
-| `suspensionUntil` | `DateTime?` |
-| `sanctionReasonSummary` | `String?` |
-| `isAdmin` | `Boolean` |
-| `settings` | `Object` |
-| `settings.pushNotificationEnabled` | `Boolean` |
-
-현재 구현 메모:
-
-- `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
-- `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`와 소속 `affiliation`이 포함된다.
-- `/users/me` 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
-- 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
-- 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
-- 서버는 accessToken에서 확인한 `userId`와 `admin.user-ids` 설정값으로 `ROLE_USER`/`ROLE_ADMIN`을 내부 판단한다.
-- 프론트는 `isAdmin=true`일 때 관리자 UI를 노출할 수 있다.
-- 실제 보호는 계속 서버의 관리자 API 권한 검사와 `403 FORBIDDEN` 응답으로 처리한다.
-- `isAdmin`은 UI 제어용 보조 정보이고, 최종 권한 판단 기준은 항상 서버다.
-
-### 5.2.2 내 정보 수정
-
-`PUT /api/v1/users/me`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `nickname` | `String` | - |
-| `affiliation` | `String` | - |
-| `beltColor` | `String` | - |
-
-현재 구현 메모:
-
-- `phone` 수정은 아직 미지원이다.
-- `affiliation`은 선택 입력이며, 빈 값 없이 전달된 문자열을 그대로 반영한다.
-
-### 5.2.3 내 설정 수정
-
-`PATCH /api/v1/users/me/settings`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `pushNotificationEnabled` | `Boolean` | O |
-
-Response data:
-
-| 필드 | 타입 |
-| --- | --- |
-| `pushNotificationEnabled` | `Boolean` |
-
-현재 구현 메모:
-
-- 이 설정은 사용자 전역 푸시 수신 설정이다.
-- `false`면 해당 사용자는 모든 디바이스에서 FCM 발송 대상에서 제외된다.
-- `Notification` 알림함 저장 자체는 계속 유지된다.
-- 앱은 마이페이지 진입 시 `GET /api/v1/users/me`의 `settings.pushNotificationEnabled`를 source of truth로 사용한다.
-- 앱에서 스위치를 변경하면 `PATCH /api/v1/users/me/settings`를 호출한다.
-- 푸시를 꺼도 `GET /api/v1/notifications` 알림함 데이터는 계속 조회 가능해야 한다.
-
-### 5.2.4 FCM 토큰 등록
-
-`POST /api/v1/users/me/fcm`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `fcmToken` | `String` | O |
-| `platform` | `String` | - |
-| `deviceId` | `String` | - |
-| `appVersion` | `String` | - |
-
-Response data: `null`
-
-현재 구현 메모:
-
-- 토큰 저장 구조는 `user_devices` 1:N 이다.
-- 동일 토큰 재등록 시 기존 디바이스 레코드를 재사용한다.
-- 동일 토큰 재등록 시 `platform`, `deviceId`, `appVersion`, `updatedAt`도 최신값으로 갱신한다.
-- 로그아웃/탈퇴/기기 변경 시점별 토큰 정리 규칙은 운영 문서에서 추가 정리 중이다.
-
-### 5.2.5 FCM 토큰 삭제
-
-`DELETE /api/v1/users/me/fcm`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `fcmToken` | `String` | O |
-
-Response data: `null`
-
-현재 구현 메모:
-
-- 현재 로그인한 사용자에게 연결된 토큰만 삭제한다.
-- 존재하지 않는 토큰이어도 성공 응답을 반환한다.
-- 로그아웃 API의 선택적 `fcmToken` 제거와 함께 같은 토큰 라이프사이클 정책으로 관리한다.
-
-### 5.2.6 사용자 차단
-
-`POST /api/v1/users/{id}/block`
-
-- 인증: 필요
-- Response data: `null`
-
-현재 구현 메모:
-
-- 차단은 조회자 기준으로 동작한다.
-- 차단한 사용자의 오픈매트/대회 콘텐츠는 목록과 상세에서 제외된다.
-- 차단 정보는 `user_blocked_users` 조인 테이블에 저장되며 `blocked_at`으로 차단 시각을 기록한다.
-- `GET /api/v1/users/blocks`로 차단한 사용자 목록과 차단 시각을 조회할 수 있다.
-
-### 5.2.7 사용자 차단 해제
-
-`DELETE /api/v1/users/{id}/block`
-
-- 인증: 필요
-- Response data: `null`
-
-현재 구현 메모:
-
-- 차단 해제는 기존 차단 관계를 제거한다.
-- 차단 해제 이후에는 오픈매트/대회 콘텐츠가 다시 일반 조회 결과에 노출된다.
-
-### 5.2.8 관리자 사용자 제재
-
-관리자 사용자 제재는 운영 상태로 구현되어 있다.
-
-핵심 원칙:
-
-- 제재 이력은 `user_sanctions` 테이블에 저장한다.
-- `users`에는 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`를 두어 현재 상태를 빠르게 보여준다.
-- 상태 예시: `ACTIVE`, `WARNING`, `SUSPENDED`, `WITHDRAWN`
-- `TEMP_SUSPEND`는 로그인 허용 + 제한 모드다.
-- 무기한 정지도 별도 상태가 아니라 장기 `TEMP_SUSPEND`로 처리한다.
-- `RELEASE`는 제재 타입이 아니라 해제 동작이다.
-
-현재 관리자 API:
-
-- `GET /api/v1/admin/users`
-- `GET /api/v1/admin/users/{id}`
-- `GET /api/v1/admin/users/{id}/sanctions`
-- `POST /api/v1/admin/users/{id}/sanctions`
-- `DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}`
-
-`GET /api/v1/admin/users` 응답 필드:
-
-- `id`
-- `nickname`
-- `email`
-- `affiliation`
-- `createdAt`
-- `accountStatus`
-- `suspensionUntil`
-- `lastSanctionAt`
-
-`GET /api/v1/admin/users/{id}` 응답 필드:
-
-- `id`
-- `nickname`
-- `email`
-- `phone`
-- `affiliation`
-- `socialProvider`
-- `beltColor`
-- `createdAt`
-- `accountStatus`
-- `suspensionUntil`
-- `sanctionReasonSummary`
-- `isWithdrawn`
-- `withdrawalPending`
-- `withdrawalScheduledAt`
-- `lastSanctionAt`
-
-`GET /api/v1/admin/users/{id}/sanctions` 응답 필드:
-
-- `id`
-- `type`
-- `reason`
-- `memo`
-- `startsAt`
-- `endsAt`
-- `createdByUserId`
-- `createdAt`
-- `releasedByUserId`
-- `releasedAt`
-
-`POST /api/v1/admin/users/{id}/sanctions` 요청 body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `type` | `String` | O | `WARNING`, `TEMP_SUSPEND` |
-| `reason` | `String` | O | 제재 사유 |
-| `memo` | `String` | - | 운영 메모 |
-| `endsAt` | `DateTime` | - | `TEMP_SUSPEND`일 때만 필요 |
-
-`POST /api/v1/admin/users/{id}/sanctions` 응답:
-
-- `UserSanctionResponse`
-
-`DELETE /api/v1/admin/users/{id}/sanctions/{sanctionId}` 응답:
-
-- `null`
-
-제한 모드 메모:
-
-- 허용 범위는 문의, 도움말, 알림 on/off, 차단한 사용자 관리, 탈퇴 요청/취소, 로그아웃으로 최소화한다.
-- 사용자 정보 수정은 기본 차단한다.
-- 제재 만료는 스케줄러가 자동 해제한다.
-- 장기 정지도 제한 모드에서 문의와 탈퇴 경로를 유지한다.
-
-## 5.3 알림 API
-
-### 5.3.1 알림 목록 조회
-
-`GET /api/v1/notifications`
-
-- 인증: 필요
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `20` |
-
-기본 정렬:
-
-- `createdAt DESC`
-
-Response item:
-
-| 필드 | 타입 |
-| --- | --- |
-| `id` | `Long` |
-| `type` | `String` |
-| `targetId` | `Long` |
-| `route` | `String` |
-| `title` | `String` |
-| `body` | `String` |
-| `readAt` | `DateTime?` |
-| `createdAt` | `DateTime` |
-
-### 5.3.2 알림 읽음 처리
-
-`PATCH /api/v1/notifications/{id}/read`
-
-- 인증: 필요
-- Response data: `null`
-
-## 5.4 오픈매트 API
-
-### 5.4.1 오픈매트 리스트 조회
-
-`GET /api/v1/open-mats`
-
-- 인증: 불필요
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 | 설명 |
-| --- | --- | --- | --- |
-| `region` | `String` | - | 지역 필터 |
-| `status` | `String` | - | 상태 필터 |
-| `q` | `String` | - | 제목/장소명/주소 부분 일치 검색 |
-| `page` | `Integer` | `0` | 페이지 번호 |
-| `size` | `Integer` | `20` | 페이지 크기 |
-| `sort` | `String` | `startDateTime,asc` | 정렬 |
-
-Response: 페이징된 `OpenMatModel`
-
-현재 구현 메모:
-
-- 로그인 사용자가 차단한 작성자의 오픈매트는 목록과 검색 결과에서 제외된다.
-- 비로그인 사용자는 기존 공개 목록과 동일하게 조회된다.
-- App Review 비회원 둘러보기에서는 저장된 토큰이 있더라도 이 공개 조회 요청에 `Authorization` 헤더를 붙이지 않는다.
-- 로그인한 앱 클라이언트는 목록·검색 요청에 `Authorization` 헤더를 포함해야 차단 필터가 적용된다.
-
-### 5.4.2 오픈매트 상세 조회
-
-`GET /api/v1/open-mats/{id}`
-
-- 인증: 불필요
-- Response: `OpenMatModel`
-
-현재 구현 메모:
-
-- 현재 상세 응답 모델은 `OpenMatModel`이며 `hostNickname`을 포함한다.
-- 프론트 상세 화면은 별도 생성자 조회 API 없이 상세 응답의 `hostNickname`을 그대로 사용하면 된다.
-- 비회원 상세 조회는 `Authorization` 헤더 없이 호출해야 App Review 공개 조회 계약과 일치한다.
-- soft delete된 오픈매트는 비로그인 사용자에게는 `NOT_FOUND`다.
-- 삭제 알림을 받은 신청자, 호스트, 관리자에게는 `deleted=true`, `deletedAt`이 포함된 상세 응답을 반환한다.
-- 로그인 사용자가 차단한 작성자의 오픈매트는 상세 조회에서 `NOT_FOUND`로 처리한다.
-
-### 5.4.3 오픈매트 등록
-
-`POST /api/v1/open-mats`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `title` | `String` | O |
-| `description` | `String` | O |
-| `startDateTime` | `DateTime` | O |
-| `endDateTime` | `DateTime` | O |
-| `locationName` | `String` | O |
-| `address` | `String` | O |
-| `latitude` | `Decimal?` | - |
-| `longitude` | `Decimal?` | - |
-| `region` | `Region` | O |
-| `maxCapacity` | `Integer` | O |
-| `hostInstagramId` | `String?` | - |
-
-Response: `OpenMatModel`
-
-검증:
-
-- 종료 시간은 시작 시간보다 이후여야 한다.
-- `maxCapacity`는 `-1` 또는 `1 이상`이어야 한다.
-- `latitude`는 값이 있으면 `-90..90` 범위여야 한다.
-- `longitude`는 값이 있으면 `-180..180` 범위여야 한다.
-- `latitude`, `longitude`는 둘 다 없으면 좌표 없이 생성한다.
-- `latitude`, `longitude` 중 하나만 있으면 `VALIDATION_ERROR`다.
-- 좌표 변환은 `GET /api/v1/maps/kakao/geocode`가 카카오 Local API를 호출해 처리한다.
-
-### 5.4.4 오픈매트 수정
-
-`PUT /api/v1/open-mats/{id}`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `title` | `String?` | - |
-| `description` | `String?` | - |
-| `startDateTime` | `DateTime?` | - |
-| `endDateTime` | `DateTime?` | - |
-| `locationName` | `String?` | - |
-| `address` | `String?` | - |
-| `latitude` | `Decimal?` | - |
-| `longitude` | `Decimal?` | - |
-| `region` | `Region?` | - |
-| `maxCapacity` | `Integer?` | - |
-| `hostInstagramId` | `String?` | - |
-
-Response: `OpenMatModel`
-
-현재 구현 메모:
-
-- 작성자만 수정 가능
-- `latitude`, `longitude`는 값이 있으면 각각 `-90..90`, `-180..180` 범위여야 한다.
-- 수정 요청에서 `latitude`, `longitude`가 둘 다 숫자면 기존 좌표를 새 좌표로 교체한다.
-- 수정 요청에서 `latitude`, `longitude`가 둘 다 `null`로 명시되면 기존 좌표를 제거한다.
-- 수정 요청에 좌표 필드가 없으면 기존 좌표를 유지한다.
-- 수정 요청에서 `latitude`, `longitude` 중 하나만 있으면 `VALIDATION_ERROR`다.
-- 참가자가 있고 일정/장소 필드가 바뀌면 수정 알림 저장 후 FCM 발송 시도
-- 수정은 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
-
-### 5.4.5 오픈매트 삭제
-
-`DELETE /api/v1/open-mats/{id}`
-
-- 인증: 필요
-
-
-Response data: `null`
-
-현재 구현 메모:
-
-- 작성자만 삭제 가능
-- 신청자가 있어도 바로 삭제 가능
-- 실제로는 soft delete
-- 참가자가 있으면 삭제 알림 저장 후 FCM 발송 시도
-- 삭제는 작성자의 accessToken이 반드시 필요하고 비인증 우회 정책은 없다.
-
-### 5.4.6 오픈매트 신청
-
-`POST /api/v1/open-mats/{id}/apply`
-
-- 인증: 필요
-- Response data: `null`
-
-에러:
-
-- `HOST_CANNOT_APPLY`
-- `OPEN_MAT_REPORTED`
-- `OPEN_MAT_CLOSED`
-- `OPEN_MAT_FINISHED`
-- `ALREADY_APPLIED`
-- `CAPACITY_FULL`
-
-### 5.4.7 오픈매트 신청 취소
-
-`DELETE /api/v1/open-mats/{id}/apply`
-
-- 인증: 필요
-- Response data: `null`
-
-### 5.4.8 내가 신청한 오픈매트 목록
-
-`GET /api/v1/open-mats/my`
-
-- 인증: 필요
-- Response: 페이징된 `OpenMatModel`
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `10` |
-| `sort` | `String` | `startDateTime,asc` |
-
-현재 구현 메모:
-
-- 현재 `/api/v1/open-mats/my`는 내가 신청한 오픈매트 목록만 조회한다.
-- 응답은 `OpenMatResponse`를 사용하므로 각 항목에 `hostNickname`이 포함된다.
-- 내가 개최한 오픈매트 목록은 `/api/v1/open-mats/my-hosting`으로 별도 조회한다.
-
-### 5.4.9 내가 개최한 오픈매트 목록
-
-`GET /api/v1/open-mats/my-hosting`
-
-- 인증: 필요
-- Response: 페이징된 `OpenMatModel`
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `10` |
-| `sort` | `String` | `startDateTime,asc` |
-
-현재 구현 메모:
-
-- 내가 개최한 오픈매트만 조회한다.
-- soft delete된 오픈매트는 제외한다.
-- 응답은 `OpenMatResponse`를 사용하므로 각 항목에 `hostNickname`이 포함된다.
-
-### 5.4.10 오픈매트 참가자 목록 조회
-
-`GET /api/v1/open-mats/{id}/participants`
-
-- 인증: 필요
-- 권한: 로그인 사용자
-- Response data: `List<OpenMatParticipantResponse>`
-
-Response item 메모:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `userId` | `Long` | 참가자 사용자 ID |
-| `name` | `String` | 참가자 이름. 현재 구현에서는 `nickname`을 사용 |
-| `affiliation` | `String?` | 참가자 소속 |
-| `beltColor` | `String` | 벨트 색상 |
-
-프론트 구현 메모:
-
-- 오픈매트 상세 화면에서 로그인한 사용자에게 참가자 목록을 노출한다.
-- 참가자 목록은 현재 신청 순서대로 반환한다.
-- 현재 프론트는 API 실패 시 상세 응답의 `participantUids`로 최소 fallback 목록을 구성한다.
-- 이 endpoint는 아직 `api-spec.json`에 반영되지 않았으므로 실서버 검증 전까지 확정 계약으로 보지 않는다.
-
-### 5.4.11 오픈매트 참가자 강제 취소
-
-`DELETE /api/v1/open-mats/{openMatId}/participants/{participantUserId}`
-
-- 인증: 필요
-- 권한: 작성자 전용
-- Response data: `null`
-
-프론트 구현 메모:
-
-- 작성자는 상세 화면의 참가자 목록에서 개별 참가자를 강제 취소할 수 있다.
-- 성공 시 참가자 목록과 상세 데이터를 다시 조회해 현재 신청 인원 수를 맞춘다.
-- 이 endpoint는 아직 `api-spec.json`에 반영되지 않았으므로 실서버 검증 전까지 확정 계약으로 보지 않는다.
-
-### 5.4.12 오픈매트 모집 상태 수동 변경
-
-`PATCH /api/v1/open-mats/{id}/status`
-
-- 인증: 필요
-- 권한: 작성자 전용
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `status` | `String` | O | `RECRUITING`, `CLOSED` |
-
-Response: `OpenMatModel`
-
-프론트 구현 메모:
-
-- 상세 화면에서 작성자는 `RECRUITING`, `CLOSED` 상태를 직접 변경할 수 있다.
-- `FINISHED`는 자동 상태로 보고 수동 변경 대상에서 제외한다.
-- 현재 프론트는 `PATCH /status`가 `404 NOT_FOUND`이면 기존 `PUT /api/v1/open-mats/{id}`의 `status` 필드 변경으로 한 번 더 fallback 시도한다.
-- 이 endpoint는 아직 `api-spec.json`에 반영되지 않았으므로 실서버 검증 전까지 확정 계약으로 보지 않는다.
-
-### 5.4.13 오픈매트 신고
-
-`POST /api/v1/open-mats/{id}/report`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `reason` | `String` | O |
-| `customReason` | `String?` | - |
-
-Response data: `null`
-
-에러:
-
-- `ALREADY_REPORTED`
-- `SELF_REPORT_NOT_ALLOWED`
-- `VALIDATION_ERROR`
-- `NOT_FOUND`
-
-### 5.4.14 카카오 주소 좌표 변환
-
-`GET /api/v1/maps/kakao/geocode?address={address}`
-
-- 인증: 필요
-- 용도: Flutter 카카오/다음 우편번호 WebView에서 선택한 주소를 위도/경도로 변환
-- 백엔드 설정: `KAKAO_REST_API_KEY` 필요
-
-Response data:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `address` | `String` | 좌표 변환 기준 주소 |
-| `latitude` | `Decimal` | 위도. 카카오 Local API `y` |
-| `longitude` | `Decimal` | 경도. 카카오 Local API `x` |
-
-에러:
-
-- `VALIDATION_ERROR`: `address`가 비어 있거나 너무 짧은 경우
-- `GEOCODE_NOT_FOUND`: 카카오 Local API 결과가 없는 경우
-- `KAKAO_GEOCODE_FAILED`: 카카오 API 호출 실패 또는 응답 형식 오류
-- `KAKAO_GEOCODE_TIMEOUT`: 카카오 API timeout
-- `KAKAO_GEOCODE_RATE_LIMITED`: 카카오 API quota/rate limit
-
-## 5.5 대회 API
-
-### 5.5.1 대회 리스트 조회
-
-`GET /api/v1/tournaments`
-
-- 인증: 불필요
-- Response: 페이징된 `TournamentResponse`
-- `posterUrl`은 수동 등록 대회의 `posterKey` 또는 크롤링 저장 URL을 기준으로 조립된 공개 이미지 URL이다.
-- 리스트 응답에는 `posterKey`가 없고, 프론트는 `posterUrl`만 사용한다.
-
-현재 구현 메모:
-
-- 로그인 사용자가 차단한 작성자의 대회는 목록에서 제외된다.
-- 비로그인 사용자는 기존 공개 목록과 동일하게 조회된다.
-- App Review 비회원 둘러보기에서는 저장된 토큰이 있더라도 이 공개 조회 요청에 `Authorization` 헤더를 붙이지 않는다.
-- 로그인한 앱 클라이언트는 목록·검색 요청에 `Authorization` 헤더를 포함해야 차단 필터가 적용된다.
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `source` | `String` | - |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `20` |
-
-### 5.5.2 대회 상세 조회
-
-`GET /api/v1/tournaments/{id}`
-
-- 인증: 불필요
-- Response: `TournamentResponse`
-- 작성자 포함 모든 사용자가 동일한 응답을 받는다.
-- 상세 응답에도 `posterKey`는 없고, `posterUrl`만 사용한다.
-- 상세의 `posterUrl` 역시 브라우저에서 직접 열 수 있는 공개 URL이어야 한다.
-- 비회원 상세 조회는 `Authorization` 헤더 없이 호출해야 App Review 공개 조회 계약과 일치한다.
-- 로그인 사용자가 차단한 작성자의 대회는 상세 조회에서 `NOT_FOUND`로 처리한다.
-
-### 5.5.3 대회 등록
-
-`POST /api/v1/tournaments`
-
-- 인증: 필요
-- 포스터 이미지는 먼저 `POST /api/v1/tournaments/poster-upload-url`로 업로드 URL을 발급받은 뒤 S3에 직접 업로드한다.
-- 업로드 성공 후 생성 API에는 업로드된 파일이 아니라 `posterKey`만 전달한다.
-- 허용 이미지 형식은 `jpg`, `png`이며 `webp`, `gif`는 선택 확장 형식이다.
-- Response: `TournamentResponse`
-- `posterUrl`은 응답 시 `posterKey`를 기준으로 조립된다.
-- `posterKey`가 없으면 생성 요청은 실패한다.
-
-Request body:
-
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `title` | `String` | O |
-| `organizer` | `String?` | - |
-| `posterKey` | `String` | O |
-| `competitionDate` | `Date` | O |
-| `registrationDeadline` | `Date` | O |
-| `location` | `String?` | - |
-| `applyLink` | `String` | O |
-
-Response: `TournamentResponse`
-
-현재 개편 메모:
-
-- 대회 생성/상세/신고 개편 기준 문서는 [BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md](/C:/rolling/rolling-spring-backend/rolling-api/docs/tournaments/BACKEND_TOURNAMENT_CREATE_DETAIL_REPORT_PLAN.md)다.
-- 대회 생성은 `POST /api/v1/tournaments/poster-upload-url`로 받은 `posterKey`를 사용한다.
-- 응답의 `posterUrl`은 `posterKey`를 기반으로 조립된 공개 URL이다.
-- 프론트는 `poster-upload-url` 응답의 `uploadUrl`로 S3에 PUT 업로드를 수행하고, 그 다음 생성 API를 호출해야 한다.
-- 업로드 요청의 `contentType`은 실제 파일 MIME type과 일치해야 한다. 예: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
-- `fileName` 또는 `contentType`이 비정상이면 업로드 URL 발급 단계에서 실패한다.
-- 상세 조회는 작성자 포함 공용 `TournamentResponse`를 그대로 사용한다.
-
-### 5.5.4 대회 수정
-
-`PUT /api/v1/tournaments/{id}`
-
-- 인증: 필요
-- Request body: 현재는 등록 API와 별개로 `posterUrl`을 포함한 기존 수정 필드를 유지한다.
-- Response: `TournamentResponse`
-
-현재 구현 메모:
-
-- 최소 1개 필드는 전달해야 한다.
-- `registrationDeadline <= competitionDate` 규칙 유지
-
-### 5.5.5 대회 삭제
-
-`DELETE /api/v1/tournaments/{id}`
-
-- 인증: 필요
-- Response data: `null`
-
-### 5.5.6 대회 크롤링 수동 실행
-
-`POST /api/v1/tournaments/crawl`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `source` | `String` | - |
-
-Response data:
-
-| 필드 | 타입 |
-| --- | --- |
-| `crawledCount` | `Integer` |
-| `createdCount` | `Integer` |
-| `updatedCount` | `Integer` |
-| `skippedCount` | `Integer` |
-
-권한 메모:
-
-- 관리자 userId 목록: `admin.user-ids`
-- 관리자 권한 판별 기준: `admin.user-ids`
-- 인증된 사용자는 기본 `ROLE_USER`, 관리자 대상은 `ROLE_ADMIN` 권한을 가진다.
-- 클라이언트는 `ROLE` 값을 요청에 따로 보내지 않으며 `Authorization: Bearer {accessToken}`만 전달한다.
-- 관리자 여부 최종 판별은 항상 서버가 수행한다.
-- 관리자 페이지 버튼 노출 여부는 프론트 UX 정책이고, 실제 관리자 액션 보호는 서버 `403 FORBIDDEN` 응답으로 처리한다.
-- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
-
-### 5.5.7 대회 포스터 업로드 URL 발급
-
-`POST /api/v1/tournaments/poster-upload-url`
-
-- 인증: 필요
-- Response: `TournamentPosterUploadUrlResponse`
-
-현재 구현 메모:
-
-- 클라이언트는 먼저 업로드 URL을 발급받고 S3에 직접 업로드한 뒤, 생성 API에 `posterKey`를 전달한다.
-- 응답에는 `posterKey`와 업로드 URL이 내려가고, 생성/조회 응답의 `posterUrl`은 `posterKey` 기준으로 조립한다.
-- 운영 환경에서는 `AWS_S3_PUBLIC_BASE_URL`에 CloudFront 또는 공개 이미지 도메인을 넣고, 누락 시 서버 시작이 실패해야 한다.
-- 운영 배포 전 smoke test는 `poster-upload-url` 발급 -> S3 PUT 업로드 -> `POST /api/v1/tournaments` -> 목록/상세 `posterUrl` 200 확인 순서로 진행한다.
-- 출시 성공 기준은 업로드/생성/신고 성공률과 `posterUrl` GET 성공률을 분리해서 본다.
-- `posterUrl`이 S3 직링크로 보이면 운영 설정 누락으로 보고 우선 점검한다.
-
-### 5.5.8 대회 신고
-
-`POST /api/v1/tournaments/{id}/report`
-
-- 인증: 필요
-- Response: `null`
-
-현재 구현 메모:
-
-- 동일 사용자는 같은 대회를 한 번만 신고할 수 있다.
-- 자기 작성 대회 신고는 차단한다.
-- 신고 저장은 공통 `Report` 도메인을 재사용한다.
-- 신고 운영은 제출 성공률과 중복/자기신고 차단 실패율을 함께 본다.
-
-## 5.6 공지사항 API
-
-구현 상태 메모:
-
-- 현재 서버는 조회 API(`GET /api/v1/notices`, `GET /api/v1/notices/{id}`)와 운영 API(`POST/PUT/DELETE /api/v1/notices`)를 지원한다.
-- 앱 범위에서는 계속 조회 API만 사용한다.
-- 운영자는 Apidog 또는 관리자 페이지에서 `Authorization: Bearer {accessToken}`으로 공지사항 작성/수정/삭제를 수행한다.
-- 공지사항 운영 API는 `ROLE_ADMIN` accessToken이 필요하며, 관리자는 `admin.user-ids` 설정으로 판별한다.
-
-### 5.6.1 공지사항 목록 조회
-
-`GET /api/v1/notices`
-
-- 인증: 불필요
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 | 설명 |
-| --- | --- | --- | --- |
-| `page` | `Integer` | `0` | 페이지 번호 |
-| `size` | `Integer` | `20` | 페이지 크기 |
-
-기본 정렬:
-
-- `createdAt DESC`
-
-Response: 페이징된 `NoticeModel`
-
-프론트 메모:
-
-- 목록 item에 `content`가 포함되어도 된다.
-- 현재 구현 기준으로 목록 item에는 `updatedAt`이 포함되지 않는다.
-- 앱에서는 목록에서 본문 일부만 잘라 보여줘도 되고, 상세에서는 전체 본문을 보여주면 된다.
-
-### 5.6.2 공지사항 상세 조회
-
-`GET /api/v1/notices/{id}`
-
-- 인증: 불필요
-- Response: `NoticeModel`
-
-에러:
-
-- `NOT_FOUND`
-
-### 5.6.3 공지사항 생성
-
-`POST /api/v1/notices`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `title` | `String` | O | 공지사항 제목 |
-| `content` | `String` | O | 공지사항 본문 |
-| `authorName` | `String` | O | 앱에 노출할 작성자 이름 |
-| `createdBy` | `String` | - | 운영 내부 추적용 작성자 식별자 |
-
-Response: `NoticeModel`
-
-현재 구현 메모:
-
-- `createdBy`가 없으면 `authorName` 값을 그대로 저장한다.
-- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
-
-### 5.6.4 공지사항 수정
-
-`PUT /api/v1/notices/{id}`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `title` | `String` | - | 공지사항 제목 |
-| `content` | `String` | - | 공지사항 본문 |
-| `authorName` | `String` | - | 앱에 노출할 작성자 이름 |
-| `createdBy` | `String` | - | 운영 내부 추적용 작성자 식별자 |
-
-Response: `NoticeModel`
-
-현재 구현 메모:
-
-- 최소 1개 필드는 전달해야 한다.
-- 전달하지 않은 필드는 기존 값을 유지한다.
-- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
-
-에러:
-
-- `VALIDATION_ERROR`
-- `NOT_FOUND`
-
-### 5.6.5 공지사항 삭제
-
-`DELETE /api/v1/notices/{id}`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-- Response data: `null`
-
-현재 구현 메모:
-
-- 삭제는 soft delete가 아니라 `hard delete`다.
-- `X-Crawler-Admin-Key`와 `tournament.crawler.admin-key` 기반 우회 정책은 제거됐다.
-
-에러:
-
-- `NOT_FOUND`
-
-## 5.7 문의 API
-
-구현 상태 메모:
-
-- 문의 도메인 명칭은 `Inquiry`로 확정했다.
-- 사용자 API는 `POST /api/v1/inquiries`, `GET /api/v1/inquiries`, `GET /api/v1/inquiries/{id}`다.
-- 관리자 API는 `GET /api/v1/admin/inquiries`, `GET /api/v1/admin/inquiries/{id}`, `PATCH /api/v1/admin/inquiries/{id}/answer`, `PATCH /api/v1/admin/inquiries/{id}/status`다.
-- 관리자 API는 `Authorization: Bearer {accessToken}` + `ROLE_ADMIN` 기준으로 보호한다.
-- 첫 답변 완료 시 알림함에 `INQUIRY_ANSWERED` 알림을 저장한다.
-
-### 5.7.1 문의 생성
-
-`POST /api/v1/inquiries`
-
-- 인증: 필요
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `title` | `String` | O | 문의 제목 |
-| `content` | `String` | O | 문의 본문 |
-
-Response: `InquiryModel`
-
-현재 구현 메모:
-
-- 생성 시 상태는 항상 `RECEIVED`다.
-- 생성자는 accessToken 기준 현재 로그인 사용자로 결정한다.
-
-### 5.7.2 내 문의 목록 조회
-
-`GET /api/v1/inquiries`
-
-- 인증: 필요
-- Response: 페이징된 `InquiryModel`
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `20` |
-| `sort` | `String` | `createdAt,desc` |
-
-현재 구현 메모:
-
-- 현재 로그인한 사용자의 문의만 최신순으로 조회한다.
-
-### 5.7.3 내 문의 상세 조회
-
-`GET /api/v1/inquiries/{id}`
-
-- 인증: 필요
-- Response: `InquiryModel`
-
-에러:
-
-- `NOT_FOUND`
-
-현재 구현 메모:
-
-- 현재 로그인한 사용자 본인 문의가 아니면 `NOT_FOUND`로 처리한다.
-
-### 5.7.4 관리자 문의 목록 조회
-
-`GET /api/v1/admin/inquiries`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-- Response: 페이징된 `InquiryModel`
-
-Query parameters:
-
-| 파라미터 | 타입 | 기본값 |
-| --- | --- | --- |
-| `page` | `Integer` | `0` |
-| `size` | `Integer` | `20` |
-| `sort` | `String` | `createdAt,desc` |
-
-### 5.7.5 관리자 문의 상세 조회
-
-`GET /api/v1/admin/inquiries/{id}`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-- Response: `InquiryModel`
-
-에러:
-
-- `NOT_FOUND`
-
-### 5.7.6 관리자 문의 답변 저장
-
-`PATCH /api/v1/admin/inquiries/{id}/answer`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `answerContent` | `String` | O | 운영자 답변 본문 |
-
-Response: `InquiryModel`
-
-현재 구현 메모:
-
-- 답변 저장 시 `answerContent`, `answeredByUserId`, `answeredAt`을 기록한다.
-- 답변 저장 시 상태는 `ANSWERED`로 변경된다.
-- 이미 `ANSWERED` 상태에서 답변 내용을 수정하는 것은 가능하지만, 추가 알림은 보내지 않는다.
-
-### 5.7.7 관리자 문의 상태 변경
-
-`PATCH /api/v1/admin/inquiries/{id}/status`
-
-- 인증: `Authorization: Bearer {accessToken}` 필요 (`ROLE_ADMIN`)
-
-Request body:
-
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `status` | `String` | O | `RECEIVED`, `IN_REVIEW`, `ANSWERED` |
-
-Response: `InquiryModel`
-
-에러:
-
-- `VALIDATION_ERROR`
-- `NOT_FOUND`
-
-현재 구현 메모:
-
-- 답변이 없는 문의는 `ANSWERED` 상태로 변경할 수 없다.
-- 답변이 저장된 문의는 `ANSWERED` 외 상태로 되돌리지 않는다.
-## 6. 날짜/시간 형식
-
-| 타입 | 형식 | 예시 |
-| --- | --- | --- |
-| `DateTime` | ISO 8601 | `2026-03-17T21:00:00` |
-| `Date` | ISO 8601 | `2026-03-17` |
-
-
+## 11. 운영 작업 규칙
+
+- 새 scheduler를 추가하면 `ScheduledTaskTracker`, `SchedulerHealthIndicator`, Slack alert 반영 여부를 함께 검토한다.
+- 자동 실행과 관리자 수동 실행은 같은 service 로직을 재사용한다.
+- cron은 `Asia/Seoul` 기준인지 명시하고, 시스템 기본 시간대에 암묵 의존하지 않는다.
+- 실패를 catch 후 무시하지 말고 추적기와 운영 알림에 남긴다.
+- 성공 summary는 운영자가 재실행 필요 여부를 판단할 수 있는 수준으로 작성한다.
+
+## 12. Git과 커밋
+
+- 기능 추가, 버그 수정, 리팩터링, 문서 수정 등 작업 단위가 달라지면 목적에 맞는 새 브랜치를 사용한다.
+- 커밋 제목과 본문은 한글로 작성한다.
+- 커밋 메시지 형식은 `<타입>(<적용 범위>): <제목>`을 사용한다.
+- 예시: `feat(openmat): 오픈매트 신청 검증 보강`
+- 타입은 `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci` 중 하나를 사용한다.
+- 본문에는 변경 이유와 방식을 하이픈 목록으로 구체적으로 적는다.
