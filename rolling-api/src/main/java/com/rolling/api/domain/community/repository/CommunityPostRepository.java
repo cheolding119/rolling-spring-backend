@@ -78,4 +78,34 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
               )
             """)
     Optional<CommunityPost> findVisibleById(@Param("id") Long id, @Param("viewerUserId") Long viewerUserId);
+
+    @EntityGraph(attributePaths = {"author", "images"})
+    Optional<CommunityPost> findById(Long id);
+
+    @EntityGraph(attributePaths = {"author", "images"})
+    @Query(
+            value = """
+                    select p from CommunityPost p
+                    where (:status is null or p.status = :status)
+                      and (
+                            :keyword is null
+                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                            or lower(p.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """,
+            countQuery = """
+                    select count(p) from CommunityPost p
+                    where (:status is null or p.status = :status)
+                      and (
+                            :keyword is null
+                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                            or lower(p.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """
+    )
+    Page<CommunityPost> findAdminPosts(
+            @Param("status") CommunityPostStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
 }

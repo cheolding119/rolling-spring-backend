@@ -168,4 +168,16 @@ public class CommunityPost extends BaseTimeEntity {
         this.status = CommunityPostStatus.DELETED;
         this.deletedAt = deletedAt;
     }
+
+    public void hide() {
+        if (this.status != CommunityPostStatus.DELETED) {
+            this.status = CommunityPostStatus.HIDDEN;
+        }
+    }
+
+    public void unhide() {
+        if (this.status != CommunityPostStatus.DELETED) {
+            this.status = CommunityPostStatus.ACTIVE;
+        }
+    }
 }

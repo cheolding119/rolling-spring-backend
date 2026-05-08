@@ -6,10 +6,18 @@ import com.rolling.api.domain.notice.dto.NoticeListItemResponse;
 import com.rolling.api.domain.notice.dto.NoticeResponse;
 import com.rolling.api.domain.notice.service.NoticeService;
 import com.rolling.api.domain.community.controller.CommunityController;
+import com.rolling.api.domain.community.controller.CommunityAdminController;
+import com.rolling.api.domain.community.dto.CommunityAdminCommentResponse;
+import com.rolling.api.domain.community.dto.CommunityAdminPostResponse;
+import com.rolling.api.domain.community.dto.CommunityCommentReportAdminResponse;
 import com.rolling.api.domain.community.dto.CommunityCommentResponse;
 import com.rolling.api.domain.community.dto.CommunityPostDetailResponse;
+import com.rolling.api.domain.community.dto.CommunityPostReportAdminResponse;
 import com.rolling.api.domain.community.dto.CommunityPostSummaryResponse;
 import com.rolling.api.domain.community.entity.CommunityPostCategory;
+import com.rolling.api.domain.community.entity.CommunityCommentStatus;
+import com.rolling.api.domain.community.entity.CommunityPostStatus;
+import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.community.service.CommunityService;
 import com.rolling.api.domain.map.controller.MapController;
 import com.rolling.api.domain.map.service.KakaoGeocodeService;
@@ -67,6 +75,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -314,6 +323,11 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/admin/community/posts"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -354,6 +368,10 @@ class SecurityAuthorizationIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/v1/admin/community/posts/11/hide")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -391,6 +409,102 @@ class SecurityAuthorizationIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(9));
+
+        given(communityService.findPostsForAdmin(isNull(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityAdminPostResponse.builder()
+                                .id(1L)
+                                .category(CommunityPostCategory.FREE)
+                                .title("커뮤니티 글")
+                                .content("본문")
+                                .authorId(2L)
+                                .authorNickname("community-user")
+                                .status(CommunityPostStatus.ACTIVE)
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(communityService.hidePost(1L, 1L)).willReturn(CommunityAdminPostResponse.builder()
+                .id(1L)
+                .status(CommunityPostStatus.HIDDEN)
+                .build());
+        given(communityService.findCommentsForAdmin(isNull(), isNull(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityAdminCommentResponse.builder()
+                                .id(2L)
+                                .postId(1L)
+                                .postTitle("커뮤니티 글")
+                                .authorId(3L)
+                                .authorNickname("comment-user")
+                                .status(com.rolling.api.domain.community.entity.CommunityCommentStatus.ACTIVE)
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(communityService.findPostReportsForAdmin(isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityPostReportAdminResponse.builder()
+                                .id(3L)
+                                .postId(1L)
+                                .postTitle("커뮤니티 글")
+                                .postAuthorNickname("community-user")
+                                .reporterUserId(4L)
+                                .reporterNickname("reporter")
+                                .status(ReportStatus.RECEIVED)
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(communityService.findCommentReportsForAdmin(isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityCommentReportAdminResponse.builder()
+                                .id(4L)
+                                .commentId(2L)
+                                .postId(1L)
+                                .postTitle("커뮤니티 글")
+                                .commentContent("댓글")
+                                .commentAuthorNickname("comment-user")
+                                .reporterUserId(5L)
+                                .reporterNickname("reporter")
+                                .status(ReportStatus.RECEIVED)
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(communityService.updatePostReportStatus(eq(1L), eq(3L), any())).willReturn(CommunityPostReportAdminResponse.builder()
+                .id(3L)
+                .status(ReportStatus.RESOLVED)
+                .build());
+
+        mockMvc.perform(get("/api/v1/admin/community/posts")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(1));
+
+        mockMvc.perform(patch("/api/v1/admin/community/posts/1/hide")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("HIDDEN"));
+
+        mockMvc.perform(get("/api/v1/admin/community/comments")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(2));
+
+        mockMvc.perform(get("/api/v1/admin/community/posts/reports")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(3));
+
+        mockMvc.perform(get("/api/v1/admin/community/comments/reports")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(4));
+
+        mockMvc.perform(patch("/api/v1/admin/community/posts/reports/3/status")
+                        .header("Authorization", bearerToken(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"status\": \"RESOLVED\",
+                                  \"processingMemo\": \"검토 완료\",
+                                  \"finalAction\": \"CONTENT_HIDDEN\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"));
     }
 
     @Test
@@ -544,6 +658,7 @@ class SecurityAuthorizationIntegrationTest {
             NoticeController.class,
             NoticeAdminController.class,
             CommunityController.class,
+            CommunityAdminController.class,
             MapController.class,
             TournamentCrawlerController.class,
             TestActuatorController.class

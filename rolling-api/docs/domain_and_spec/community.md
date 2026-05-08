@@ -2,9 +2,9 @@
 
 ## Status
 
-- 커뮤니티 도메인은 현재 Phase 1, 2, 3, 4, 5의 핵심 기능이 구현되어 있다.
-- 현재 구현 범위는 커뮤니티 전용 닉네임, 게시글, 댓글, 좋아요, 신고, 이미지 첨부다.
-- 사용자 차단 기반 필터링과 관리자 숨김 기능은 아직 구현하지 않았다.
+- 커뮤니티 도메인은 현재 Phase 1, 2, 3, 4, 5, 6, 7의 핵심 기능이 구현되어 있다.
+- 현재 구현 범위는 커뮤니티 전용 닉네임, 게시글, 댓글, 좋아요, 신고, 이미지 첨부, 관리자 숨김/신고 처리, 댓글 알림이다.
+- 사용자 차단 기반 필터링과 Flutter UX 분기는 아직 구현하지 않았다.
 
 ## Model
 
@@ -63,6 +63,10 @@
 | `reason` | `ReportReason` | 신고 사유 |
 | `customReason` | `String?` | 기타 사유 |
 | `status` | `ReportStatus` | 신고 처리 상태 |
+| `processedByUserId` | `Long?` | 처리한 관리자 ID |
+| `processedAt` | `LocalDateTime?` | 처리 시각 |
+| `processingMemo` | `String?` | 처리 메모 |
+| `finalAction` | `String?` | 최종 조치 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
 
 ### CommunityCommentReport
@@ -75,6 +79,10 @@
 | `reason` | `ReportReason` | 신고 사유 |
 | `customReason` | `String?` | 기타 사유 |
 | `status` | `ReportStatus` | 신고 처리 상태 |
+| `processedByUserId` | `Long?` | 처리한 관리자 ID |
+| `processedAt` | `LocalDateTime?` | 처리 시각 |
+| `processingMemo` | `String?` | 처리 메모 |
+| `finalAction` | `String?` | 최종 조치 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
 
 `CommunityPostCategory` 현재 값:
@@ -405,6 +413,29 @@ Request body:
 
 Response data: `null`
 
+### 16. 관리자 커뮤니티 API
+
+- `GET /api/v1/admin/community/posts`
+- `GET /api/v1/admin/community/posts/{id}`
+- `PATCH /api/v1/admin/community/posts/{id}/hide`
+- `PATCH /api/v1/admin/community/posts/{id}/unhide`
+- `GET /api/v1/admin/community/comments`
+- `GET /api/v1/admin/community/comments/{id}`
+- `PATCH /api/v1/admin/community/comments/{id}/hide`
+- `PATCH /api/v1/admin/community/comments/{id}/unhide`
+- `GET /api/v1/admin/community/posts/reports`
+- `GET /api/v1/admin/community/comments/reports`
+- `PATCH /api/v1/admin/community/posts/reports/{id}/status`
+- `PATCH /api/v1/admin/community/comments/reports/{id}/status`
+
+관리자 API는 모두 `ROLE_ADMIN` accessToken이 필요하다.
+
+### 17. 댓글 알림
+
+- 댓글 작성 시 게시글 작성자에게 `PushNotificationType.COMMUNITY_COMMENT_CREATED` 알림을 저장한다.
+- 자기 게시글에 직접 단 댓글은 알림을 만들지 않는다.
+- 알림 route는 `/community/posts/{postId}`를 사용한다.
+
 ## Policy
 
 - 비회원은 게시글 목록, 게시글 상세, 댓글 목록만 조회할 수 있다.
@@ -412,4 +443,4 @@ Response data: `null`
 - 작성, 수정, 삭제는 로그인 사용자만 가능하다.
 - 커뮤니티 응답은 `authorNickname`만 노출하고 `affiliation`, `email`, `phone`, `socialProvider`는 노출하지 않는다.
 - 내부 권한 검사는 표시명이 아니라 `userId` 기준으로 처리한다.
-- 현재 구현에는 관리자 숨김 API가 없다.
+- Flutter 쪽 진입 UX와 비회원 액션 분기는 아직 앱 레이어에서 마무리해야 한다.

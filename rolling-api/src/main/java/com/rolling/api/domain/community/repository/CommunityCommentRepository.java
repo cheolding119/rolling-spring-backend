@@ -57,4 +57,32 @@ public interface CommunityCommentRepository extends JpaRepository<CommunityComme
 
     @EntityGraph(attributePaths = {"author", "post"})
     Optional<CommunityComment> findById(Long id);
+
+    @EntityGraph(attributePaths = {"author", "post", "post.author"})
+    @Query(
+            value = """
+                    select c from CommunityComment c
+                    where (:postId is null or c.post.id = :postId)
+                      and (:status is null or c.status = :status)
+                      and (
+                            :keyword is null
+                            or lower(c.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """,
+            countQuery = """
+                    select count(c) from CommunityComment c
+                    where (:postId is null or c.post.id = :postId)
+                      and (:status is null or c.status = :status)
+                      and (
+                            :keyword is null
+                            or lower(c.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """
+    )
+    Page<CommunityComment> findAdminComments(
+            @Param("postId") Long postId,
+            @Param("status") com.rolling.api.domain.community.entity.CommunityCommentStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
 }
