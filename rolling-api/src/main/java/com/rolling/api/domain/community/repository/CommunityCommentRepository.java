@@ -65,8 +65,7 @@ public interface CommunityCommentRepository extends JpaRepository<CommunityComme
                     where (:postId is null or c.post.id = :postId)
                       and (:status is null or c.status = :status)
                       and (
-                            :keyword is null
-                            or lower(c.content) like lower(concat('%', :keyword, '%'))
+                            lower(c.content) like lower(concat('%', :keyword, '%'))
                       )
                     """,
             countQuery = """
@@ -74,15 +73,33 @@ public interface CommunityCommentRepository extends JpaRepository<CommunityComme
                     where (:postId is null or c.post.id = :postId)
                       and (:status is null or c.status = :status)
                       and (
-                            :keyword is null
-                            or lower(c.content) like lower(concat('%', :keyword, '%'))
+                            lower(c.content) like lower(concat('%', :keyword, '%'))
                       )
                     """
     )
-    Page<CommunityComment> findAdminComments(
+    Page<CommunityComment> findAdminCommentsWithKeyword(
             @Param("postId") Long postId,
             @Param("status") com.rolling.api.domain.community.entity.CommunityCommentStatus status,
             @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"author", "post", "post.author"})
+    @Query(
+            value = """
+                    select c from CommunityComment c
+                    where (:postId is null or c.post.id = :postId)
+                      and (:status is null or c.status = :status)
+                    """,
+            countQuery = """
+                    select count(c) from CommunityComment c
+                    where (:postId is null or c.post.id = :postId)
+                      and (:status is null or c.status = :status)
+                    """
+    )
+    Page<CommunityComment> findAdminCommentsWithoutKeyword(
+            @Param("postId") Long postId,
+            @Param("status") com.rolling.api.domain.community.entity.CommunityCommentStatus status,
             Pageable pageable
     );
 }
