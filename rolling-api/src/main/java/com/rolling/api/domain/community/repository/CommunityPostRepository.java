@@ -29,9 +29,8 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                             )
                       )
                       and (:category is null or p.category = :category)
-                      and (
-                            :keyword is null
-                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                    and (
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
                             or lower(p.content) like lower(concat('%', :keyword, '%'))
                       )
                     """,
@@ -49,16 +48,52 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                       )
                       and (:category is null or p.category = :category)
                       and (
-                            :keyword is null
-                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
                             or lower(p.content) like lower(concat('%', :keyword, '%'))
                       )
                     """
     )
-    Page<CommunityPost> searchVisible(
+    Page<CommunityPost> searchVisibleWithKeyword(
             @Param("viewerUserId") Long viewerUserId,
             @Param("category") CommunityPostCategory category,
             @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = "author")
+    @Query(
+            value = """
+                    select p from CommunityPost p
+                    where p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (
+                            :viewerUserId is null
+                            or p.author.id not in (
+                                select blocked.blockedUser.id
+                                from User viewer
+                                join viewer.blockedUserLinks blocked
+                                where viewer.id = :viewerUserId
+                            )
+                      )
+                      and (:category is null or p.category = :category)
+                    """,
+            countQuery = """
+                    select count(p) from CommunityPost p
+                    where p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (
+                            :viewerUserId is null
+                            or p.author.id not in (
+                                select blocked.blockedUser.id
+                                from User viewer
+                                join viewer.blockedUserLinks blocked
+                                where viewer.id = :viewerUserId
+                            )
+                      )
+                      and (:category is null or p.category = :category)
+                    """
+    )
+    Page<CommunityPost> searchVisibleWithoutKeyword(
+            @Param("viewerUserId") Long viewerUserId,
+            @Param("category") CommunityPostCategory category,
             Pageable pageable
     );
 
@@ -88,8 +123,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                     select p from CommunityPost p
                     where (:status is null or p.status = :status)
                       and (
-                            :keyword is null
-                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
                             or lower(p.content) like lower(concat('%', :keyword, '%'))
                       )
                     """,
@@ -97,15 +131,30 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
                     select count(p) from CommunityPost p
                     where (:status is null or p.status = :status)
                       and (
-                            :keyword is null
-                            or lower(p.title) like lower(concat('%', :keyword, '%'))
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
                             or lower(p.content) like lower(concat('%', :keyword, '%'))
                       )
                     """
     )
-    Page<CommunityPost> findAdminPosts(
+    Page<CommunityPost> findAdminPostsWithKeyword(
             @Param("status") CommunityPostStatus status,
             @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"author", "images"})
+    @Query(
+            value = """
+                    select p from CommunityPost p
+                    where (:status is null or p.status = :status)
+                    """,
+            countQuery = """
+                    select count(p) from CommunityPost p
+                    where (:status is null or p.status = :status)
+                    """
+    )
+    Page<CommunityPost> findAdminPostsWithoutKeyword(
+            @Param("status") CommunityPostStatus status,
             Pageable pageable
     );
 }

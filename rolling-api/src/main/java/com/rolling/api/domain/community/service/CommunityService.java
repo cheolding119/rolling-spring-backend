@@ -89,8 +89,10 @@ public class CommunityService {
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("createdAt").descending().and(Sort.by("id").descending()));
 
         String normalizedKeyword = normalizeOptionalSearchText(keyword);
-        return communityPostRepository.searchVisible(viewerUserId, category, normalizedKeyword, resolvedPageable)
-                .map(CommunityPostSummaryResponse::from);
+        Page<CommunityPost> posts = normalizedKeyword == null
+                ? communityPostRepository.searchVisibleWithoutKeyword(viewerUserId, category, resolvedPageable)
+                : communityPostRepository.searchVisibleWithKeyword(viewerUserId, category, normalizedKeyword, resolvedPageable);
+        return posts.map(CommunityPostSummaryResponse::from);
     }
 
     @Transactional
@@ -287,8 +289,10 @@ public class CommunityService {
     public Page<CommunityAdminPostResponse> findPostsForAdmin(CommunityPostStatus status, String keyword, Pageable pageable) {
         Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, POST_ADMIN_ALLOWED_SORTS);
         String normalizedKeyword = normalizeOptionalSearchText(keyword);
-        return communityPostRepository.findAdminPosts(status, normalizedKeyword, resolvedPageable)
-                .map(CommunityAdminPostResponse::from);
+        Page<CommunityPost> posts = normalizedKeyword == null
+                ? communityPostRepository.findAdminPostsWithoutKeyword(status, resolvedPageable)
+                : communityPostRepository.findAdminPostsWithKeyword(status, normalizedKeyword, resolvedPageable);
+        return posts.map(CommunityAdminPostResponse::from);
     }
 
     @Transactional(readOnly = true)
@@ -320,8 +324,10 @@ public class CommunityService {
     public Page<CommunityAdminCommentResponse> findCommentsForAdmin(Long postId, CommunityCommentStatus status, String keyword, Pageable pageable) {
         Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, COMMENT_ADMIN_ALLOWED_SORTS);
         String normalizedKeyword = normalizeOptionalSearchText(keyword);
-        return communityCommentRepository.findAdminComments(postId, status, normalizedKeyword, resolvedPageable)
-                .map(CommunityAdminCommentResponse::from);
+        Page<CommunityComment> comments = normalizedKeyword == null
+                ? communityCommentRepository.findAdminCommentsWithoutKeyword(postId, status, resolvedPageable)
+                : communityCommentRepository.findAdminCommentsWithKeyword(postId, status, normalizedKeyword, resolvedPageable);
+        return comments.map(CommunityAdminCommentResponse::from);
     }
 
     @Transactional(readOnly = true)

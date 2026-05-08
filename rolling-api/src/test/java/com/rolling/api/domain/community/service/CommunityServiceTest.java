@@ -101,7 +101,7 @@ class CommunityServiceTest {
         CommunityPost post = createPost(10L, author, CommunityPostCategory.TECHNIQUE_QNA, "암바 방어 질문", "내용입니다", 3L, 5L);
         Page<CommunityPost> page = new PageImpl<>(List.of(post), PageRequest.of(0, 20), 1);
 
-        when(communityPostRepository.searchVisible(isNull(), eq(CommunityPostCategory.TECHNIQUE_QNA), eq("암바"), any()))
+        when(communityPostRepository.searchVisibleWithKeyword(isNull(), eq(CommunityPostCategory.TECHNIQUE_QNA), eq("암바"), any()))
                 .thenReturn(page);
 
         Page<CommunityPostSummaryResponse> response = communityService.findPosts(null, CommunityPostCategory.TECHNIQUE_QNA, "암바", PageRequest.of(0, 20));
@@ -109,6 +109,22 @@ class CommunityServiceTest {
         assertThat(response).hasSize(1);
         assertThat(response.getContent().get(0).getAuthorNickname()).isEqualTo("rolling-community");
         assertThat(response.getContent().get(0).getCommentCount()).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("검색어가 없으면 게시글 목록 조회는 keyword 없는 쿼리를 사용한다")
+    void findPosts_withoutKeywordUsesKeywordlessQuery() {
+        User author = createUser(1L, "social-1b", "open-mat", "rolling-community");
+        CommunityPost post = createPost(11L, author, CommunityPostCategory.FREE, "자유글", "내용입니다", 1L, 0L);
+        Page<CommunityPost> page = new PageImpl<>(List.of(post), PageRequest.of(0, 20), 1);
+
+        when(communityPostRepository.searchVisibleWithoutKeyword(isNull(), isNull(), any()))
+                .thenReturn(page);
+
+        Page<CommunityPostSummaryResponse> response = communityService.findPosts(null, null, null, PageRequest.of(0, 20));
+
+        assertThat(response).hasSize(1);
+        assertThat(response.getContent().get(0).getTitle()).isEqualTo("자유글");
     }
 
     @Test
