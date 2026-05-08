@@ -1,14 +1,19 @@
 package com.rolling.api.domain.community.service;
 
 import com.rolling.api.domain.community.dto.CommunityCommentCreateRequest;
+import com.rolling.api.domain.community.dto.CommunityAdminCommentResponse;
+import com.rolling.api.domain.community.dto.CommunityAdminPostResponse;
+import com.rolling.api.domain.community.dto.CommunityCommentReportAdminResponse;
 import com.rolling.api.domain.community.dto.CommunityCommentResponse;
 import com.rolling.api.domain.community.dto.CommunityCommentUpdateRequest;
 import com.rolling.api.domain.community.dto.CommunityPostCreateRequest;
 import com.rolling.api.domain.community.dto.CommunityPostDetailResponse;
 import com.rolling.api.domain.community.dto.CommunityPostImageResponse;
+import com.rolling.api.domain.community.dto.CommunityPostReportAdminResponse;
 import com.rolling.api.domain.community.dto.CommunityPostSummaryResponse;
 import com.rolling.api.domain.community.dto.CommunityPostUpdateRequest;
 import com.rolling.api.domain.community.dto.CommunityReportRequest;
+import com.rolling.api.domain.community.event.CommunityCommentCreatedEvent;
 import com.rolling.api.domain.community.entity.CommunityComment;
 import com.rolling.api.domain.community.entity.CommunityCommentReport;
 import com.rolling.api.domain.community.entity.CommunityCommentStatus;
@@ -23,12 +28,15 @@ import com.rolling.api.domain.community.repository.CommunityCommentRepository;
 import com.rolling.api.domain.community.repository.CommunityPostLikeRepository;
 import com.rolling.api.domain.community.repository.CommunityPostReportRepository;
 import com.rolling.api.domain.community.repository.CommunityPostRepository;
+import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
 import com.rolling.api.domain.report.entity.ReportReason;
 import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.page.PageableUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -44,6 +52,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +61,11 @@ public class CommunityService {
     private static final int MAX_IMAGE_COUNT = 5;
     private static final int MAX_POST_IMAGE_URL_LENGTH = 1000;
     private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp", "gif", "bmp", "svg", "avif", "ico");
+    private static final Sort DEFAULT_ADMIN_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
+    private static final Set<String> POST_ADMIN_ALLOWED_SORTS = Set.of("createdAt", "updatedAt", "status", "reportCount");
+    private static final Set<String> COMMENT_ADMIN_ALLOWED_SORTS = Set.of("createdAt", "updatedAt", "status", "reportCount");
+    private static final Set<String> POST_REPORT_ADMIN_ALLOWED_SORTS = Set.of("createdAt", "updatedAt", "status", "processedAt");
+    private static final Set<String> COMMENT_REPORT_ADMIN_ALLOWED_SORTS = Set.of("createdAt", "updatedAt", "status", "processedAt");
 
     private final UserRepository userRepository;
     private final CommunityPostRepository communityPostRepository;
@@ -59,6 +73,7 @@ public class CommunityService {
     private final CommunityPostLikeRepository communityPostLikeRepository;
     private final CommunityPostReportRepository communityPostReportRepository;
     private final CommunityCommentReportRepository communityCommentReportRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final Clock clock;
 
     @Value("${cloud.aws.s3.public-base-url:}")
@@ -159,6 +174,17 @@ public class CommunityService {
 
         post.incrementCommentCount();
         CommunityComment saved = communityCommentRepository.save(comment);
+        if (!post.getAuthor().getId().equals(author.getId())) {
+            applicationEventPublisher.publishEvent(new CommunityCommentCreatedEvent(
+                    saved.getId(),
+                    post.getId(),
+                    post.getAuthor().getId(),
+                    author.getId(),
+                    author.getCommunityNickname(),
+                    post.getTitle(),
+                    saved.getContent()
+            ));
+        }
         return CommunityCommentResponse.from(saved);
     }
 
@@ -257,6 +283,114 @@ public class CommunityService {
         comment.incrementReportCount();
     }
 
+    @Transactional(readOnly = true)
+    public Page<CommunityAdminPostResponse> findPostsForAdmin(CommunityPostStatus status, String keyword, Pageable pageable) {
+        Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, POST_ADMIN_ALLOWED_SORTS);
+        String normalizedKeyword = normalizeOptionalSearchText(keyword);
+        return communityPostRepository.findAdminPosts(status, normalizedKeyword, resolvedPageable)
+                .map(CommunityAdminPostResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityAdminPostResponse findPostForAdmin(Long postId) {
+        return CommunityAdminPostResponse.from(loadPostForAdmin(postId));
+    }
+
+    @Transactional
+    public CommunityAdminPostResponse hidePost(Long adminUserId, Long postId) {
+        CommunityPost post = loadPostForAdmin(postId);
+        if (post.getStatus() == CommunityPostStatus.DELETED) {
+            throw BusinessException.notFound("게시글을 찾을 수 없습니다");
+        }
+        post.hide();
+        return CommunityAdminPostResponse.from(post);
+    }
+
+    @Transactional
+    public CommunityAdminPostResponse unhidePost(Long adminUserId, Long postId) {
+        CommunityPost post = loadPostForAdmin(postId);
+        if (post.getStatus() == CommunityPostStatus.DELETED) {
+            throw BusinessException.notFound("게시글을 찾을 수 없습니다");
+        }
+        post.unhide();
+        return CommunityAdminPostResponse.from(post);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CommunityAdminCommentResponse> findCommentsForAdmin(Long postId, CommunityCommentStatus status, String keyword, Pageable pageable) {
+        Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, COMMENT_ADMIN_ALLOWED_SORTS);
+        String normalizedKeyword = normalizeOptionalSearchText(keyword);
+        return communityCommentRepository.findAdminComments(postId, status, normalizedKeyword, resolvedPageable)
+                .map(CommunityAdminCommentResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityAdminCommentResponse findCommentForAdmin(Long commentId) {
+        return CommunityAdminCommentResponse.from(loadCommentForAdmin(commentId));
+    }
+
+    @Transactional
+    public CommunityAdminCommentResponse hideComment(Long adminUserId, Long commentId) {
+        CommunityComment comment = loadCommentForAdmin(commentId);
+        if (comment.getStatus() == CommunityCommentStatus.DELETED) {
+            throw BusinessException.notFound("댓글을 찾을 수 없습니다");
+        }
+        comment.hide();
+        return CommunityAdminCommentResponse.from(comment);
+    }
+
+    @Transactional
+    public CommunityAdminCommentResponse unhideComment(Long adminUserId, Long commentId) {
+        CommunityComment comment = loadCommentForAdmin(commentId);
+        if (comment.getStatus() == CommunityCommentStatus.DELETED) {
+            throw BusinessException.notFound("댓글을 찾을 수 없습니다");
+        }
+        comment.unhide();
+        return CommunityAdminCommentResponse.from(comment);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CommunityPostReportAdminResponse> findPostReportsForAdmin(ReportStatus status, Pageable pageable) {
+        Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, POST_REPORT_ADMIN_ALLOWED_SORTS);
+        Page<CommunityPostReport> reports = status == null
+                ? communityPostReportRepository.findAll(resolvedPageable)
+                : communityPostReportRepository.findAllByStatus(status, resolvedPageable);
+        return reports.map(CommunityPostReportAdminResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CommunityCommentReportAdminResponse> findCommentReportsForAdmin(ReportStatus status, Pageable pageable) {
+        Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, COMMENT_REPORT_ADMIN_ALLOWED_SORTS);
+        Page<CommunityCommentReport> reports = status == null
+                ? communityCommentReportRepository.findAll(resolvedPageable)
+                : communityCommentReportRepository.findAllByStatus(status, resolvedPageable);
+        return reports.map(CommunityCommentReportAdminResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityPostReportAdminResponse findPostReportForAdmin(Long reportId) {
+        return CommunityPostReportAdminResponse.from(loadPostReportForAdmin(reportId));
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityCommentReportAdminResponse findCommentReportForAdmin(Long reportId) {
+        return CommunityCommentReportAdminResponse.from(loadCommentReportForAdmin(reportId));
+    }
+
+    @Transactional
+    public CommunityPostReportAdminResponse updatePostReportStatus(Long adminUserId, Long reportId, ReportStatusUpdateRequest request) {
+        CommunityPostReport report = loadPostReportForAdmin(reportId);
+        report.updateStatus(requireStatus(request.getStatus()), adminUserId, now(), normalizeFreeText(request.getProcessingMemo()), normalizeFreeText(request.getFinalAction()));
+        return CommunityPostReportAdminResponse.from(report);
+    }
+
+    @Transactional
+    public CommunityCommentReportAdminResponse updateCommentReportStatus(Long adminUserId, Long reportId, ReportStatusUpdateRequest request) {
+        CommunityCommentReport report = loadCommentReportForAdmin(reportId);
+        report.updateStatus(requireStatus(request.getStatus()), adminUserId, now(), normalizeFreeText(request.getProcessingMemo()), normalizeFreeText(request.getFinalAction()));
+        return CommunityCommentReportAdminResponse.from(report);
+    }
+
     private CommunityPostDetailResponse buildPostDetailResponse(CommunityPost post, Long viewerUserId, boolean isAdmin) {
         boolean likedByMe = viewerUserId != null && communityPostLikeRepository.existsByPost_IdAndUser_Id(post.getId(), viewerUserId);
         boolean editableByMe = isAdmin || isAuthor(viewerUserId, post);
@@ -352,6 +486,26 @@ public class CommunityService {
         return loadVisibleComment(commentId);
     }
 
+    private CommunityPost loadPostForAdmin(Long postId) {
+        return communityPostRepository.findById(postId)
+                .orElseThrow(() -> BusinessException.notFound("게시글을 찾을 수 없습니다"));
+    }
+
+    private CommunityComment loadCommentForAdmin(Long commentId) {
+        return communityCommentRepository.findById(commentId)
+                .orElseThrow(() -> BusinessException.notFound("댓글을 찾을 수 없습니다"));
+    }
+
+    private CommunityPostReport loadPostReportForAdmin(Long reportId) {
+        return communityPostReportRepository.findById(reportId)
+                .orElseThrow(() -> BusinessException.notFound("신고를 찾을 수 없습니다"));
+    }
+
+    private CommunityCommentReport loadCommentReportForAdmin(Long reportId) {
+        return communityCommentReportRepository.findById(reportId)
+                .orElseThrow(() -> BusinessException.notFound("신고를 찾을 수 없습니다"));
+    }
+
     private User getActiveUser(Long userId) {
         return userRepository.findByIdAndIsWithdrawnFalse(userId)
                 .orElseThrow(() -> BusinessException.notFound("User not found"));
@@ -394,6 +548,17 @@ public class CommunityService {
         throw BusinessException.badRequest("수정할 필드가 없습니다");
     }
 
+    private Pageable normalizeAdminPageable(Pageable pageable, Sort defaultSort, Set<String> allowedSorts) {
+        return PageableUtils.normalize(pageable, defaultSort, allowedSorts, 20, 100);
+    }
+
+    private ReportStatus requireStatus(ReportStatus status) {
+        if (status == null) {
+            throw BusinessException.badRequest("신고 상태는 필수입니다");
+        }
+        return status;
+    }
+
     private String normalizeRequiredText(String value, int minLength, int maxLength, String message) {
         if (!StringUtils.hasText(value)) {
             throw BusinessException.badRequest(message);
@@ -417,6 +582,13 @@ public class CommunityService {
             throw BusinessException.badRequest(message);
         }
         return normalized;
+    }
+
+    private String normalizeFreeText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 
     private String normalizeOptionalSearchText(String value) {

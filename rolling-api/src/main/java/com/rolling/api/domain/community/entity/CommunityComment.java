@@ -83,4 +83,16 @@ public class CommunityComment extends BaseTimeEntity {
         this.status = CommunityCommentStatus.DELETED;
         this.deletedAt = deletedAt;
     }
+
+    public void hide() {
+        if (this.status != CommunityCommentStatus.DELETED) {
+            this.status = CommunityCommentStatus.HIDDEN;
+        }
+    }
+
+    public void unhide() {
+        if (this.status != CommunityCommentStatus.DELETED) {
+            this.status = CommunityCommentStatus.ACTIVE;
+        }
+    }
 }

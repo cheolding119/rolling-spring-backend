@@ -22,6 +22,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(
         name = "community_post_reports",
@@ -60,16 +62,48 @@ public class CommunityPostReport extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private ReportStatus status;
 
+    @Column(name = "processed_by_user_id")
+    private Long processedByUserId;
+
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+
+    @Column(name = "processing_memo", length = 1000)
+    private String processingMemo;
+
+    @Column(name = "final_action", length = 100)
+    private String finalAction;
+
     @Builder
     public CommunityPostReport(CommunityPost post,
                                User reporter,
                                ReportReason reason,
                                String customReason,
-                               ReportStatus status) {
+                               ReportStatus status,
+                               Long processedByUserId,
+                               LocalDateTime processedAt,
+                               String processingMemo,
+                               String finalAction) {
         this.post = post;
         this.reporter = reporter;
         this.reason = reason;
         this.customReason = customReason;
         this.status = status;
+        this.processedByUserId = processedByUserId;
+        this.processedAt = processedAt;
+        this.processingMemo = processingMemo;
+        this.finalAction = finalAction;
+    }
+
+    public void updateStatus(ReportStatus status,
+                             Long processedByUserId,
+                             LocalDateTime processedAt,
+                             String processingMemo,
+                             String finalAction) {
+        this.status = status;
+        this.processedByUserId = processedByUserId;
+        this.processedAt = processedAt;
+        this.processingMemo = processingMemo;
+        this.finalAction = finalAction;
     }
 }
