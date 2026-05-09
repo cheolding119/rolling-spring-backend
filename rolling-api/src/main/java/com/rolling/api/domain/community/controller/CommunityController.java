@@ -5,10 +5,13 @@ import com.rolling.api.domain.community.dto.CommunityCommentResponse;
 import com.rolling.api.domain.community.dto.CommunityCommentUpdateRequest;
 import com.rolling.api.domain.community.dto.CommunityPostCreateRequest;
 import com.rolling.api.domain.community.dto.CommunityPostDetailResponse;
+import com.rolling.api.domain.community.dto.CommunityPostImageUploadUrlRequest;
+import com.rolling.api.domain.community.dto.CommunityPostImageUploadUrlResponse;
 import com.rolling.api.domain.community.dto.CommunityReportRequest;
 import com.rolling.api.domain.community.dto.CommunityPostSummaryResponse;
 import com.rolling.api.domain.community.dto.CommunityPostUpdateRequest;
 import com.rolling.api.domain.community.entity.CommunityPostCategory;
+import com.rolling.api.domain.community.service.CommunityPostImageUploadService;
 import com.rolling.api.domain.community.service.CommunityService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
@@ -43,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final CommunityPostImageUploadService communityPostImageUploadService;
 
     @Operation(summary = "게시글 목록 조회", description = "커뮤니티 게시글 목록을 조회합니다.")
     @ApiResponses({
@@ -86,6 +90,22 @@ public class CommunityController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CommunityPostCreateRequest request) {
         CommunityPostDetailResponse response = communityService.createPost(requireUserId(principal), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "게시글 이미지 업로드 URL 발급", description = "커뮤니티 게시글 본문에 첨부할 이미지를 S3에 직접 업로드하기 위한 presigned URL을 발급합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PostMapping("/posts/image-upload-url")
+    public ResponseEntity<ApiResponse<CommunityPostImageUploadUrlResponse>> createImageUploadUrl(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CommunityPostImageUploadUrlRequest request) {
+        requireUserId(principal);
+        CommunityPostImageUploadUrlResponse response = communityPostImageUploadService.createUploadUrl(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
