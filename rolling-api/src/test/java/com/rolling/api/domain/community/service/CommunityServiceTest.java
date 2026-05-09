@@ -128,6 +128,24 @@ class CommunityServiceTest {
     }
 
     @Test
+    @DisplayName("내 게시글 목록 조회는 작성자 기준으로 조회한다")
+    void findMyPosts_filtersByAuthor() {
+        User author = createUser(2L, "social-my", "open-mat", "rolling-community");
+        CommunityPost post = createPost(20L, author, CommunityPostCategory.FREE, "내 글", "내용입니다", 7L, 2L);
+        Page<CommunityPost> page = new PageImpl<>(List.of(post), PageRequest.of(0, 20), 1);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(2L)).thenReturn(Optional.of(author));
+        when(communityPostRepository.searchMyPostsWithoutKeyword(eq(2L), eq(CommunityPostCategory.FREE), any()))
+                .thenReturn(page);
+
+        Page<CommunityPostSummaryResponse> response = communityService.findMyPosts(2L, CommunityPostCategory.FREE, null, PageRequest.of(0, 20));
+
+        assertThat(response).hasSize(1);
+        assertThat(response.getContent().get(0).getTitle()).isEqualTo("내 글");
+        assertThat(response.getContent().get(0).getAuthorNickname()).isEqualTo("rolling-community");
+    }
+
+    @Test
     @DisplayName("게시글 상세 조회는 조회 수를 증가시킨다")
     void findPost_incrementsViewCount() {
         User author = createUser(1L, "social-2", "open-mat", "rolling-community");

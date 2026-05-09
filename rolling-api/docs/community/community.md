@@ -489,6 +489,8 @@ Response data: `null`
 `GET /api/v1/community/posts/my`
 
 - 인증: 필요
+- 비회원: 불가
+- 용도: 현재 로그인한 사용자가 작성한 커뮤니티 게시글 목록 조회
 - Response: 페이징된 `CommunityPostSummary`
 
 Query parameters:

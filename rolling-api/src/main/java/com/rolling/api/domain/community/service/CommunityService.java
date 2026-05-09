@@ -95,6 +95,24 @@ public class CommunityService {
         return posts.map(CommunityPostSummaryResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public Page<CommunityPostSummaryResponse> findMyPosts(Long userId,
+                                                          CommunityPostCategory category,
+                                                          String keyword,
+                                                          Pageable pageable) {
+        getActiveUser(userId);
+
+        Pageable resolvedPageable = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("createdAt").descending().and(Sort.by("id").descending()));
+
+        String normalizedKeyword = normalizeOptionalSearchText(keyword);
+        Page<CommunityPost> posts = normalizedKeyword == null
+                ? communityPostRepository.searchMyPostsWithoutKeyword(userId, category, resolvedPageable)
+                : communityPostRepository.searchMyPostsWithKeyword(userId, category, normalizedKeyword, resolvedPageable);
+        return posts.map(CommunityPostSummaryResponse::from);
+    }
+
     @Transactional
     public CommunityPostDetailResponse findPost(Long viewerUserId, boolean isAdmin, Long postId) {
         CommunityPost post = loadVisiblePost(viewerUserId, isAdmin, postId);
