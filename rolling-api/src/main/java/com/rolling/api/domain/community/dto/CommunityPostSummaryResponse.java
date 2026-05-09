@@ -22,7 +22,7 @@ public class CommunityPostSummaryResponse {
     @Schema(description = "제목", example = "암바 방어가 계속 뚫립니다")
     private String title;
 
-    @Schema(description = "작성자 닉네임", example = "노기좋아하는거북이")
+    @Schema(description = "작성자 닉네임", example = "rolling_user")
     private String authorNickname;
 
     @Schema(description = "좋아요 수", example = "3")
