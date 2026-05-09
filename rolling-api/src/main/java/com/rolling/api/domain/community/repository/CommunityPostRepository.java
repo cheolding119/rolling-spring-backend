@@ -97,6 +97,57 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = "author")
+    @Query(
+            value = """
+                    select p from CommunityPost p
+                    where p.author.id = :authorId
+                      and p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (:category is null or p.category = :category)
+                      and (
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
+                            or lower(p.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """,
+            countQuery = """
+                    select count(p) from CommunityPost p
+                    where p.author.id = :authorId
+                      and p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (:category is null or p.category = :category)
+                      and (
+                            lower(p.title) like lower(concat('%', :keyword, '%'))
+                            or lower(p.content) like lower(concat('%', :keyword, '%'))
+                      )
+                    """
+    )
+    Page<CommunityPost> searchMyPostsWithKeyword(
+            @Param("authorId") Long authorId,
+            @Param("category") CommunityPostCategory category,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = "author")
+    @Query(
+            value = """
+                    select p from CommunityPost p
+                    where p.author.id = :authorId
+                      and p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (:category is null or p.category = :category)
+                    """,
+            countQuery = """
+                    select count(p) from CommunityPost p
+                    where p.author.id = :authorId
+                      and p.status = com.rolling.api.domain.community.entity.CommunityPostStatus.ACTIVE
+                      and (:category is null or p.category = :category)
+                    """
+    )
+    Page<CommunityPost> searchMyPostsWithoutKeyword(
+            @Param("authorId") Long authorId,
+            @Param("category") CommunityPostCategory category,
+            Pageable pageable
+    );
+
     @EntityGraph(attributePaths = {"author", "images"})
     @Query("""
             select p from CommunityPost p

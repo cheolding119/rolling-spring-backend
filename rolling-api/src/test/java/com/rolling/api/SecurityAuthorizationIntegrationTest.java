@@ -313,6 +313,11 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
 
+        mockMvc.perform(get("/api/v1/community/posts/my"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
         mockMvc.perform(post("/api/v1/community/posts/11/report")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -510,10 +515,29 @@ class SecurityAuthorizationIntegrationTest {
     @Test
     @DisplayName("인증 사용자는 커뮤니티 좋아요와 신고 API에 접근할 수 있다")
     void communityActions_withUserToken_returnsOk() throws Exception {
+        given(communityService.findMyPosts(eq(2L), isNull(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        CommunityPostSummaryResponse.builder()
+                                .id(12L)
+                                .category(CommunityPostCategory.FREE)
+                                .title("내 글")
+                                .authorNickname("community-user")
+                                .commentCount(0L)
+                                .viewCount(1L)
+                                .createdAt(LocalDateTime.of(2026, 3, 20, 11, 0))
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+
         mockMvc.perform(post("/api/v1/community/posts/11/like")
                         .header("Authorization", bearerToken(2L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get("/api/v1/community/posts/my")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(12));
 
         mockMvc.perform(post("/api/v1/community/posts/11/report")
                         .header("Authorization", bearerToken(2L))

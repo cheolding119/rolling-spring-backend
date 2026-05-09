@@ -63,6 +63,22 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "내 게시글 목록 조회", description = "현재 로그인한 사용자가 작성한 커뮤니티 게시글 목록을 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/posts/my")
+    public ResponseEntity<ApiResponse<Page<CommunityPostSummaryResponse>>> listMyPosts(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) CommunityPostCategory category,
+            @RequestParam(name = "q", required = false) String keyword,
+            @PageableDefault(size = 20, sort = {"createdAt", "id"}, direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<CommunityPostSummaryResponse> response = communityService.findMyPosts(requireUserId(principal), category, keyword, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "게시글 상세 조회", description = "커뮤니티 게시글 단건을 조회합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),

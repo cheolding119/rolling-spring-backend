@@ -195,6 +195,39 @@ Response item:
 
 비회원 응답에는 개인화된 `likedByMe`, `editableByMe` 같은 필드는 포함하지 않는다.
 
+### 3.1 내 게시글 목록 조회
+
+`GET /api/v1/community/posts/my`
+
+- 인증: 필요
+- 비회원: 불가
+- 용도: 현재 로그인한 사용자가 작성한 커뮤니티 게시글 목록 조회
+
+Query parameters:
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `category` | `String` | - | 카테고리 필터 |
+| `q` | `String` | - | 제목/본문 검색어 |
+| `page` | `Integer` | `0` | 페이지 번호 |
+| `size` | `Integer` | `20` | 페이지 크기 |
+| `sort` | `String` | `createdAt,desc` | 정렬 |
+
+Response item:
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | 게시글 ID |
+| `category` | `CommunityPostCategory` | 카테고리 |
+| `title` | `String` | 제목 |
+| `authorNickname` | `String` | 작성자의 `communityNickname` |
+| `likeCount` | `Long` | 좋아요 수 |
+| `commentCount` | `Long` | 댓글 수 |
+| `viewCount` | `Long` | 조회 수 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+
+비회원 응답에는 개인화된 `likedByMe`, `editableByMe` 같은 필드는 포함하지 않는다.
+
 ### 4. 게시글 상세 조회
 
 `GET /api/v1/community/posts/{id}`
