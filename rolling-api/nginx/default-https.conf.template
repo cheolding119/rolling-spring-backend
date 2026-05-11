@@ -7,6 +7,18 @@ server {
     ssl_certificate ${SSL_CERT_PATH};
     ssl_certificate_key ${SSL_KEY_PATH};
 
+    location = /.well-known/apple-app-site-association {
+        root /usr/share/nginx/landing;
+        default_type application/json;
+        try_files $uri =404;
+    }
+
+    location = /.well-known/assetlinks.json {
+        root /usr/share/nginx/landing;
+        default_type application/json;
+        try_files $uri =404;
+    }
+
     location = /maps/kakao/openmat.html {
         root /usr/share/nginx/landing;
         try_files $uri =404;
