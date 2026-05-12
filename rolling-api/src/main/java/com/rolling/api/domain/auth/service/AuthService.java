@@ -114,13 +114,7 @@ public class AuthService {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-        refreshTokenRepository.deleteByUserId(user.getId());
-        LocalDateTime expiryDate = now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
-        refreshTokenRepository.save(RefreshToken.builder()
-                .tokenHash(refreshTokenHashProvider.hash(refreshToken))
-                .userId(user.getId())
-                .expiryDate(expiryDate)
-                .build());
+        replaceRefreshToken(user.getId(), refreshToken, now());
 
         log.info("{} login success - userId: {}, newUser: {}", provider, user.getId(), isNewUser[0]);
 
@@ -168,12 +162,8 @@ public class AuthService {
         String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
 
         refreshTokenRepository.delete(savedToken);
-        LocalDateTime expiryDate = now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
-        refreshTokenRepository.save(RefreshToken.builder()
-                .tokenHash(refreshTokenHashProvider.hash(newRefreshToken))
-                .userId(userId)
-                .expiryDate(expiryDate)
-                .build());
+        refreshTokenRepository.flush();
+        saveRefreshToken(userId, newRefreshToken, now());
 
         log.info("Token refresh success - userId: {}", userId);
 
@@ -365,5 +355,19 @@ public class AuthService {
 
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
+    }
+
+    private void replaceRefreshToken(Long userId, String refreshToken, LocalDateTime now) {
+        refreshTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.flush();
+        saveRefreshToken(userId, refreshToken, now);
+    }
+
+    private void saveRefreshToken(Long userId, String refreshToken, LocalDateTime now) {
+        refreshTokenRepository.save(RefreshToken.builder()
+                .tokenHash(refreshTokenHashProvider.hash(refreshToken))
+                .userId(userId)
+                .expiryDate(now.plus(refreshTokenExpiry, ChronoUnit.MILLIS))
+                .build());
     }
 }
