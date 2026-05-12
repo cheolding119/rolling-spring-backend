@@ -3,6 +3,7 @@ package com.rolling.api.domain.seminar.controller;
 import com.rolling.api.domain.seminar.dto.SeminarResponse;
 import com.rolling.api.domain.seminar.entity.SeminarStatus;
 import com.rolling.api.domain.seminar.service.SeminarService;
+import com.rolling.api.domain.report.entity.ReportReason;
 import com.rolling.api.global.security.UserPrincipal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,5 +53,33 @@ class SeminarControllerTest {
         controller.findById(null, 10L);
 
         verify(seminarService).findById(10L, null);
+    }
+
+    @Test
+    @DisplayName("내 주최 세미나 목록은 인증 사용자의 user id를 서비스에 전달한다")
+    void myHostedSeminars_withUserToken_passesUserId() {
+        SeminarController controller = new SeminarController(seminarService);
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(seminarService.findMyHostedSeminars(2L, SeminarStatus.RECRUITING, pageable))
+                .thenReturn(new PageImpl<>(List.of(SeminarResponse.builder().id(10L).title("세미나 10").build())));
+
+        controller.myHostedSeminars(new UserPrincipal(2L), SeminarStatus.RECRUITING, pageable);
+
+        verify(seminarService).findMyHostedSeminars(2L, SeminarStatus.RECRUITING, pageable);
+    }
+
+    @Test
+    @DisplayName("세미나 신고는 reason과 customReason을 서비스에 전달한다")
+    void report_passesReasonAndCustomReason() {
+        SeminarController controller = new SeminarController(seminarService);
+        com.rolling.api.domain.report.dto.ReportCreateRequest request =
+                new com.rolling.api.domain.report.dto.ReportCreateRequest();
+        org.springframework.test.util.ReflectionTestUtils.setField(request, "reason", ReportReason.SPAM);
+        org.springframework.test.util.ReflectionTestUtils.setField(request, "customReason", "광고성 게시물");
+        doNothing().when(seminarService).report(2L, 10L, ReportReason.SPAM, "광고성 게시물");
+
+        controller.report(new UserPrincipal(2L), 10L, request);
+
+        verify(seminarService).report(2L, 10L, ReportReason.SPAM, "광고성 게시물");
     }
 }

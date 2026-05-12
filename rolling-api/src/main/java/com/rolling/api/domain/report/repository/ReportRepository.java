@@ -20,6 +20,19 @@ public interface ReportRepository extends JpaRepository<Report, Long>, JpaSpecif
 
     boolean existsByReporter_IdAndTargetTypeAndTargetId(Long reporterId, ReportTargetType targetType, Long targetId);
 
+    @Query("""
+            select r.targetId
+            from Report r
+            where r.reporter.id = :reporterId
+              and r.targetType = :targetType
+              and r.targetId in :targetIds
+            """)
+    List<Long> findTargetIdsByReporter_IdAndTargetTypeAndTargetIdIn(
+            @Param("reporterId") Long reporterId,
+            @Param("targetType") ReportTargetType targetType,
+            @Param("targetIds") Collection<Long> targetIds
+    );
+
     @Override
     @EntityGraph(attributePaths = "reporter")
     Page<Report> findAll(Specification<Report> spec, Pageable pageable);

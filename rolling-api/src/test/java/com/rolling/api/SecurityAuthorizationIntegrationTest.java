@@ -297,6 +297,11 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
 
+        mockMvc.perform(get("/api/v1/seminars/my"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
         mockMvc.perform(get("/api/v1/seminars/my-applications"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
@@ -312,6 +317,17 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(post("/api/v1/seminars/11/applications"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/seminars/11/reports")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));

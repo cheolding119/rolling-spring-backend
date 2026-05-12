@@ -122,6 +122,9 @@ public class Seminar extends BaseTimeEntity {
 
     private LocalDateTime deletedAt;
 
+    @Column(nullable = false)
+    private Boolean manualClosed = false;
+
     @Builder
     public Seminar(User host,
                    String title,
@@ -147,7 +150,8 @@ public class Seminar extends BaseTimeEntity {
                    Integer price,
                    String paymentGuide,
                    String refundPolicy,
-                   SeminarStatus status) {
+                   SeminarStatus status,
+                   Boolean manualClosed) {
         this.host = host;
         this.title = title;
         this.description = description;
@@ -178,6 +182,9 @@ public class Seminar extends BaseTimeEntity {
         this.refundPolicy = refundPolicy;
         if (status != null) {
             this.status = status;
+        }
+        if (manualClosed != null) {
+            this.manualClosed = manualClosed;
         }
     }
 
@@ -236,12 +243,39 @@ public class Seminar extends BaseTimeEntity {
         this.status = SeminarStatus.DELETED;
     }
 
+    public void updateStatus(SeminarStatus status) {
+        this.status = status;
+    }
+
+    public void report() {
+        this.reportCount++;
+    }
+
+    public void closeRecruitmentManually() {
+        this.manualClosed = true;
+        this.status = SeminarStatus.CLOSED;
+    }
+
+    public void reopenRecruitmentManually() {
+        this.manualClosed = false;
+        this.status = SeminarStatus.RECRUITING;
+    }
+
+    public void cancel() {
+        this.manualClosed = false;
+        this.status = SeminarStatus.CANCELED;
+    }
+
     public void synchronizeStatus(LocalDateTime now, int appliedCount) {
         if (now == null || Boolean.TRUE.equals(isHidden) || status == SeminarStatus.CANCELED) {
             return;
         }
         if (!endDateTime.isAfter(now)) {
             this.status = SeminarStatus.FINISHED;
+            return;
+        }
+        if (Boolean.TRUE.equals(manualClosed)) {
+            this.status = SeminarStatus.CLOSED;
             return;
         }
         if (applicationEndDateTime != null && !applicationEndDateTime.isAfter(now)) {

@@ -4,11 +4,14 @@ import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.seminar.dto.SeminarApplicationResponse;
 import com.rolling.api.domain.seminar.dto.SeminarCancelApplicationRequest;
 import com.rolling.api.domain.seminar.dto.SeminarCreateRequest;
+import com.rolling.api.domain.seminar.dto.SeminarHostCancelApplicationRequest;
 import com.rolling.api.domain.seminar.dto.SeminarResponse;
+import com.rolling.api.domain.seminar.dto.SeminarStatusUpdateRequest;
 import com.rolling.api.domain.seminar.dto.SeminarUpdateRequest;
 import com.rolling.api.domain.seminar.entity.SeminarApplicationStatus;
 import com.rolling.api.domain.seminar.entity.SeminarStatus;
 import com.rolling.api.domain.seminar.service.SeminarService;
+import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
 import com.rolling.api.global.security.UserPrincipal;
@@ -29,6 +32,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -70,6 +74,18 @@ public class SeminarController {
             @PageableDefault(size = 10, sort = "seminar.startDateTime", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Page<SeminarResponse> response = seminarService.findMyApplications(requireUserId(principal), status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "내 주최 세미나 목록", description = "내가 주최한 세미나 목록을 조회합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<Page<SeminarResponse>>> myHostedSeminars(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) SeminarStatus status,
+            @PageableDefault(size = 10, sort = "startDateTime", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Page<SeminarResponse> response = seminarService.findMyHostedSeminars(requireUserId(principal), status, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -144,6 +160,61 @@ public class SeminarController {
     ) {
         SeminarApplicationResponse response = seminarService.cancelMyApplication(requireUserId(principal), id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "세미나 신청자 목록 조회", description = "호스트가 세미나 신청자 목록을 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/{id}/applications")
+    public ResponseEntity<ApiResponse<Page<SeminarApplicationResponse>>> applications(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "세미나 ID") @PathVariable Long id,
+            @RequestParam(required = false) SeminarApplicationStatus status,
+            @PageableDefault(size = 20, sort = "appliedAt", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Page<SeminarApplicationResponse> response = seminarService.findApplications(requireUserId(principal), id, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "세미나 참가자 강제 취소", description = "호스트가 특정 신청자를 강제 취소합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/applications/{applicationId}/cancel")
+    public ResponseEntity<ApiResponse<SeminarApplicationResponse>> cancelApplicationByHost(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "세미나 ID") @PathVariable Long id,
+            @Parameter(description = "신청 ID") @PathVariable Long applicationId,
+            @RequestBody(required = false) SeminarHostCancelApplicationRequest request
+    ) {
+        SeminarApplicationResponse response = seminarService.cancelApplicationByHost(
+                requireUserId(principal),
+                id,
+                applicationId,
+                request
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "세미나 모집 상태 변경", description = "호스트가 세미나 모집 상태를 변경합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<SeminarResponse>> updateStatus(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "세미나 ID") @PathVariable Long id,
+            @Valid @RequestBody SeminarStatusUpdateRequest request
+    ) {
+        SeminarResponse response = seminarService.updateStatus(requireUserId(principal), id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "세미나 신고", description = "세미나를 신고합니다. 동일 사용자는 같은 세미나를 한 번만 신고할 수 있습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{id}/reports")
+    public ResponseEntity<ApiResponse<Void>> report(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Parameter(description = "세미나 ID") @PathVariable Long id,
+            @Valid @RequestBody ReportCreateRequest request
+    ) {
+        seminarService.report(requireUserId(principal), id, request.getReason(), request.getCustomReason());
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     private Long requireUserId(UserPrincipal principal) {

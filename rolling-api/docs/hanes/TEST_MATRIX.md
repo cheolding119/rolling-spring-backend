@@ -105,20 +105,22 @@ Crawler별 테스트:
 
 ### Seminar
 
-세미나 Phase 0~2는 기본 도메인과 참석 신청까지 구현되어 있다.
+세미나 Phase 0~4는 기본 도메인, 참석 신청, 호스트 관리, 알림, 신고까지 구현되어 있다.
 
 세미나 기능 변경 시 최소 추가 대상:
 
 ```powershell
 .\gradlew.bat test --tests "com.rolling.api.domain.seminar.service.SeminarServiceTest"
 .\gradlew.bat test --tests "com.rolling.api.domain.seminar.controller.SeminarControllerTest"
+.\gradlew.bat test --tests "com.rolling.api.domain.seminar.service.SeminarPushNotificationEventHandlerTest"
 ```
 
 추가 기준:
 
 - 신청/취소 기능을 바꾸면 정원 초과, 중복 신청, 종료/마감 상태 차단 테스트를 포함한다.
-- 공개 조회와 인증 액션이 함께 있으면 security 통합 테스트를 추가한다.
-- 호스트 신청자 관리, 모집 상태 변경, 신고, 알림 저장을 추가하면 해당 service/controller 테스트를 추가한다.
+- 공개 조회와 인증 액션이 함께 있으면 `SecurityAuthorizationIntegrationTest`를 추가한다.
+- 신고를 바꾸면 `ReportServiceTest`를 추가한다.
+- 알림 타입이나 inbox 저장 책임을 바꾸면 `NotificationSchemaConfigTest`를 추가한다.
 
 ### Community
 

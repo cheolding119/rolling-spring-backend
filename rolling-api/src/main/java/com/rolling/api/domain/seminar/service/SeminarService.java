@@ -4,12 +4,24 @@ import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.seminar.dto.SeminarApplicationResponse;
 import com.rolling.api.domain.seminar.dto.SeminarCancelApplicationRequest;
 import com.rolling.api.domain.seminar.dto.SeminarCreateRequest;
+import com.rolling.api.domain.seminar.dto.SeminarHostCancelApplicationRequest;
 import com.rolling.api.domain.seminar.dto.SeminarResponse;
+import com.rolling.api.domain.seminar.dto.SeminarStatusUpdateRequest;
 import com.rolling.api.domain.seminar.dto.SeminarUpdateRequest;
+import com.rolling.api.domain.seminar.event.SeminarAppliedEvent;
+import com.rolling.api.domain.seminar.event.SeminarApplicationCanceledByHostEvent;
+import com.rolling.api.domain.seminar.event.SeminarApplicationCanceledEvent;
+import com.rolling.api.domain.seminar.event.SeminarCanceledEvent;
+import com.rolling.api.domain.seminar.event.SeminarDeletedEvent;
+import com.rolling.api.domain.seminar.event.SeminarUpdatedEvent;
 import com.rolling.api.domain.seminar.entity.Seminar;
 import com.rolling.api.domain.seminar.entity.SeminarApplication;
 import com.rolling.api.domain.seminar.entity.SeminarApplicationStatus;
 import com.rolling.api.domain.seminar.entity.SeminarStatus;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportTargetType;
+import com.rolling.api.domain.report.repository.ReportRepository;
+import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.seminar.repository.SeminarApplicationRepository;
 import com.rolling.api.domain.seminar.repository.SeminarRepository;
 import com.rolling.api.domain.user.entity.User;
@@ -23,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,7 +59,10 @@ public class SeminarService {
     private final SeminarRepository seminarRepository;
     private final SeminarApplicationRepository seminarApplicationRepository;
     private final UserRepository userRepository;
+    private final ReportRepository reportRepository;
+    private final ReportService reportService;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SeminarResponse create(Long hostId, SeminarCreateRequest request) {
@@ -88,6 +105,7 @@ public class SeminarService {
                 .paymentGuide(request.getPaymentGuide())
                 .refundPolicy(request.getRefundPolicy())
                 .status(SeminarStatus.RECRUITING)
+                .manualClosed(false)
                 .build();
 
         seminar.synchronizeStatus(now(), 0);
@@ -135,7 +153,7 @@ public class SeminarService {
         int appliedCount = countApplied(seminar.getId());
         seminar.synchronizeStatus(now(), appliedCount);
         SeminarApplicationStatus myStatus = findMyApplicationStatus(viewerUserId, seminar.getId());
-        return SeminarResponse.from(seminar, appliedCount, myStatus, false);
+        return SeminarResponse.from(seminar, appliedCount, myStatus, hasReported(viewerUserId, seminarId));
     }
 
     @Transactional
@@ -175,6 +193,12 @@ public class SeminarService {
             throw BusinessException.badRequest("정원을 현재 신청 인원(" + appliedCount + "명)보다 작게 줄일 수 없습니다");
         }
 
+        boolean scheduleChanged = hasScheduleOrLocationChanged(seminar, request);
+        boolean participantVisibleChange = scheduleChanged
+                || isChanged(seminar.getPrice(), request.getPrice())
+                || isChanged(seminar.getMaxCapacity(), request.getMaxCapacity());
+        List<Long> appliedUserIds = participantVisibleChange ? findAppliedUserIds(seminar.getId()) : List.of();
+
         seminar.update(
                 request.getTitle(),
                 request.getDescription(),
@@ -201,6 +225,10 @@ public class SeminarService {
         applyCoordinateUpdate(seminar, request);
         seminar.synchronizeStatus(now(), appliedCount);
 
+        if (participantVisibleChange && !appliedUserIds.isEmpty()) {
+            eventPublisher.publishEvent(new SeminarUpdatedEvent(seminar.getId(), seminar.getTitle(), appliedUserIds));
+        }
+
         return SeminarResponse.from(seminar, appliedCount, null, false);
     }
 
@@ -212,8 +240,16 @@ public class SeminarService {
         validateHost(seminar, hostId);
         LocalDateTime now = now();
         seminar.hide(now);
-        seminarApplicationRepository.findAllBySeminar_IdAndStatus(seminarId, SeminarApplicationStatus.APPLIED)
-                .forEach(application -> application.cancelBySeminar(now));
+        List<SeminarApplication> appliedApplications = seminarApplicationRepository
+                .findAllBySeminar_IdAndStatus(seminarId, SeminarApplicationStatus.APPLIED);
+        appliedApplications.forEach(application -> application.cancelBySeminar(now));
+        if (!appliedApplications.isEmpty()) {
+            eventPublisher.publishEvent(new SeminarDeletedEvent(
+                    seminarId,
+                    seminar.getTitle(),
+                    appliedApplications.stream().map(application -> application.getUser().getId()).toList()
+            ));
+        }
     }
 
     @Transactional
@@ -248,6 +284,7 @@ public class SeminarService {
         }
 
         seminar.synchronizeStatus(now, appliedCount + 1);
+        eventPublisher.publishEvent(new SeminarAppliedEvent(seminarId, seminar.getTitle(), userId));
         return SeminarApplicationResponse.from(application);
     }
 
@@ -278,6 +315,7 @@ public class SeminarService {
         String cancelReason = request == null ? null : request.getCancelReason();
         application.cancel(cancelReason, now);
         seminar.synchronizeStatus(now, Math.max(appliedCount - 1, 0));
+        eventPublisher.publishEvent(new SeminarApplicationCanceledEvent(seminarId, seminar.getTitle(), userId));
         return SeminarApplicationResponse.from(application);
     }
 
@@ -294,20 +332,161 @@ public class SeminarService {
 
         SeminarApplicationStatus effectiveStatus = status == null ? SeminarApplicationStatus.APPLIED : status;
         Page<SeminarApplication> page = seminarApplicationRepository.findMine(userId, effectiveStatus, pageableWithSort);
-        Map<Long, Integer> appliedCounts = loadAppliedCounts(page.getContent().stream()
+        List<Long> seminarIds = page.getContent().stream()
                 .map(application -> application.getSeminar().getId())
-                .toList());
+                .toList();
+        Map<Long, Integer> appliedCounts = loadAppliedCounts(seminarIds);
+        Set<Long> reportedSeminarIds = loadReportedSeminarIds(userId, seminarIds);
 
         List<SeminarResponse> content = page.getContent().stream()
                 .map(application -> {
                     Seminar seminar = application.getSeminar();
                     int appliedCount = appliedCounts.getOrDefault(seminar.getId(), 0);
                     seminar.synchronizeStatus(now(), appliedCount);
-                    return SeminarResponse.from(seminar, appliedCount, application.getStatus(), false);
+                    return SeminarResponse.from(
+                            seminar,
+                            appliedCount,
+                            application.getStatus(),
+                            reportedSeminarIds.contains(seminar.getId())
+                    );
                 })
                 .toList();
 
         return new PageImpl<>(content, pageableWithSort, page.getTotalElements());
+    }
+
+    @Transactional
+    public Page<SeminarResponse> findMyHostedSeminars(
+            Long userId,
+            SeminarStatus status,
+            Pageable pageable
+    ) {
+        syncExpiredSeminars();
+        Pageable pageableWithSort = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
+
+        Page<Seminar> page = status == null
+                ? seminarRepository.findByHost_IdAndIsHiddenFalse(userId, pageableWithSort)
+                : seminarRepository.findByHost_IdAndIsHiddenFalseAndStatus(userId, status, pageableWithSort);
+        return toSeminarResponsePage(page, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SeminarApplicationResponse> findApplications(
+            Long hostUserId,
+            Long seminarId,
+            SeminarApplicationStatus status,
+            Pageable pageable
+    ) {
+        Seminar seminar = seminarRepository.findByIdAndIsHiddenFalse(seminarId)
+                .orElseThrow(() -> BusinessException.notFound("세미나를 찾을 수 없습니다"));
+        validateHostManager(seminar, hostUserId);
+
+        Pageable pageableWithSort = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("appliedAt").ascending());
+
+        SeminarApplicationStatus effectiveStatus = status == null ? SeminarApplicationStatus.APPLIED : status;
+        return seminarApplicationRepository.findBySeminarId(seminarId, effectiveStatus, pageableWithSort)
+                .map(SeminarApplicationResponse::from);
+    }
+
+    @Transactional
+    public SeminarApplicationResponse cancelApplicationByHost(
+            Long hostUserId,
+            Long seminarId,
+            Long applicationId,
+            SeminarHostCancelApplicationRequest request
+    ) {
+        Seminar seminar = seminarRepository.findByIdForUpdate(seminarId)
+                .orElseThrow(() -> BusinessException.notFound("세미나를 찾을 수 없습니다"));
+        validateHostManager(seminar, hostUserId);
+
+        LocalDateTime now = now();
+        int appliedCount = countApplied(seminarId);
+        seminar.synchronizeStatus(now, appliedCount);
+
+        if (seminar.getStatus() == SeminarStatus.FINISHED) {
+            throw new BusinessException("SEMINAR_FINISHED", "이미 종료된 세미나입니다", HttpStatus.BAD_REQUEST);
+        }
+
+        SeminarApplication application = seminarApplicationRepository.findByIdAndSeminar_Id(applicationId, seminarId)
+                .orElseThrow(() -> new BusinessException("APPLICATION_NOT_FOUND", "신청 내역을 찾을 수 없습니다", HttpStatus.NOT_FOUND));
+        if (!application.isApplied()) {
+            throw new BusinessException("APPLICATION_ALREADY_CANCELED", "이미 취소된 신청입니다", HttpStatus.BAD_REQUEST);
+        }
+
+        application.cancelByHost(request == null ? null : request.getCancelReason(), now);
+        seminar.synchronizeStatus(now, Math.max(appliedCount - 1, 0));
+        eventPublisher.publishEvent(new SeminarApplicationCanceledByHostEvent(
+                seminarId,
+                seminar.getTitle(),
+                application.getUser().getId()
+        ));
+        return SeminarApplicationResponse.from(application);
+    }
+
+    @Transactional
+    public SeminarResponse updateStatus(Long hostUserId, Long seminarId, SeminarStatusUpdateRequest request) {
+        Seminar seminar = seminarRepository.findByIdForUpdate(seminarId)
+                .orElseThrow(() -> BusinessException.notFound("세미나를 찾을 수 없습니다"));
+        validateHostManager(seminar, hostUserId);
+
+        LocalDateTime now = now();
+        int appliedCount = countApplied(seminarId);
+        seminar.synchronizeStatus(now, appliedCount);
+
+        if (seminar.getStatus() == SeminarStatus.FINISHED) {
+            throw new BusinessException("SEMINAR_FINISHED", "이미 종료된 세미나입니다", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getStatus() == null
+                || request.getStatus() == SeminarStatus.FINISHED
+                || request.getStatus() == SeminarStatus.DELETED) {
+            throw BusinessException.badRequest("모집 상태는 RECRUITING, CLOSED, CANCELED만 설정할 수 있습니다");
+        }
+        if (request.getStatus() == SeminarStatus.RECRUITING && seminar.isCapacityFull(appliedCount)) {
+            throw new BusinessException("CAPACITY_FULL", "정원이 가득 찬 세미나는 모집중으로 변경할 수 없습니다", HttpStatus.BAD_REQUEST);
+        }
+
+        if (request.getStatus() == SeminarStatus.CANCELED) {
+            List<SeminarApplication> appliedApplications = seminarApplicationRepository
+                    .findAllBySeminar_IdAndStatus(seminarId, SeminarApplicationStatus.APPLIED);
+            appliedApplications.forEach(application -> application.cancelBySeminar(request.getReason(), now));
+            seminar.cancel();
+            if (!appliedApplications.isEmpty()) {
+                eventPublisher.publishEvent(new SeminarCanceledEvent(
+                        seminarId,
+                        seminar.getTitle(),
+                        appliedApplications.stream().map(application -> application.getUser().getId()).toList()
+                ));
+            }
+            return SeminarResponse.from(seminar, 0, null, false);
+        }
+
+        if (request.getStatus() == SeminarStatus.CLOSED) {
+            seminar.closeRecruitmentManually();
+        } else {
+            seminar.reopenRecruitmentManually();
+            seminar.synchronizeStatus(now, appliedCount);
+        }
+        return SeminarResponse.from(seminar, appliedCount, null, false);
+    }
+
+    @Transactional
+    public void report(Long userId, Long seminarId, ReportReason reason, String customReason) {
+        Seminar seminar = seminarRepository.findByIdForUpdate(seminarId)
+                .orElseThrow(() -> BusinessException.notFound("세미나를 찾을 수 없습니다"));
+
+        reportService.createReport(
+                userId,
+                ReportTargetType.SEMINAR,
+                seminarId,
+                seminar.getHost().getId(),
+                reason,
+                customReason
+        );
+        seminar.report();
     }
 
     @Transactional
@@ -347,6 +526,12 @@ public class SeminarService {
     private void validateHost(Seminar seminar, Long userId) {
         if (!Objects.equals(seminar.getHost().getId(), userId)) {
             throw BusinessException.forbidden("호스트만 세미나를 수정/삭제할 수 있습니다");
+        }
+    }
+
+    private void validateHostManager(Seminar seminar, Long userId) {
+        if (!Objects.equals(seminar.getHost().getId(), userId)) {
+            throw BusinessException.forbidden("호스트만 신청자와 모집 상태를 관리할 수 있습니다");
         }
     }
 
@@ -433,6 +618,29 @@ public class SeminarService {
         seminar.updateCoordinates(request.getLatitude(), request.getLongitude());
     }
 
+    private boolean hasScheduleOrLocationChanged(Seminar seminar, SeminarUpdateRequest request) {
+        return isChanged(seminar.getStartDateTime(), request.getStartDateTime())
+                || isChanged(seminar.getEndDateTime(), request.getEndDateTime())
+                || isChanged(seminar.getApplicationStartDateTime(), request.getApplicationStartDateTime())
+                || isChanged(seminar.getApplicationEndDateTime(), request.getApplicationEndDateTime())
+                || isChanged(seminar.getLocationName(), request.getLocationName())
+                || isChanged(seminar.getAddress(), request.getAddress())
+                || isChanged(seminar.getRegion(), request.getRegion())
+                || willCoordinatesChange(seminar, request);
+    }
+
+    private boolean willCoordinatesChange(Seminar seminar, SeminarUpdateRequest request) {
+        if (!request.hasLatitudeField() && !request.hasLongitudeField()) {
+            return false;
+        }
+        return !Objects.equals(seminar.getLatitude(), request.getLatitude())
+                || !Objects.equals(seminar.getLongitude(), request.getLongitude());
+    }
+
+    private boolean isChanged(Object currentValue, Object newValue) {
+        return newValue != null && !Objects.equals(currentValue, newValue);
+    }
+
     private void validateNotBlockedHost(Long viewerUserId, Long hostUserId) {
         if (viewerUserId == null) {
             return;
@@ -452,17 +660,24 @@ public class SeminarService {
 
     private Page<SeminarResponse> toSeminarResponsePage(Page<Seminar> page, Long viewerUserId) {
         List<Seminar> seminars = page.getContent();
-        Map<Long, Integer> appliedCounts = loadAppliedCounts(seminars.stream().map(Seminar::getId).toList());
+        List<Long> seminarIds = seminars.stream().map(Seminar::getId).toList();
+        Map<Long, Integer> appliedCounts = loadAppliedCounts(seminarIds);
         Map<Long, SeminarApplicationStatus> myStatuses = loadMyApplicationStatuses(
                 viewerUserId,
-                seminars.stream().map(Seminar::getId).toList()
+                seminarIds
         );
+        Set<Long> reportedSeminarIds = loadReportedSeminarIds(viewerUserId, seminarIds);
 
         LocalDateTime now = now();
         return page.map(seminar -> {
             int appliedCount = appliedCounts.getOrDefault(seminar.getId(), 0);
             seminar.synchronizeStatus(now, appliedCount);
-            return SeminarResponse.from(seminar, appliedCount, myStatuses.get(seminar.getId()), false);
+            return SeminarResponse.from(
+                    seminar,
+                    appliedCount,
+                    myStatuses.get(seminar.getId()),
+                    reportedSeminarIds.contains(seminar.getId())
+            );
         });
     }
 
@@ -493,6 +708,36 @@ public class SeminarService {
                         (left, right) -> left,
                         LinkedHashMap::new
                 ));
+    }
+
+    private List<Long> findAppliedUserIds(Long seminarId) {
+        return seminarApplicationRepository.findAllBySeminar_IdAndStatus(seminarId, SeminarApplicationStatus.APPLIED)
+                .stream()
+                .map(application -> application.getUser().getId())
+                .toList();
+    }
+
+    private boolean hasReported(Long viewerUserId, Long seminarId) {
+        if (viewerUserId == null) {
+            return false;
+        }
+        return reportRepository.existsByReporter_IdAndTargetTypeAndTargetId(
+                viewerUserId,
+                ReportTargetType.SEMINAR,
+                seminarId
+        );
+    }
+
+    private Set<Long> loadReportedSeminarIds(Long viewerUserId, Collection<Long> seminarIds) {
+        if (viewerUserId == null || seminarIds == null || seminarIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return reportRepository.findTargetIdsByReporter_IdAndTargetTypeAndTargetIdIn(
+                        viewerUserId,
+                        ReportTargetType.SEMINAR,
+                        seminarIds
+                ).stream()
+                .collect(Collectors.toSet());
     }
 
     private SeminarApplicationStatus findMyApplicationStatus(Long viewerUserId, Long seminarId) {

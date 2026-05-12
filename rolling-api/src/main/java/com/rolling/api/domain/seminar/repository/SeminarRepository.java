@@ -87,6 +87,9 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
     @EntityGraph(attributePaths = "host")
     Page<Seminar> findByHost_IdAndIsHiddenFalse(Long hostId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "host")
+    Page<Seminar> findByHost_IdAndIsHiddenFalseAndStatus(Long hostId, SeminarStatus status, Pageable pageable);
+
     List<Seminar> findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(
             SeminarStatus status,
             LocalDateTime endDateTime
