@@ -17,6 +17,7 @@ import com.rolling.api.domain.community.dto.CommunityPostSummaryResponse;
 import com.rolling.api.domain.community.entity.CommunityPostCategory;
 import com.rolling.api.domain.community.entity.CommunityCommentStatus;
 import com.rolling.api.domain.community.entity.CommunityPostStatus;
+import com.rolling.api.domain.community.service.CommunityPostImageUploadService;
 import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.community.service.CommunityService;
 import com.rolling.api.domain.map.controller.MapController;
@@ -33,6 +34,9 @@ import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.service.TournamentManagerService;
 import com.rolling.api.domain.tournament.service.TournamentService;
+import com.rolling.api.domain.user.entity.BeltColor;
+import com.rolling.api.domain.user.entity.SocialProvider;
+import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
 import com.rolling.api.global.exception.GlobalExceptionHandler;
@@ -64,6 +68,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.isEmptyOrNullString;
 import static org.hamcrest.Matchers.not;
@@ -562,6 +567,27 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true));
     }
 
+    @Test
+    @DisplayName("제재 계정 accessToken은 비허용 API에서 403을 반환한다")
+    void suspendedUserToken_onRestrictedRoute_returnsForbidden() throws Exception {
+        User suspendedUser = User.builder()
+                .socialId("social-suspended")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("정지사용자")
+                .email("suspended@example.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(suspendedUser, "id", 3L);
+        suspendedUser.suspend(LocalDateTime.of(2126, 4, 20, 0, 0), "중대한 운영 위반");
+        given(userRepository.findByIdAndIsWithdrawnFalse(3L)).willReturn(Optional.of(suspendedUser));
+
+        mockMvc.perform(post("/api/v1/community/posts/11/like")
+                        .header("Authorization", bearerToken(3L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
     private void stubOpenMatResponses() {
         OpenMatResponse response = OpenMatResponse.builder()
                 .id(1L)
@@ -702,6 +728,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         CommunityService communityService() {
             return mock(CommunityService.class);
+        }
+
+        @Bean
+        CommunityPostImageUploadService communityPostImageUploadService() {
+            return mock(CommunityPostImageUploadService.class);
         }
 
         @Bean

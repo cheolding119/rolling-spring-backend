@@ -59,6 +59,7 @@ public class AuthService {
     private final UserDeviceRepository userDeviceRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenHashProvider refreshTokenHashProvider;
     private final AdminAccessConfig adminAccessConfig;
     private final ScheduledTaskTracker scheduledTaskTracker;
     private final OperationalAlertPublisher operationalAlertPublisher;
@@ -114,9 +115,9 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
         refreshTokenRepository.deleteByUserId(user.getId());
-        LocalDateTime expiryDate = LocalDateTime.now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
+        LocalDateTime expiryDate = now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
         refreshTokenRepository.save(RefreshToken.builder()
-                .token(refreshToken)
+                .tokenHash(refreshTokenHashProvider.hash(refreshToken))
                 .userId(user.getId())
                 .expiryDate(expiryDate)
                 .build());
@@ -142,8 +143,9 @@ public class AuthService {
     @Transactional
     public TokenRefreshResponse refresh(TokenRefreshRequest request) {
         String oldToken = request.getRefreshToken();
+        String oldTokenHash = refreshTokenHashProvider.hash(oldToken);
 
-        RefreshToken savedToken = refreshTokenRepository.findByToken(oldToken)
+        RefreshToken savedToken = refreshTokenRepository.findByTokenHash(oldTokenHash)
                 .orElseThrow(AuthException::invalidRefreshToken);
 
         if (savedToken.isExpired()) {
@@ -166,9 +168,9 @@ public class AuthService {
         String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
 
         refreshTokenRepository.delete(savedToken);
-        LocalDateTime expiryDate = LocalDateTime.now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
+        LocalDateTime expiryDate = now().plus(refreshTokenExpiry, ChronoUnit.MILLIS);
         refreshTokenRepository.save(RefreshToken.builder()
-                .token(newRefreshToken)
+                .tokenHash(refreshTokenHashProvider.hash(newRefreshToken))
                 .userId(userId)
                 .expiryDate(expiryDate)
                 .build());

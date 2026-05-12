@@ -2,14 +2,20 @@ package com.rolling.api.domain.auth.repository;
 
 import com.rolling.api.domain.auth.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-    Optional<RefreshToken> findByToken(String token);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from RefreshToken r where r.tokenHash = :tokenHash")
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     void deleteByUserId(Long userId);
 
-    void deleteByToken(String token);
+    void deleteByTokenHash(String tokenHash);
 }

@@ -26,8 +26,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -67,6 +69,9 @@ class AuthServiceLifecycleTest {
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Spy
+    private RefreshTokenHashProvider refreshTokenHashProvider = new RefreshTokenHashProvider();
 
     @Mock
     private AdminAccessConfig adminAccessConfig;
@@ -125,7 +130,11 @@ class AuthServiceLifecycleTest {
         assertThat(response.getUserId()).isEqualTo(1L);
         assertThat(response.getName()).isEqualTo("관리자");
         verify(refreshTokenRepository).deleteByUserId(1L);
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
+        assertThat(refreshTokenCaptor.getValue().getTokenHash())
+                .isEqualTo(refreshTokenHashProvider.hash("refresh-token"))
+                .isNotEqualTo("refresh-token");
     }
 
     @Test
@@ -163,7 +172,11 @@ class AuthServiceLifecycleTest {
         assertThat(response.getName()).isEqualTo("Unknown");
         assertThat(response.isNewUser()).isTrue();
         verify(refreshTokenRepository).deleteByUserId(70L);
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
+        assertThat(refreshTokenCaptor.getValue().getTokenHash())
+                .isEqualTo(refreshTokenHashProvider.hash("refresh-token"))
+                .isNotEqualTo("refresh-token");
     }
 
     @Test
@@ -211,12 +224,13 @@ class AuthServiceLifecycleTest {
         ReflectionTestUtils.setField(request, "refreshToken", "old-refresh-token");
 
         RefreshToken savedToken = RefreshToken.builder()
-                .token("old-refresh-token")
+                .tokenHash(refreshTokenHashProvider.hash("old-refresh-token"))
                 .userId(2L)
                 .expiryDate(LocalDateTime.now().plusDays(7))
                 .build();
 
-        when(refreshTokenRepository.findByToken("old-refresh-token")).thenReturn(Optional.of(savedToken));
+        when(refreshTokenRepository.findByTokenHash(refreshTokenHashProvider.hash("old-refresh-token")))
+                .thenReturn(Optional.of(savedToken));
         when(jwtTokenProvider.validateToken("old-refresh-token")).thenReturn(true);
         User user = User.builder()
                 .socialId("social-refresh")
@@ -236,7 +250,11 @@ class AuthServiceLifecycleTest {
         assertThat(response.getIsAdmin()).isFalse();
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         verify(refreshTokenRepository).delete(savedToken);
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
+        assertThat(refreshTokenCaptor.getValue().getTokenHash())
+                .isEqualTo(refreshTokenHashProvider.hash("new-refresh-token"))
+                .isNotEqualTo("new-refresh-token");
     }
 
     @Test
