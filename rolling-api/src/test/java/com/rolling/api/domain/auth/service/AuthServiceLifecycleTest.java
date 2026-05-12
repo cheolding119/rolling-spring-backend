@@ -22,6 +22,7 @@ import com.rolling.api.infra.apple.dto.AppleUserResponse;
 import com.rolling.api.infra.google.GoogleClient;
 import com.rolling.api.infra.google.dto.GoogleUserResponse;
 import com.rolling.api.infra.kakao.KakaoClient;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,7 @@ class AuthServiceLifecycleTest {
         assertThat(response.getUserId()).isEqualTo(1L);
         assertThat(response.getName()).isEqualTo("관리자");
         verify(refreshTokenRepository).deleteByUserId(1L);
+        verify(refreshTokenRepository).flush();
         ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         assertThat(refreshTokenCaptor.getValue().getTokenHash())
@@ -172,6 +174,7 @@ class AuthServiceLifecycleTest {
         assertThat(response.getName()).isEqualTo("Unknown");
         assertThat(response.isNewUser()).isTrue();
         verify(refreshTokenRepository).deleteByUserId(70L);
+        verify(refreshTokenRepository).flush();
         ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         assertThat(refreshTokenCaptor.getValue().getTokenHash())
@@ -250,6 +253,7 @@ class AuthServiceLifecycleTest {
         assertThat(response.getIsAdmin()).isFalse();
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         verify(refreshTokenRepository).delete(savedToken);
+        verify(refreshTokenRepository).flush();
         ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         assertThat(refreshTokenCaptor.getValue().getTokenHash())
