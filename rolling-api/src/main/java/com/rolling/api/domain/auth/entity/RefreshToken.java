@@ -18,8 +18,8 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 512)
-    private String token;
+    @Column(name = "token", nullable = false, unique = true, length = 128)
+    private String tokenHash;
 
     @Column(nullable = false)
     private Long userId;
@@ -28,8 +28,8 @@ public class RefreshToken {
     private LocalDateTime expiryDate;
 
     @Builder
-    public RefreshToken(String token, Long userId, LocalDateTime expiryDate) {
-        this.token = token;
+    public RefreshToken(String tokenHash, Long userId, LocalDateTime expiryDate) {
+        this.tokenHash = tokenHash;
         this.userId = userId;
         this.expiryDate = expiryDate;
     }
