@@ -53,7 +53,30 @@ public interface SeminarApplicationRepository extends JpaRepository<SeminarAppli
             SeminarApplicationStatus status
     );
 
+    @EntityGraph(attributePaths = {"seminar", "seminar.host", "user"})
     List<SeminarApplication> findAllBySeminar_IdAndStatus(Long seminarId, SeminarApplicationStatus status);
+
+    @EntityGraph(attributePaths = {"seminar", "seminar.host", "user"})
+    Optional<SeminarApplication> findByIdAndSeminar_Id(Long id, Long seminarId);
+
+    @EntityGraph(attributePaths = {"seminar", "seminar.host", "user"})
+    @Query(
+            value = """
+                    SELECT a FROM SeminarApplication a
+                    WHERE a.seminar.id = :seminarId
+                      AND (:status IS NULL OR a.status = :status)
+                    """,
+            countQuery = """
+                    SELECT COUNT(a) FROM SeminarApplication a
+                    WHERE a.seminar.id = :seminarId
+                      AND (:status IS NULL OR a.status = :status)
+                    """
+    )
+    Page<SeminarApplication> findBySeminarId(
+            @Param("seminarId") Long seminarId,
+            @Param("status") SeminarApplicationStatus status,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = {"seminar", "seminar.host", "user"})
     @Query(

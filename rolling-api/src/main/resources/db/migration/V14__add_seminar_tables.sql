@@ -28,6 +28,7 @@ CREATE TABLE seminars (
     report_count INTEGER NOT NULL DEFAULT 0,
     is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at TIMESTAMP(6),
+    manual_closed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT fk_seminars_host FOREIGN KEY (host_id) REFERENCES users (id),

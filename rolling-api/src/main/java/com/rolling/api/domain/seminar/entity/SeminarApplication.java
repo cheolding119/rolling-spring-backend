@@ -95,9 +95,19 @@ public class SeminarApplication extends BaseTimeEntity {
         this.canceledAt = canceledAt;
     }
 
+    public void cancelByHost(String cancelReason, LocalDateTime canceledAt) {
+        this.status = SeminarApplicationStatus.HOST_CANCELED;
+        this.cancelReason = normalize(cancelReason);
+        this.canceledAt = canceledAt;
+    }
+
     public void cancelBySeminar(LocalDateTime canceledAt) {
+        cancelBySeminar(null, canceledAt);
+    }
+
+    public void cancelBySeminar(String cancelReason, LocalDateTime canceledAt) {
         this.status = SeminarApplicationStatus.SEMINAR_CANCELED;
-        this.cancelReason = null;
+        this.cancelReason = normalize(cancelReason);
         this.canceledAt = canceledAt;
     }
 
