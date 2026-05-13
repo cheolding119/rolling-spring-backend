@@ -131,8 +131,9 @@ public class SeminarService {
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("startDateTime").ascending());
 
+        Long searchViewerUserId = viewerUserId == null ? -1L : viewerUserId;
         Page<Seminar> page = seminarRepository.searchVisible(
-                viewerUserId,
+                searchViewerUserId,
                 region,
                 status,
                 normalizeKeywordPattern(keyword),
@@ -763,11 +764,11 @@ public class SeminarService {
 
     private String normalizeKeywordPattern(String keyword) {
         if (keyword == null) {
-            return null;
+            return "%";
         }
         String normalized = keyword.trim().replaceAll("\\s+", " ");
         if (normalized.isEmpty()) {
-            return null;
+            return "%";
         }
         return "%" + normalized.toLowerCase(Locale.ROOT) + "%";
     }
