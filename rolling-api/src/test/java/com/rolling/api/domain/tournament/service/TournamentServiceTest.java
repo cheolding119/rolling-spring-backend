@@ -15,6 +15,7 @@ import com.rolling.api.global.security.AdminAccessConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -172,6 +173,35 @@ class TournamentServiceTest {
         assertThat(response.getTitle()).isEqualTo("제5회 롤링컵");
         assertThat(response.getCompetitionDate()).isEqualTo(LocalDate.of(2026, 4, 15));
         verify(tournamentRepository).save(any(Tournament.class));
+    }
+
+    @Test
+    @DisplayName("대회 생성 시 포스터가 없으면 posterKey와 posterUrl 없이 저장한다")
+    void create_allowsNullPosterKey() {
+        TournamentCreateRequest request = createRequest();
+        ReflectionTestUtils.setField(request, "posterKey", null);
+        when(userRepository.existsByIdAndIsWithdrawnFalse(11L)).thenReturn(true);
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> {
+            Tournament tournament = invocation.getArgument(0);
+            ReflectionTestUtils.setField(tournament, "id", 100L);
+            return tournament;
+        });
+
+        TournamentService tournamentService = new TournamentService(
+                tournamentRepository,
+                userRepository,
+                reportService,
+                tournamentPosterService,
+                adminAccessConfig);
+
+        TournamentResponse response = tournamentService.create(11L, request);
+
+        ArgumentCaptor<Tournament> captor = ArgumentCaptor.forClass(Tournament.class);
+        verify(tournamentRepository).save(captor.capture());
+        assertThat(captor.getValue().getPosterKey()).isNull();
+        assertThat(captor.getValue().getPosterUrl()).isNull();
+        assertThat(response.getPosterUrl()).isNull();
+        assertThat(response.getId()).isEqualTo(100L);
     }
 
     @Test

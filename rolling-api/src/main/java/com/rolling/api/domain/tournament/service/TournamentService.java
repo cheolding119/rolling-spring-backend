@@ -93,7 +93,7 @@ public class TournamentService {
         LocalDate registrationDeadline = request.getRegistrationDeadline();
         validateDatePolicy(competitionDate, registrationDeadline);
 
-        String posterKey = requireText(request.getPosterKey(), "포스터 key는 필수입니다");
+        String posterKey = optionalText(request.getPosterKey());
         String posterUrl = tournamentPosterService.buildPublicUrl(posterKey);
 
         Tournament tournament = Tournament.builder()

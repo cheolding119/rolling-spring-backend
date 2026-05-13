@@ -8,6 +8,7 @@
 
 불필요한 테스트는 진행하지 않는다 .
 
+브랜치 명 앞에는 codex 를 붙이지 않는다 
 브랜치 이름은 작업 내용을 식별할 수 있도록 작성합니다. 예시: feature/auth-login, fix/payment-timeout, docs/commit-convention
 
 
@@ -81,3 +82,11 @@ ci: CI/CD 설정 파일 및 스크립트 변경
 관련된 이슈 트래커(Jira, Github Issues 등)의 번호를 적어 커밋과 이슈를 연결합니다.
 
 예시: Fixes: #123, Resolves: #456, Related to: #789
+
+7. 브랜치 운영 규칙 - 추가
+   작업 흐름은 `main -> dev -> feature` 순서를 기준으로 진행합니다.
+
+- 먼저 `main`에서 `dev` 브랜치를 생성합니다.
+- 이후 실제 기능/버그 작업은 `dev`에서 분기한 `feature` 브랜치에서 진행합니다.
+- 작업이 완료되면 `feature` 브랜치를 `dev`로 머지한 뒤 PR을 올려 반영합니다.
+- `dev`에 필요한 변경이 모두 반영되면 `dev`에서 `main`으로 PR을 올려 최종 머지합니다.
