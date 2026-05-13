@@ -38,11 +38,11 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                       AND (:from IS NULL OR s.startDateTime >= :from)
                       AND (:to IS NULL OR s.startDateTime <= :to)
                       AND (
-                            :keyword IS NULL
-                            OR LOWER(s.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.instructorName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.locationName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            :keywordPattern IS NULL
+                            OR LOWER(s.title) LIKE :keywordPattern
+                            OR LOWER(s.instructorName) LIKE :keywordPattern
+                            OR LOWER(s.locationName) LIKE :keywordPattern
+                            OR LOWER(s.address) LIKE :keywordPattern
                       )
                     """,
             countQuery = """
@@ -63,11 +63,11 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                       AND (:from IS NULL OR s.startDateTime >= :from)
                       AND (:to IS NULL OR s.startDateTime <= :to)
                       AND (
-                            :keyword IS NULL
-                            OR LOWER(s.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.instructorName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.locationName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                            OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            :keywordPattern IS NULL
+                            OR LOWER(s.title) LIKE :keywordPattern
+                            OR LOWER(s.instructorName) LIKE :keywordPattern
+                            OR LOWER(s.locationName) LIKE :keywordPattern
+                            OR LOWER(s.address) LIKE :keywordPattern
                       )
                     """
     )
@@ -75,7 +75,7 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
             @Param("viewerUserId") Long viewerUserId,
             @Param("region") Region region,
             @Param("status") SeminarStatus status,
-            @Param("keyword") String keyword,
+            @Param("keywordPattern") String keywordPattern,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             Pageable pageable

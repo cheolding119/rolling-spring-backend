@@ -42,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -134,7 +135,7 @@ public class SeminarService {
                 viewerUserId,
                 region,
                 status,
-                normalizeKeyword(keyword),
+                normalizeKeywordPattern(keyword),
                 from,
                 to,
                 pageableWithSort
@@ -760,11 +761,14 @@ public class SeminarService {
         return LocalDateTime.now(clock);
     }
 
-    private String normalizeKeyword(String keyword) {
+    private String normalizeKeywordPattern(String keyword) {
         if (keyword == null) {
             return null;
         }
         String normalized = keyword.trim().replaceAll("\\s+", " ");
-        return normalized.isEmpty() ? null : normalized;
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return "%" + normalized.toLowerCase(Locale.ROOT) + "%";
     }
 }

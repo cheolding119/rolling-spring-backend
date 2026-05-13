@@ -52,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -224,6 +225,48 @@ class SeminarServiceTest {
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).getReported()).isTrue();
         assertThat(response.getContent().get(0).getMyApplicationStatus()).isEqualTo(SeminarApplicationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("세미나 목록 검색어는 DB가 안전하게 처리할 수 있도록 패턴으로 정규화된다")
+    void findAll_normalizesKeywordToLikePattern() {
+        User host = createUser(1L, "host-seminar-search", "host");
+        Seminar seminar = createSeminar(10L, host, 3);
+
+        when(seminarRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(eq(SeminarStatus.FINISHED), any()))
+                .thenReturn(List.of());
+        when(seminarRepository.searchVisible(
+                isNull(),
+                isNull(),
+                isNull(),
+                eq("%가드 패스%"),
+                isNull(),
+                isNull(),
+                any(PageRequest.class)
+        )).thenReturn(new PageImpl<>(List.of(seminar), PageRequest.of(0, 10), 1));
+        when(seminarApplicationRepository.countBySeminarIdsAndStatus(List.of(10L), SeminarApplicationStatus.APPLIED))
+                .thenReturn(List.of(countView(10L, 0L)));
+
+        Page<SeminarResponse> response = seminarService.findAll(
+                null,
+                null,
+                "  가드   패스  ",
+                null,
+                null,
+                PageRequest.of(0, 10),
+                null
+        );
+
+        assertThat(response.getContent()).hasSize(1);
+        verify(seminarRepository).searchVisible(
+                isNull(),
+                isNull(),
+                isNull(),
+                eq("%가드 패스%"),
+                isNull(),
+                isNull(),
+                any(PageRequest.class)
+        );
     }
 
     @Test
