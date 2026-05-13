@@ -24,7 +24,7 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                     SELECT s FROM Seminar s
                     WHERE s.isHidden = false
                       AND (
-                            :viewerUserId IS NULL
+                            :viewerUserId = -1
                             OR s.host.id NOT IN (
                                 SELECT blocked.blockedUser.id
                                 FROM User viewer
@@ -33,13 +33,12 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                                   AND blocked.blockedUser.isWithdrawn = false
                             )
                       )
-                      AND (:region IS NULL OR s.region = :region)
-                      AND (:status IS NULL OR s.status = :status)
-                      AND (:from IS NULL OR s.startDateTime >= :from)
-                      AND (:to IS NULL OR s.startDateTime <= :to)
+                      AND s.region = COALESCE(:region, s.region)
+                      AND s.status = COALESCE(:status, s.status)
+                      AND s.startDateTime >= COALESCE(:from, s.startDateTime)
+                      AND s.startDateTime <= COALESCE(:to, s.startDateTime)
                       AND (
-                            :keywordPattern IS NULL
-                            OR LOWER(s.title) LIKE :keywordPattern
+                            LOWER(s.title) LIKE :keywordPattern
                             OR LOWER(s.instructorName) LIKE :keywordPattern
                             OR LOWER(s.locationName) LIKE :keywordPattern
                             OR LOWER(s.address) LIKE :keywordPattern
@@ -49,7 +48,7 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                     SELECT COUNT(s) FROM Seminar s
                     WHERE s.isHidden = false
                       AND (
-                            :viewerUserId IS NULL
+                            :viewerUserId = -1
                             OR s.host.id NOT IN (
                                 SELECT blocked.blockedUser.id
                                 FROM User viewer
@@ -58,13 +57,12 @@ public interface SeminarRepository extends JpaRepository<Seminar, Long> {
                                   AND blocked.blockedUser.isWithdrawn = false
                             )
                       )
-                      AND (:region IS NULL OR s.region = :region)
-                      AND (:status IS NULL OR s.status = :status)
-                      AND (:from IS NULL OR s.startDateTime >= :from)
-                      AND (:to IS NULL OR s.startDateTime <= :to)
+                      AND s.region = COALESCE(:region, s.region)
+                      AND s.status = COALESCE(:status, s.status)
+                      AND s.startDateTime >= COALESCE(:from, s.startDateTime)
+                      AND s.startDateTime <= COALESCE(:to, s.startDateTime)
                       AND (
-                            :keywordPattern IS NULL
-                            OR LOWER(s.title) LIKE :keywordPattern
+                            LOWER(s.title) LIKE :keywordPattern
                             OR LOWER(s.instructorName) LIKE :keywordPattern
                             OR LOWER(s.locationName) LIKE :keywordPattern
                             OR LOWER(s.address) LIKE :keywordPattern

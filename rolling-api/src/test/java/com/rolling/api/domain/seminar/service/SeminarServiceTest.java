@@ -236,7 +236,7 @@ class SeminarServiceTest {
         when(seminarRepository.findAllByIsHiddenFalseAndStatusNotAndEndDateTimeLessThanEqual(eq(SeminarStatus.FINISHED), any()))
                 .thenReturn(List.of());
         when(seminarRepository.searchVisible(
-                isNull(),
+                eq(-1L),
                 isNull(),
                 isNull(),
                 eq("%가드 패스%"),
@@ -259,7 +259,7 @@ class SeminarServiceTest {
 
         assertThat(response.getContent()).hasSize(1);
         verify(seminarRepository).searchVisible(
-                isNull(),
+                eq(-1L),
                 isNull(),
                 isNull(),
                 eq("%가드 패스%"),
