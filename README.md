@@ -75,12 +75,15 @@ Rolling은 이런 비효율을 줄이기 위해 오픈매트와 대회 정보를
 
 | 로그인 | 메인 페이지 | 오픈매트 목록 |
 | :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-login"><img src="images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="images/users/main_page.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="images/users/openmat_list.jpg" width="250" alt="오픈매트 목록"></a> |
+| <a href="./docs/screenshots.md#user-login"><img src="images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="images/00514users/메인페이지.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="images/00514users/오픈매트리스트.jpg" width="250" alt="오픈매트 목록"></a> |
 
-| 오픈매트 신청 | 개최한 오픈매트 | 대회 목록 |
+| 오픈매트 신청 | 대회 목록 | 대회 상세 |
 | :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="images/users/openmat_sign_up.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-subject-open-mat"><img src="images/users/subject_open_mat.jpg" width="250" alt="개최한 오픈매트"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="images/users/tournaments_list.jpg" width="250" alt="대회 목록"></a> |
+| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="images/00514users/오픈매트상세.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="images/00514users/대회리스트페이지.jpg" width="250" alt="대회 목록"></a> | <a href="./docs/screenshots.md#user-tournaments-detail"><img src="images/00514users/대회 상세 페이지.jpg" width="250" alt="대회 상세"></a> |
 
+| 알림 목록 | 커뮤니티 목록 | 커뮤니티 상세 |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-notifications"><img src="images/00514users/알림리스트페이지.jpg" width="250" alt="알림 목록"></a> | <a href="./docs/screenshots.md#user-community-list"><img src="images/00514users/커뮤니티리스트페이지.jpg" width="250" alt="커뮤니티 목록"></a> | <a href="./docs/screenshots.md#user-community-detail"><img src="images/00514users/커뮤니티상세.jpg" width="250" alt="커뮤니티 상세"></a> |
 ### 관리자 주요 화면
 
 
