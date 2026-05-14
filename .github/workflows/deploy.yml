@@ -7,6 +7,20 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'rolling-api/src/**'
+      - 'rolling-api/build.gradle'
+      - 'rolling-api/settings.gradle'
+      - 'rolling-api/gradlew'
+      - 'rolling-api/gradlew.bat'
+      - 'rolling-api/gradle/**'
+      - 'rolling-api/Dockerfile'
+      - 'rolling-api/Dockerfile.runtime'
+      - 'rolling-api/docker-compose.yml'
+      - 'rolling-api/docker-compose.monitoring.yml'
+      - 'rolling-api/nginx/**'
+      - 'rolling-api/monitoring/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
@@ -103,7 +117,6 @@ jobs:
             SLACK_METRICS_ALERT_WEBHOOK_URL=${{ secrets.SLACK_METRICS_ALERT_WEBHOOK_URL }}
             SLACK_METRICS_ALERT_ENVIRONMENT=prod
 
-            
             EOF
 
             docker compose -f docker-compose.yml -f docker-compose.monitoring.yml pull
