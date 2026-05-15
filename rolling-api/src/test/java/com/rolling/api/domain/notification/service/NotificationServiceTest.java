@@ -1,5 +1,6 @@
 package com.rolling.api.domain.notification.service;
 
+import com.rolling.api.domain.notification.dto.NotificationBadgeResponse;
 import com.rolling.api.domain.notification.dto.NotificationResponse;
 import com.rolling.api.domain.notification.entity.Notification;
 import com.rolling.api.domain.notification.model.PushNotificationCommand;
@@ -60,7 +61,7 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("알림함 저장은 새 트랜잭션으로 실행한다")
+    @DisplayName("알림 저장은 별도 트랜잭션으로 실행한다")
     void saveNotificationsForUsers_usesRequiresNewTransaction() throws NoSuchMethodException {
         Transactional transactional = NotificationService.class
                 .getMethod("saveNotificationsForUsers", java.util.Collection.class, PushNotificationCommand.class)
@@ -71,14 +72,14 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("대상 사용자별 알림함 레코드를 저장한다")
+    @DisplayName("활성 사용자에게 알림 inbox 레코드를 저장한다")
     void saveNotificationsForUsers_savesInboxEntries() {
         User firstUser = createUser(2L, "user-2");
         User secondUser = createUser(3L, "user-3");
         PushNotificationCommand command = new PushNotificationCommand(
                 PushNotificationType.OPEN_MAT_UPDATED,
                 "오픈매트 일정이 변경되었습니다",
-                "주말 오픈매트 오픈매트의 일정 또는 장소가 변경되었습니다.",
+                "주말 오픈매트 일정 또는 취소 여부가 변경되었습니다.",
                 11L,
                 Map.of("route", "/openmat/detail")
         );
@@ -116,7 +117,7 @@ class NotificationServiceTest {
                 .targetId(99L)
                 .route("/openmat/detail")
                 .title("오픈매트가 취소되었습니다")
-                .body("평일 오픈매트 오픈매트가 삭제되었습니다.")
+                .body("당일 오픈매트가 취소되었습니다.")
                 .build();
         ReflectionTestUtils.setField(notification, "id", 100L);
         ReflectionTestUtils.setField(notification, "createdAt", LocalDateTime.of(2026, 3, 17, 15, 30));
@@ -138,7 +139,40 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("알림 읽음 처리 시 readAt을 기록한다")
+    @DisplayName("알림 배지는 현재 사용자의 readAt 이 null 인 미읽음 개수를 반환한다")
+    void getBadge_returnsUnreadCount() {
+        when(userRepository.existsByIdAndIsWithdrawnFalse(5L)).thenReturn(true);
+        when(notificationRepository.countByUser_IdAndReadAtIsNull(5L)).thenReturn(3L);
+
+        NotificationBadgeResponse response = notificationService.getBadge(5L);
+
+        verify(notificationRepository).countByUser_IdAndReadAtIsNull(5L);
+        assertThat(response.getUnreadCount()).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("알림이 없으면 배지 count 는 0을 반환한다")
+    void getBadge_whenNoUnreadNotifications_returnsZero() {
+        when(userRepository.existsByIdAndIsWithdrawnFalse(5L)).thenReturn(true);
+        when(notificationRepository.countByUser_IdAndReadAtIsNull(5L)).thenReturn(0L);
+
+        NotificationBadgeResponse response = notificationService.getBadge(5L);
+
+        assertThat(response.getUnreadCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("알림 배지 조회는 활성 사용자만 허용한다")
+    void getBadge_whenUserMissing_throwsNotFound() {
+        when(userRepository.existsByIdAndIsWithdrawnFalse(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> notificationService.getBadge(99L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("사용자를 찾을 수 없습니다");
+    }
+
+    @Test
+    @DisplayName("알림 읽음 처리 시 readAt 을 기록한다")
     void markAsRead_setsReadAt() {
         Notification notification = Notification.builder()
                 .user(createUser(7L, "user-7"))
@@ -169,7 +203,7 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("알림함 저장은 route가 없으면 실패한다")
+    @DisplayName("알림 저장 시 route 가 없으면 검증 오류를 반환한다")
     void saveNotificationsForUsers_withoutRoute_throwsValidationError() {
         PushNotificationCommand command = new PushNotificationCommand(
                 PushNotificationType.OPEN_MAT_UPDATED,
@@ -181,11 +215,11 @@ class NotificationServiceTest {
 
         assertThatThrownBy(() -> notificationService.saveNotificationsForUsers(List.of(2L), command))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("알림 route는 비어 있을 수 없습니다");
+                .hasMessage("알림 route 는 비어 있을 수 없습니다");
     }
 
     @Test
-    @DisplayName("알림함 저장은 targetId가 없으면 실패한다")
+    @DisplayName("알림 저장 시 targetId 가 없으면 검증 오류를 반환한다")
     void saveNotificationsForUsers_withoutTargetId_throwsValidationError() {
         PushNotificationCommand command = new PushNotificationCommand(
                 PushNotificationType.OPEN_MAT_UPDATED,
@@ -197,7 +231,7 @@ class NotificationServiceTest {
 
         assertThatThrownBy(() -> notificationService.saveNotificationsForUsers(List.of(2L), command))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("알림 targetId는 비어 있을 수 없습니다");
+                .hasMessage("알림 targetId 는 비어 있을 수 없습니다");
     }
 
     private User createUser(Long id, String socialId) {
@@ -212,10 +246,3 @@ class NotificationServiceTest {
         return user;
     }
 }
-
-
-
-
-
-
-
