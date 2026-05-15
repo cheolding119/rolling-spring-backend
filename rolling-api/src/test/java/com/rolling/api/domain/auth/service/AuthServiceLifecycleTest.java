@@ -262,6 +262,50 @@ class AuthServiceLifecycleTest {
     }
 
     @Test
+    @DisplayName("legacy raw refresh token도 갱신에 성공하고 새 refresh token은 hash로 저장한다")
+    void refresh_withLegacyRawToken_rotatesToHashedRefreshToken() {
+        ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
+        TokenRefreshRequest request = new TokenRefreshRequest();
+        ReflectionTestUtils.setField(request, "refreshToken", "legacy-raw-refresh-token");
+
+        RefreshToken savedToken = RefreshToken.builder()
+                .tokenHash("legacy-raw-refresh-token")
+                .userId(3L)
+                .expiryDate(LocalDateTime.now().plusDays(7))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(refreshTokenHashProvider.hash("legacy-raw-refresh-token")))
+                .thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByLegacyRawToken("legacy-raw-refresh-token"))
+                .thenReturn(Optional.of(savedToken));
+        when(jwtTokenProvider.validateToken("legacy-raw-refresh-token")).thenReturn(true);
+        User user = User.builder()
+                .socialId("social-legacy-refresh")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("legacy-refresh-user")
+                .email("legacy-refresh@test.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 3L);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(3L)).thenReturn("new-access-token");
+        when(jwtTokenProvider.createRefreshToken(3L)).thenReturn("new-refresh-token");
+        when(adminAccessConfig.isAdmin(3L)).thenReturn(false);
+
+        TokenRefreshResponse response = authService.refresh(request);
+
+        assertThat(response.getAccessToken()).isEqualTo("new-access-token");
+        verify(refreshTokenRepository).delete(savedToken);
+        verify(refreshTokenRepository).flush();
+        ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
+        assertThat(refreshTokenCaptor.getValue().getTokenHash())
+                .isEqualTo(refreshTokenHashProvider.hash("new-refresh-token"))
+                .isNotEqualTo("new-refresh-token");
+    }
+
+    @Test
     @DisplayName("로그아웃 시 현재 디바이스 FCM 토큰과 리프레시 토큰을 함께 정리한다")
     void logout_removesCurrentDeviceTokenAndRefreshToken() {
         User user = User.builder()
