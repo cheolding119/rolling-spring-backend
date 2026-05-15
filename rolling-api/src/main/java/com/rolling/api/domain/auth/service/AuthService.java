@@ -140,6 +140,7 @@ public class AuthService {
         String oldTokenHash = refreshTokenHashProvider.hash(oldToken);
 
         RefreshToken savedToken = refreshTokenRepository.findByTokenHash(oldTokenHash)
+                .or(() -> refreshTokenRepository.findByLegacyRawToken(oldToken))
                 .orElseThrow(AuthException::invalidRefreshToken);
 
         if (savedToken.isExpired()) {
