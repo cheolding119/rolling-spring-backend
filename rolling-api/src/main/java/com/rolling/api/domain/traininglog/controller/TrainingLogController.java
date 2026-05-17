@@ -3,6 +3,10 @@ package com.rolling.api.domain.traininglog.controller;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
+import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
 import com.rolling.api.domain.traininglog.service.TrainingLogService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
@@ -36,6 +40,7 @@ import java.util.List;
 public class TrainingLogController {
 
     private final TrainingLogService trainingLogService;
+    private final TrainingLogImageUploadService trainingLogImageUploadService;
 
     @Operation(summary = "특정 날짜 훈련 기록 목록 조회", description = "현재 로그인한 사용자의 특정 날짜 훈련 기록 목록을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
@@ -118,6 +123,52 @@ public class TrainingLogController {
             @RequestParam String q
     ) {
         List<String> response = trainingLogService.autocompleteTags(requireUserId(principal), q);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "훈련 기록 연간 캘린더 요약 조회", description = "현재 로그인한 사용자의 연간 훈련 기록 집계를 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/calendar")
+    public ResponseEntity<ApiResponse<TrainingLogCalendarSummaryResponse>> calendar(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam int year
+    ) {
+        TrainingLogCalendarSummaryResponse response = trainingLogService.getCalendarSummary(requireUserId(principal), year);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "최근 훈련 기록 조회", description = "현재 로그인한 사용자의 최근 훈련 기록 목록을 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/recent")
+    public ResponseEntity<ApiResponse<List<TrainingLogEntryResponse>>> recent(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<TrainingLogEntryResponse> response = trainingLogService.findRecentEntries(requireUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "훈련 기록 이미지 업로드 URL 발급", description = "현재 로그인한 사용자가 훈련 기록 이미지 업로드용 presigned URL을 발급받습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PostMapping("/upload-url")
+    public ResponseEntity<ApiResponse<TrainingLogImageUploadUrlResponse>> createUploadUrl(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody TrainingLogImageUploadUrlRequest request
+    ) {
+        requireUserId(principal);
+        TrainingLogImageUploadUrlResponse response = trainingLogImageUploadService.createUploadUrl(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

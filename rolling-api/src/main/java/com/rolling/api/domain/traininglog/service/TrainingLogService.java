@@ -5,15 +5,22 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarMonthlySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
+import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import org.springframework.data.domain.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +40,7 @@ public class TrainingLogService {
     private static final int MAX_CHECKLIST_ITEMS = 20;
     private static final int MAX_HASHTAGS = 10;
     private static final int TAG_AUTOCOMPLETE_LIMIT = 20;
+    private static final int RECENT_LIMIT = 10;
     private static final Pattern HASHTAG_PATTERN = Pattern.compile("^[0-9a-z가-힣-]+$");
     private static final TypeReference<List<TrainingLogChecklistItem>> CHECKLIST_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<String>> HASHTAG_TYPE = new TypeReference<>() {};
@@ -50,23 +58,71 @@ public class TrainingLogService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public TrainingLogCalendarSummaryResponse getCalendarSummary(Long userId, int year) {
+        requireActiveUserExists(userId);
+        validateYear(year);
+
+        LocalDate startDate = LocalDate.of(year, 1, 1);
+        LocalDate endDateExclusive = startDate.plusYears(1);
+
+        List<TrainingLogCalendarDailySummary> dailySummaries = trainingLogEntryRepository
+                .findDailySummariesByUserIdAndTrainingDateBetween(userId, startDate, endDateExclusive)
+                .stream()
+                .map(this::toDailySummary)
+                .toList();
+        List<TrainingLogCalendarMonthlySummary> monthlySummaries = trainingLogEntryRepository
+                .findMonthlySummariesByUserIdAndTrainingDateBetween(userId, startDate, endDateExclusive)
+                .stream()
+                .map(this::toMonthlySummary)
+                .toList();
+
+        int totalTrainingMinutes = dailySummaries.stream()
+                .map(TrainingLogCalendarDailySummary::totalMinutes)
+                .reduce(0, Integer::sum);
+
+        return TrainingLogCalendarSummaryResponse.builder()
+                .year(year)
+                .totalTrainingMinutes(totalTrainingMinutes)
+                .activeDays(dailySummaries.size())
+                .monthlySummaries(monthlySummaries)
+                .dailySummaries(dailySummaries)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrainingLogEntryResponse> findRecentEntries(Long userId) {
+        requireActiveUserExists(userId);
+        return trainingLogEntryRepository
+                .findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(userId, PageRequest.of(0, RECENT_LIMIT))
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public TrainingLogEntryResponse create(Long userId, LocalDate trainingDate, TrainingLogEntryCreateRequest request) {
         validateTrainingDate(trainingDate);
         User user = getActiveUser(userId);
+        TrainingLogCategory category = requireCategory(request.getCategory());
         List<TrainingLogChecklistItem> checklist = normalizeChecklist(request.getChecklist());
         List<String> hashtags = normalizeHashtags(request.getHashtags());
+        String imageUrl = normalizeOptionalText(request.getImageUrl());
+        validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
                 TrainingLogEntry.builder()
                         .user(user)
                         .trainingDate(trainingDate)
-                        .category(requireCategory(request.getCategory()))
+                        .category(category)
                         .title(requireText(request.getTitle(), "기록 제목은 필수입니다"))
                         .content(requireText(request.getContent(), "기록 내용은 필수입니다"))
                         .checklistJson(writeChecklistJson(checklist))
                         .hashtagsJson(writeHashtagsJson(hashtags))
+                        .imageUrl(imageUrl)
                         .trainingMinutes(request.getTrainingMinutes())
+                        .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
+                        .stripeCount(category == TrainingLogCategory.PROMOTION ? request.getStripeCount() : null)
                         .build()
         );
 
@@ -91,9 +147,15 @@ public class TrainingLogService {
         List<String> hashtags = request.hasHashtagsField()
                 ? normalizeHashtags(request.getHashtags())
                 : readHashtags(entry.getHashtagsJson());
+        String imageUrl = request.hasImageUrlField()
+                ? normalizeOptionalText(request.getImageUrl())
+                : entry.getImageUrl();
         Integer trainingMinutes = request.hasTrainingMinutesField()
                 ? request.getTrainingMinutes()
                 : entry.getTrainingMinutes();
+        BeltColor beltColor = resolveBeltColor(entry, request, category);
+        Integer stripeCount = resolveStripeCount(entry, request, category);
+        validateCategoryFields(category, beltColor, stripeCount);
 
         entry.update(
                 category,
@@ -102,10 +164,10 @@ public class TrainingLogService {
                 writeChecklistJson(checklist),
                 writeHashtagsJson(hashtags),
                 trainingMinutes,
-                entry.getImageUrl(),
+                imageUrl,
                 entry.getExternalLinksJson(),
-                entry.getBeltColor(),
-                entry.getStripeCount()
+                beltColor,
+                stripeCount
         );
 
         return toResponse(entry);
@@ -149,10 +211,29 @@ public class TrainingLogService {
                 .content(entry.getContent())
                 .checklist(readChecklist(entry.getChecklistJson()))
                 .hashtags(readHashtags(entry.getHashtagsJson()))
+                .imageUrl(entry.getImageUrl())
                 .trainingMinutes(entry.getTrainingMinutes())
+                .beltColor(entry.getBeltColor())
+                .stripeCount(entry.getStripeCount())
                 .createdAt(entry.getCreatedAt())
                 .updatedAt(entry.getUpdatedAt())
                 .build();
+    }
+
+    private TrainingLogCalendarDailySummary toDailySummary(TrainingLogCalendarDailyProjection projection) {
+        return new TrainingLogCalendarDailySummary(
+                projection.date(),
+                safeToInt(projection.totalMinutes()),
+                safeToInt(projection.recordCount())
+        );
+    }
+
+    private TrainingLogCalendarMonthlySummary toMonthlySummary(TrainingLogCalendarMonthlyProjection projection) {
+        return new TrainingLogCalendarMonthlySummary(
+                projection.month(),
+                safeToInt(projection.totalMinutes()),
+                safeToInt(projection.activeDays())
+        );
     }
 
     private TrainingLogEntry getEntry(Long entryId) {
@@ -183,6 +264,12 @@ public class TrainingLogService {
         }
     }
 
+    private void validateYear(int year) {
+        if (year < 2000 || year > 2100) {
+            throw BusinessException.badRequest("year는 2000 이상 2100 이하이어야 합니다");
+        }
+    }
+
     private TrainingLogCategory requireCategory(TrainingLogCategory category) {
         if (category == null) {
             throw BusinessException.badRequest("기록 카테고리는 필수입니다");
@@ -195,6 +282,54 @@ public class TrainingLogService {
             throw BusinessException.badRequest(message);
         }
         return value.trim();
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private BeltColor resolveBeltColor(
+            TrainingLogEntry entry,
+            TrainingLogEntryUpdateRequest request,
+            TrainingLogCategory category
+    ) {
+        if (category != TrainingLogCategory.PROMOTION) {
+            return null;
+        }
+        return request.hasBeltColorField() ? request.getBeltColor() : entry.getBeltColor();
+    }
+
+    private Integer resolveStripeCount(
+            TrainingLogEntry entry,
+            TrainingLogEntryUpdateRequest request,
+            TrainingLogCategory category
+    ) {
+        if (category != TrainingLogCategory.PROMOTION) {
+            return null;
+        }
+        return request.hasStripeCountField() ? request.getStripeCount() : entry.getStripeCount();
+    }
+
+    private void validateCategoryFields(TrainingLogCategory category, BeltColor beltColor, Integer stripeCount) {
+        if (category == TrainingLogCategory.PROMOTION) {
+            if (beltColor == null) {
+                throw BusinessException.badRequest("PROMOTION 카테고리에서는 beltColor가 필수입니다");
+            }
+            if (stripeCount != null && stripeCount < 0) {
+                throw BusinessException.badRequest("PROMOTION 카테고리의 stripeCount는 0 이상이어야 합니다");
+            }
+            return;
+        }
+
+        if (beltColor != null) {
+            throw BusinessException.badRequest("beltColor는 PROMOTION 카테고리에서만 사용할 수 있습니다");
+        }
+        if (stripeCount != null) {
+            throw BusinessException.badRequest("stripeCount는 PROMOTION 카테고리에서만 사용할 수 있습니다");
+        }
     }
 
     private List<TrainingLogChecklistItem> normalizeChecklist(List<TrainingLogChecklistItemRequest> items) {
@@ -298,5 +433,9 @@ public class TrainingLogService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("훈련 기록 JSON 역직렬화에 실패했습니다", e);
         }
+    }
+
+    private int safeToInt(Long value) {
+        return value == null ? 0 : Math.toIntExact(value);
     }
 }

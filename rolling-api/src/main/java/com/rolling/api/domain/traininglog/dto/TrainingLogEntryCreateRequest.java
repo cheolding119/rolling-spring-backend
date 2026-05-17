@@ -1,6 +1,7 @@
 package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -41,8 +42,19 @@ public class TrainingLogEntryCreateRequest {
     @Schema(description = "해시태그 목록", example = "[\"triangle\", \"armbar\"]")
     private List<String> hashtags;
 
+    @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
+    @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
+    private String imageUrl;
+
     @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
     @Max(value = 600, message = "훈련 시간은 600 이하여야 합니다")
     @Schema(description = "훈련 시간(분)", example = "90")
     private Integer trainingMinutes;
+
+    @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
+    private BeltColor beltColor;
+
+    @Min(value = 0, message = "stripeCount는 0 이상이어야 합니다")
+    @Schema(description = "승급 기록 전용 stripe 수", example = "1")
+    private Integer stripeCount;
 }

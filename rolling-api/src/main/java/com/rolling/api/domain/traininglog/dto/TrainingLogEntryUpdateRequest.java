@@ -3,6 +3,7 @@ package com.rolling.api.domain.traininglog.dto;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -44,6 +45,13 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean hashtagsFieldPresent;
 
+    @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
+    @Schema(description = "대표 이미지 URL. null을 보내면 비운다.", example = "https://cdn.rolling.com/training/logs/images/sample.jpg", nullable = true)
+    private String imageUrl;
+
+    @JsonIgnore
+    private boolean imageUrlFieldPresent;
+
     @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
     @Max(value = 600, message = "훈련 시간은 600 이하여야 합니다")
     @Schema(description = "훈련 시간(분). null을 보내면 비운다.", example = "90", nullable = true)
@@ -51,6 +59,19 @@ public class TrainingLogEntryUpdateRequest {
 
     @JsonIgnore
     private boolean trainingMinutesFieldPresent;
+
+    @Schema(description = "승급 기록 전용 벨트 색상. null을 보내면 비운다.", example = "BLUE", nullable = true)
+    private BeltColor beltColor;
+
+    @JsonIgnore
+    private boolean beltColorFieldPresent;
+
+    @Min(value = 0, message = "stripeCount는 0 이상이어야 합니다")
+    @Schema(description = "승급 기록 전용 stripe 수. null을 보내면 비운다.", example = "1", nullable = true)
+    private Integer stripeCount;
+
+    @JsonIgnore
+    private boolean stripeCountFieldPresent;
 
     @JsonSetter("checklist")
     public void setChecklist(List<TrainingLogChecklistItemRequest> checklist) {
@@ -64,10 +85,28 @@ public class TrainingLogEntryUpdateRequest {
         this.hashtagsFieldPresent = true;
     }
 
+    @JsonSetter("imageUrl")
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+        this.imageUrlFieldPresent = true;
+    }
+
     @JsonSetter("trainingMinutes")
     public void setTrainingMinutes(Integer trainingMinutes) {
         this.trainingMinutes = trainingMinutes;
         this.trainingMinutesFieldPresent = true;
+    }
+
+    @JsonSetter("beltColor")
+    public void setBeltColor(BeltColor beltColor) {
+        this.beltColor = beltColor;
+        this.beltColorFieldPresent = true;
+    }
+
+    @JsonSetter("stripeCount")
+    public void setStripeCount(Integer stripeCount) {
+        this.stripeCount = stripeCount;
+        this.stripeCountFieldPresent = true;
     }
 
     @JsonIgnore
@@ -81,7 +120,22 @@ public class TrainingLogEntryUpdateRequest {
     }
 
     @JsonIgnore
+    public boolean hasImageUrlField() {
+        return imageUrlFieldPresent;
+    }
+
+    @JsonIgnore
     public boolean hasTrainingMinutesField() {
         return trainingMinutesFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasBeltColorField() {
+        return beltColorFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasStripeCountField() {
+        return stripeCountFieldPresent;
     }
 }

@@ -1,11 +1,14 @@
 package com.rolling.api.domain.traininglog.service;
 
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -32,8 +36,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingLogServiceTest {
@@ -59,22 +63,23 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("훈련 기록 생성 시 체크리스트와 해시태그를 정규화해 저장한다")
-    void create_normalizesChecklistAndHashtags() {
+    @DisplayName("create normalizes checklist hashtags and optional image URL")
+    void create_normalizesChecklistHashtagsAndImageUrl() {
         User user = createUser(10L);
         TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
         ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
-        ReflectionTestUtils.setField(request, "title", "  암 트라이앵글 디테일  ");
-        ReflectionTestUtils.setField(request, "content", "  무릎 각도와 팔 위치를 정리했다.  ");
+        ReflectionTestUtils.setField(request, "title", "  Arm Triangle Details  ");
+        ReflectionTestUtils.setField(request, "content", "  Finished details for knee angle and arm position.  ");
         ReflectionTestUtils.setField(request, "trainingMinutes", 90);
+        ReflectionTestUtils.setField(request, "imageUrl", "  https://cdn.test.com/training-log.jpg  ");
         ReflectionTestUtils.setField(request, "checklist", List.of(
-                checklistItem("  디테일 복습  ", true),
-                checklistItem("실전 적용", null)
+                checklistItem("  Triangle Review  ", true),
+                checklistItem("Live Roll Application", null)
         ));
         ReflectionTestUtils.setField(request, "hashtags", List.of(" Triangle ", "#Arm-Triangle", "triangle", " "));
 
-        when(userRepository.findByIdAndIsWithdrawnFalse(10L)).thenReturn(Optional.of(user));
-        when(trainingLogEntryRepository.save(any(TrainingLogEntry.class))).thenAnswer(invocation -> {
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+        given(trainingLogEntryRepository.save(any(TrainingLogEntry.class))).willAnswer(invocation -> {
             TrainingLogEntry entry = invocation.getArgument(0);
             ReflectionTestUtils.setField(entry, "id", 100L);
             ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 12, 0));
@@ -87,27 +92,28 @@ class TrainingLogServiceTest {
         ArgumentCaptor<TrainingLogEntry> captor = ArgumentCaptor.forClass(TrainingLogEntry.class);
         verify(trainingLogEntryRepository).save(captor.capture());
         TrainingLogEntry saved = captor.getValue();
-        assertThat(saved.getTitle()).isEqualTo("암 트라이앵글 디테일");
-        assertThat(saved.getContent()).isEqualTo("무릎 각도와 팔 위치를 정리했다.");
-        assertThat(saved.getChecklistJson()).isEqualTo(
-                "[{\"text\":\"디테일 복습\",\"checked\":true},{\"text\":\"실전 적용\",\"checked\":false}]"
-        );
+        assertThat(saved.getTitle()).isEqualTo("Arm Triangle Details");
+        assertThat(saved.getContent()).isEqualTo("Finished details for knee angle and arm position.");
+        assertThat(saved.getChecklistJson())
+                .isEqualTo("[{\"text\":\"Triangle Review\",\"checked\":true},{\"text\":\"Live Roll Application\",\"checked\":false}]");
         assertThat(saved.getHashtagsJson()).isEqualTo("[\"triangle\",\"arm-triangle\"]");
+        assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
         assertThat(saved.getTrainingMinutes()).isEqualTo(90);
 
         assertThat(response.getId()).isEqualTo(100L);
         assertThat(response.getChecklist()).hasSize(2);
-        assertThat(response.getChecklist().get(0).text()).isEqualTo("디테일 복습");
+        assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
         assertThat(response.getHashtags()).containsExactly("triangle", "arm-triangle");
+        assertThat(response.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
     }
 
     @Test
-    @DisplayName("미래 날짜 훈련 기록 생성은 거부한다")
+    @DisplayName("create rejects future training dates")
     void create_withFutureDate_throwsValidationError() {
         TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
         ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
-        ReflectionTestUtils.setField(request, "title", "암 트라이앵글");
-        ReflectionTestUtils.setField(request, "content", "디테일 정리");
+        ReflectionTestUtils.setField(request, "title", "Arm Triangle");
+        ReflectionTestUtils.setField(request, "content", "Details");
 
         assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 18), request))
                 .isInstanceOf(BusinessException.class)
@@ -115,10 +121,43 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("훈련 기록 수정은 본인 기록에만 허용된다")
+    @DisplayName("create requires belt color for promotion category")
+    void create_promotionWithoutBeltColor_throwsValidationError() {
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.PROMOTION);
+        ReflectionTestUtils.setField(request, "title", "Promotion");
+        ReflectionTestUtils.setField(request, "content", "Blue belt promotion");
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PROMOTION 카테고리에서는 beltColor가 필수입니다");
+    }
+
+    @Test
+    @DisplayName("create rejects promotion-only fields on non-promotion categories")
+    void create_nonPromotionWithPromotionFields_throwsValidationError() {
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+        ReflectionTestUtils.setField(request, "title", "Technique");
+        ReflectionTestUtils.setField(request, "content", "Normal training note");
+        ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("beltColor는 PROMOTION 카테고리에서만 사용할 수 있습니다");
+    }
+
+    @Test
+    @DisplayName("update only allows owners to modify entries")
     void update_whenNotOwner_throwsForbidden() {
         TrainingLogEntry entry = createEntry(1L, createUser(99L), LocalDate.of(2026, 5, 17));
-        when(trainingLogEntryRepository.findById(1L)).thenReturn(Optional.of(entry));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
 
         assertThatThrownBy(() -> trainingLogService.update(10L, 1L, new TrainingLogEntryUpdateRequest()))
                 .isInstanceOf(BusinessException.class)
@@ -126,49 +165,138 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("훈련 기록 수정 시 체크리스트와 훈련 시간을 비우고 해시태그를 다시 정규화할 수 있다")
-    void update_clearsChecklistAndTrainingMinutesAndNormalizesHashtags() {
+    @DisplayName("update can clear checklist image and training minutes while normalizing hashtags")
+    void update_clearsOptionalFieldsAndNormalizesHashtags() {
         User user = createUser(10L);
         TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
         entry.update(
                 TrainingLogCategory.TECHNIQUE,
-                "기존 제목",
-                "기존 내용",
-                "[{\"text\":\"기존 체크\",\"checked\":true}]",
+                "Original Title",
+                "Original Content",
+                "[{\"text\":\"Existing Checklist\",\"checked\":true}]",
                 "[\"triangle\"]",
                 60,
-                null,
+                "https://cdn.test.com/original.jpg",
                 null,
                 null,
                 null
         );
-        when(trainingLogEntryRepository.findById(1L)).thenReturn(Optional.of(entry));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
 
         TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
         request.setChecklist(List.of());
         request.setHashtags(List.of(" Guard-Pass ", "guard-pass", "#Back-Take"));
+        request.setImageUrl(null);
         request.setTrainingMinutes(null);
-        ReflectionTestUtils.setField(request, "title", "  수정 제목  ");
-        ReflectionTestUtils.setField(request, "content", "  수정 내용  ");
+        ReflectionTestUtils.setField(request, "title", "  Updated Title  ");
+        ReflectionTestUtils.setField(request, "content", "  Updated Content  ");
 
         TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
 
-        assertThat(entry.getTitle()).isEqualTo("수정 제목");
-        assertThat(entry.getContent()).isEqualTo("수정 내용");
+        assertThat(entry.getTitle()).isEqualTo("Updated Title");
+        assertThat(entry.getContent()).isEqualTo("Updated Content");
         assertThat(entry.getChecklistJson()).isNull();
         assertThat(entry.getHashtagsJson()).isEqualTo("[\"guard-pass\",\"back-take\"]");
+        assertThat(entry.getImageUrl()).isNull();
         assertThat(entry.getTrainingMinutes()).isNull();
 
         assertThat(response.getChecklist()).isEmpty();
         assertThat(response.getHashtags()).containsExactly("guard-pass", "back-take");
+        assertThat(response.getImageUrl()).isNull();
         assertThat(response.getTrainingMinutes()).isNull();
     }
 
     @Test
-    @DisplayName("해시태그 자동완성은 본인 데이터 기준 중복 없는 목록을 최근 순으로 반환한다")
-    void autocompleteTags_returnsDistinctMatchesInRecentOrder() {
-        when(userRepository.existsByIdAndIsWithdrawnFalse(10L)).thenReturn(true);
-        when(trainingLogEntryRepository.findHashtagsJsonByUserId(10L)).thenReturn(List.of(
+    @DisplayName("update clears promotion fields when category changes away from promotion")
+    void update_clearsPromotionFieldsForNonPromotionCategory() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        entry.update(
+                TrainingLogCategory.PROMOTION,
+                "Promotion Title",
+                "Promotion Content",
+                null,
+                null,
+                30,
+                null,
+                null,
+                BeltColor.BLUE,
+                2
+        );
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+
+        TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
+
+        assertThat(entry.getCategory()).isEqualTo(TrainingLogCategory.TECHNIQUE);
+        assertThat(entry.getBeltColor()).isNull();
+        assertThat(entry.getStripeCount()).isNull();
+        assertThat(response.getBeltColor()).isNull();
+        assertThat(response.getStripeCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("calendar summary aggregates daily monthly totals and active days")
+    void getCalendarSummary_aggregatesDailyAndMonthlyValues() {
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findDailySummariesByUserIdAndTrainingDateBetween(
+                10L,
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2027, 1, 1)
+        )).willReturn(List.of(
+                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 5, 1), 150L, 2L),
+                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 5, 3), 0L, 1L),
+                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 6, 1), 30L, 1L)
+        ));
+        given(trainingLogEntryRepository.findMonthlySummariesByUserIdAndTrainingDateBetween(
+                10L,
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2027, 1, 1)
+        )).willReturn(List.of(
+                new TrainingLogCalendarMonthlyProjection(5, 150L, 2L),
+                new TrainingLogCalendarMonthlyProjection(6, 30L, 1L)
+        ));
+
+        TrainingLogCalendarSummaryResponse response = trainingLogService.getCalendarSummary(10L, 2026);
+
+        assertThat(response.getYear()).isEqualTo(2026);
+        assertThat(response.getTotalTrainingMinutes()).isEqualTo(180);
+        assertThat(response.getActiveDays()).isEqualTo(3);
+        assertThat(response.getMonthlySummaries()).hasSize(2);
+        assertThat(response.getMonthlySummaries().get(0).month()).isEqualTo(5);
+        assertThat(response.getMonthlySummaries().get(0).totalMinutes()).isEqualTo(150);
+        assertThat(response.getMonthlySummaries().get(0).activeDays()).isEqualTo(2);
+        assertThat(response.getDailySummaries()).hasSize(3);
+        assertThat(response.getDailySummaries().get(1).totalMinutes()).isZero();
+        assertThat(response.getDailySummaries().get(1).recordCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("recent entries use the fixed page size and preserve repository ordering")
+    void findRecentEntries_usesFixedPageSize() {
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(any(), any(Pageable.class)))
+                .willReturn(List.of(
+                        createEntry(2L, createUser(10L), LocalDate.of(2026, 5, 17)),
+                        createEntry(1L, createUser(10L), LocalDate.of(2026, 5, 16))
+                ));
+
+        List<TrainingLogEntryResponse> response = trainingLogService.findRecentEntries(10L);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(trainingLogEntryRepository)
+                .findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(org.mockito.ArgumentMatchers.eq(10L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
+        assertThat(response).extracting(TrainingLogEntryResponse::getId).containsExactly(2L, 1L);
+    }
+
+    @Test
+    @DisplayName("autocomplete returns distinct matches in repository order")
+    void autocompleteTags_returnsDistinctMatchesInRepositoryOrder() {
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findHashtagsJsonByUserId(10L)).willReturn(List.of(
                 "[\"arm-triangle\",\"guard-pass\"]",
                 "[\"triangle\",\"armbar\",\"arm-triangle\"]"
         ));
@@ -179,10 +307,10 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("훈련 기록 삭제는 본인 기록이면 삭제한다")
+    @DisplayName("delete removes owned entries")
     void delete_ownedEntry_deletesEntry() {
         TrainingLogEntry entry = createEntry(1L, createUser(10L), LocalDate.of(2026, 5, 17));
-        when(trainingLogEntryRepository.findById(1L)).thenReturn(Optional.of(entry));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
 
         trainingLogService.delete(10L, 1L);
 
@@ -213,8 +341,8 @@ class TrainingLogServiceTest {
                 .user(user)
                 .trainingDate(trainingDate)
                 .category(TrainingLogCategory.TECHNIQUE)
-                .title("기존 제목")
-                .content("기존 내용")
+                .title("Existing Title")
+                .content("Existing Content")
                 .build();
         ReflectionTestUtils.setField(entry, "id", id);
         ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 9, 0));
