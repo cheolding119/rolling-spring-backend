@@ -1,5 +1,6 @@
 package com.rolling.api.domain.notification.service;
 
+import com.rolling.api.domain.notification.dto.NotificationBadgeResponse;
 import com.rolling.api.domain.notification.dto.NotificationResponse;
 import com.rolling.api.domain.notification.entity.Notification;
 import com.rolling.api.domain.notification.model.PushNotificationCommand;
@@ -44,7 +45,7 @@ public class NotificationService {
             return;
         }
 
-        String route = requireText(command.data().get("route"), "알림 route는 비어 있을 수 없습니다");
+        String route = requireText(command.data().get("route"), "알림 route 는 비어 있을 수 없습니다");
         String title = requireText(command.title(), "알림 제목은 비어 있을 수 없습니다");
         String body = requireText(command.body(), "알림 본문은 비어 있을 수 없습니다");
         Long targetId = requireTargetId(command.targetId());
@@ -95,6 +96,15 @@ public class NotificationService {
                 .map(NotificationResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public NotificationBadgeResponse getBadge(Long userId) {
+        requireActiveUser(userId);
+
+        return NotificationBadgeResponse.builder()
+                .unreadCount(notificationRepository.countByUser_IdAndReadAtIsNull(userId))
+                .build();
+    }
+
     @Transactional
     public void markAsRead(Long userId, Long notificationId) {
         requireActiveUser(userId);
@@ -124,7 +134,7 @@ public class NotificationService {
 
     private Long requireTargetId(Long targetId) {
         if (targetId == null) {
-            throw BusinessException.badRequest("알림 targetId는 비어 있을 수 없습니다");
+            throw BusinessException.badRequest("알림 targetId 는 비어 있을 수 없습니다");
         }
         return targetId;
     }
@@ -136,6 +146,3 @@ public class NotificationService {
         return value.trim();
     }
 }
-
-
-

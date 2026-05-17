@@ -1,5 +1,6 @@
 package com.rolling.api.domain.notification.controller;
 
+import com.rolling.api.domain.notification.dto.NotificationBadgeResponse;
 import com.rolling.api.domain.notification.dto.NotificationResponse;
 import com.rolling.api.domain.notification.service.NotificationService;
 import com.rolling.api.global.exception.AuthException;
@@ -44,6 +45,19 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "알림 배지 조회", description = "현재 로그인한 사용자의 미읽음 알림 개수를 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/badge")
+    public ResponseEntity<ApiResponse<NotificationBadgeResponse>> getBadge(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        NotificationBadgeResponse response = notificationService.getBadge(requireUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "알림 읽음 처리", description = "특정 알림을 읽음 처리합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -61,7 +75,7 @@ public class NotificationController {
 
     private Long requireUserId(UserPrincipal principal) {
         if (principal == null) {
-            throw new AuthException("UNAUTHORIZED", "인증이 필요합니다");
+            throw new AuthException("UNAUTHORIZED", "인증이 필요합니다.");
         }
         return principal.getUserId();
     }
