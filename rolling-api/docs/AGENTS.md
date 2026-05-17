@@ -10,11 +10,21 @@
 
 - 기존 아키텍처를 유지하는 작고 안전한 변경을 우선한다.
 - 요구사항이 불명확하면 코드, 테스트, 도메인 문서 순서로 근거를 확인한다.
+- 모든 코드 변경 작업 전에는 `docs/hanes/FAILURE_LOG.md`를 먼저 확인해 변경 대상 도메인 또는 작업 유형과 관련된 과거 실패 사례를 작업 계획에 반영한다.
+- 변경 대상 도메인의 `docs/domain_and_spec/*.md`를 확인해 API 계약, enum raw value, request/response 필드, 인증 요구사항, 도메인 규칙을 먼저 파악한다.
 - 도메인 문서와 코드가 충돌하면 임의로 추측하지 말고 충돌 지점을 명시한다.
 - API 계약을 바꾸면 DTO, controller/service 테스트, 도메인 문서를 함께 갱신한다.
 - 보안, 권한, 스케줄러, 외부 연동 변경은 정상 경로뿐 아니라 실패 경로도 확인한다.
 - 기존 사용자가 의존할 수 있는 응답 필드, enum raw value, paging 구조는 명시적 이유 없이 깨지 않는다.
 - unrelated 파일 변경, 포맷팅, 대규모 리팩터링은 요청 범위 밖이면 하지 않는다.
+
+## 1.1 하네스 실행 규칙
+
+- 복잡한 기능 추가, 새 도메인 추가, API 계약 변경, 보안/권한 변경, 운영 영향이 있는 작업은 구현 전 `harness-orchestrator` preflight로 컨텍스트, 실패 로그, 도메인 계약, 테스트 범위, 문서 동기화 후보를 먼저 정리한다.
+- 구현 후에는 `harness-orchestrator` postflight로 테스트 누락, 문서 동기화, 보안/운영 영향, Failure Log 반영 필요 여부를 확인한다.
+- 실제 Spring Boot 구현은 `spring-boot-engineer`, API 계약 문서 동기화는 `shared-contract-syncer`, 보안 집중 점검은 `security-auditor`, 코드 품질 리뷰는 `code-reviewer`를 사용한다.
+- 컨텍스트가 큰 작업은 파일 전체를 한 번에 읽지 말고 클래스명, endpoint, public method, DTO 필드, 테스트명으로 구조를 먼저 파악한 뒤 필요한 구현부만 깊게 읽는다.
+- 작업 체크리스트는 [hanes/AI_WORKFLOW_CHECKLIST.md](hanes/AI_WORKFLOW_CHECKLIST.md), 테스트 선택 기준은 [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)를 따른다.
 
 ## 2. 실행과 검증 명령
 
@@ -41,6 +51,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - repository query, entity graph, paging, 목록 응답을 바꾸면 N+1 또는 정렬 안정성 영향을 확인한다.
 - scheduler, health, alert 경로를 바꾸면 tracker, health indicator, Slack alert 관련 테스트를 확인한다.
 - 공통 응답, 예외, 설정 파일을 바꾸면 영향 범위가 넓으므로 전체 테스트를 고려한다.
+- 변경 범위별 세부 테스트 선택은 [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)를 따른다.
 
 ## 3. 코드 구조
 
@@ -90,10 +101,17 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 
 ## 7. 문서 Source Of Truth
 
+- 하네스 도입 계획: [hanes/HARNESS_ENGINEERING_PLAN.md](hanes/HARNESS_ENGINEERING_PLAN.md)
+- 하네스 사용 가이드: [hanes/HARNESS_USAGE_GUIDE.md](hanes/HARNESS_USAGE_GUIDE.md)
+- AI 작업 체크리스트: [hanes/AI_WORKFLOW_CHECKLIST.md](hanes/AI_WORKFLOW_CHECKLIST.md)
+- 테스트 매트릭스: [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)
+- 운영 smoke test 계획: [hanes/SMOKE_TEST_PLAN.md](hanes/SMOKE_TEST_PLAN.md)
+- 실패 로그: [hanes/FAILURE_LOG.md](hanes/FAILURE_LOG.md)
 - 도메인/API 공통: [domain_and_spec/shared/common-models.md](domain_and_spec/shared/common-models.md)
 - 오픈매트: [domain_and_spec/open-mat.md](domain_and_spec/open-mat.md)
 - 대회: [domain_and_spec/tournament.md](domain_and_spec/tournament.md)
 - 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
+- 훈련 기록: [domain_and_spec/training-log.md](domain_and_spec/training-log.md)
 - 커뮤니티: [domain_and_spec/community.md](domain_and_spec/community.md)
 - 인증 정책: [auth/AUTH_POLICY.md](auth/AUTH_POLICY.md)
 - 보안 정책: [security/SECURITY_POLICY.md](security/SECURITY_POLICY.md)
@@ -110,6 +128,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - [open-mat.md](domain_and_spec/open-mat.md): 오픈매트 도메인 모델 + API 스펙
 - [tournament.md](domain_and_spec/tournament.md): 대회 도메인 모델 + API 스펙
 - [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
+- [training-log.md](domain_and_spec/training-log.md): 훈련 기록 도메인 모델 + API 스펙
 - [community.md](domain_and_spec/community.md): 커뮤니티 도메인 모델 + API 스펙
 
 ## 9. 도메인 핵심 메모
