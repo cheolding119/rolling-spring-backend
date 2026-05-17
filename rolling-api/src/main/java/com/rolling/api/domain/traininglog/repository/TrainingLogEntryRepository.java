@@ -1,5 +1,6 @@
 package com.rolling.api.domain.traininglog.repository;
 
+import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
@@ -8,12 +9,18 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEntry, Long> {
 
     List<TrainingLogEntry> findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(Long userId, LocalDate trainingDate);
 
     List<TrainingLogEntry> findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(Long userId, Pageable pageable);
+
+    Optional<TrainingLogEntry> findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
+            Long userId,
+            TrainingLogCategory category
+    );
 
     @Query("""
             select new com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection(

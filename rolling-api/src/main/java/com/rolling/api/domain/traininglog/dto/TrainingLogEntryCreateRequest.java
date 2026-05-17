@@ -42,6 +42,11 @@ public class TrainingLogEntryCreateRequest {
     @Schema(description = "해시태그 목록", example = "[\"triangle\", \"armbar\"]")
     private List<String> hashtags;
 
+    @Valid
+    @Size(max = 3, message = "외부 링크는 최대 3개까지 입력할 수 있습니다")
+    @Schema(description = "외부 링크 목록")
+    private List<TrainingLogExternalLinkRequest> externalLinks;
+
     @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
     @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
     private String imageUrl;

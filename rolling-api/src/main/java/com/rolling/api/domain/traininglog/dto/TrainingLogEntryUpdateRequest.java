@@ -45,6 +45,14 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean hashtagsFieldPresent;
 
+    @Valid
+    @Size(max = 3, message = "외부 링크는 최대 3개까지 입력할 수 있습니다")
+    @Schema(description = "외부 링크 목록. 빈 배열 또는 null을 보내면 비운다.")
+    private List<TrainingLogExternalLinkRequest> externalLinks;
+
+    @JsonIgnore
+    private boolean externalLinksFieldPresent;
+
     @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
     @Schema(description = "대표 이미지 URL. null을 보내면 비운다.", example = "https://cdn.rolling.com/training/logs/images/sample.jpg", nullable = true)
     private String imageUrl;
@@ -85,6 +93,12 @@ public class TrainingLogEntryUpdateRequest {
         this.hashtagsFieldPresent = true;
     }
 
+    @JsonSetter("externalLinks")
+    public void setExternalLinks(List<TrainingLogExternalLinkRequest> externalLinks) {
+        this.externalLinks = externalLinks;
+        this.externalLinksFieldPresent = true;
+    }
+
     @JsonSetter("imageUrl")
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
@@ -117,6 +131,11 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasHashtagsField() {
         return hashtagsFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasExternalLinksField() {
+        return externalLinksFieldPresent;
     }
 
     @JsonIgnore

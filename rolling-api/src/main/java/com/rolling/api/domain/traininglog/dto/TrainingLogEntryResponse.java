@@ -36,6 +36,9 @@ public class TrainingLogEntryResponse {
     @Schema(description = "해시태그 목록")
     private List<String> hashtags;
 
+    @Schema(description = "외부 링크 목록")
+    private List<TrainingLogExternalLink> externalLinks;
+
     @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
     private String imageUrl;
 

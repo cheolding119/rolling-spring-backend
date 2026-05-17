@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,6 +106,23 @@ class TrainingLogEntryRepositoryTest {
         assertThat(recentEntries.get(9).getTrainingDate()).isEqualTo(LocalDate.of(2026, 5, 3));
     }
 
+    @Test
+    @DisplayName("latest promotion query returns the newest promotion entry")
+    void findLatestPromotionEntry_returnsNewestPromotion() {
+        User owner = userRepository.save(createUser("owner-promotion"));
+
+        TrainingLogEntry olderPromotion = trainingLogEntryRepository.save(createPromotionEntry(owner, LocalDate.of(2026, 5, 1), 1, BeltColor.BLUE));
+        TrainingLogEntry newerPromotion = trainingLogEntryRepository.save(createPromotionEntry(owner, LocalDate.of(2026, 5, 10), 2, BeltColor.PURPLE));
+        trainingLogEntryRepository.save(createEntry(owner, LocalDate.of(2026, 5, 15), 30));
+
+        Optional<TrainingLogEntry> latestPromotion = trainingLogEntryRepository
+                .findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(owner.getId(), TrainingLogCategory.PROMOTION);
+
+        assertThat(latestPromotion).isPresent();
+        assertThat(latestPromotion.get().getId()).isEqualTo(newerPromotion.getId());
+        assertThat(latestPromotion.get().getBeltColor()).isEqualTo(BeltColor.PURPLE);
+    }
+
     private User createUser(String socialId) {
         return User.builder()
                 .socialId(socialId)
@@ -123,6 +141,18 @@ class TrainingLogEntryRepositoryTest {
                 .title("Training " + trainingDate)
                 .content("Training note " + trainingDate)
                 .trainingMinutes(trainingMinutes)
+                .build();
+    }
+
+    private TrainingLogEntry createPromotionEntry(User user, LocalDate trainingDate, Integer stripeCount, BeltColor beltColor) {
+        return TrainingLogEntry.builder()
+                .user(user)
+                .trainingDate(trainingDate)
+                .category(TrainingLogCategory.PROMOTION)
+                .title("Promotion " + trainingDate)
+                .content("Promotion note " + trainingDate)
+                .stripeCount(stripeCount)
+                .beltColor(beltColor)
                 .build();
     }
 }
