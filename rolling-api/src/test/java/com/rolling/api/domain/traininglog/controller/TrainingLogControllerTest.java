@@ -1,8 +1,15 @@
 package com.rolling.api.domain.traininglog.controller;
 
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarMonthlySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
+import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
+import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
 import com.rolling.api.domain.traininglog.service.TrainingLogService;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
@@ -42,6 +49,7 @@ class TrainingLogControllerTest {
 
     private MockMvc mockMvc;
     private TrainingLogService trainingLogService;
+    private TrainingLogImageUploadService trainingLogImageUploadService;
     private AdminAccessConfig adminAccessConfig;
     private JwtTokenProvider jwtTokenProvider;
     private UserRepository userRepository;
@@ -60,6 +68,7 @@ class TrainingLogControllerTest {
         context.refresh();
 
         trainingLogService = context.getBean(TrainingLogService.class);
+        trainingLogImageUploadService = context.getBean(TrainingLogImageUploadService.class);
         adminAccessConfig = context.getBean(AdminAccessConfig.class);
         jwtTokenProvider = context.getBean(JwtTokenProvider.class);
         userRepository = context.getBean(UserRepository.class);
@@ -76,12 +85,9 @@ class TrainingLogControllerTest {
     }
 
     @Test
-    @DisplayName("훈련 기록 생성은 인증 사용자면 성공한다")
+    @DisplayName("create accepts authenticated user requests")
     void create_withUserToken_returnsOk() throws Exception {
-        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
-        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
-        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
-        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        authenticateUser();
         given(trainingLogService.create(any(), any(), any())).willReturn(response(1L));
 
         mockMvc.perform(post("/api/v1/training-logs/me/entries/2026-05-17")
@@ -90,15 +96,22 @@ class TrainingLogControllerTest {
                         .content("""
                                 {
                                   "category": "TECHNIQUE",
-                                  "title": "암 트라이앵글 디테일",
-                                  "content": "무릎 각도와 팔 위치를 정리했다.",
+                                  "title": "Arm Triangle Details",
+                                  "content": "Finished details for knee angle and arm position.",
                                   "checklist": [
                                     {
-                                      "text": "디테일 복습",
+                                      "text": "Triangle Review",
                                       "checked": true
                                     }
                                   ],
                                   "hashtags": ["triangle"],
+                                  "externalLinks": [
+                                    {
+                                      "type": "INSTAGRAM",
+                                      "url": "www.instagram.com/p/triangle"
+                                    }
+                                  ],
+                                  "imageUrl": "https://cdn.test.com/training-log.jpg",
                                   "trainingMinutes": 90
                                 }
                                 """))
@@ -106,11 +119,14 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
-                .andExpect(jsonPath("$.data.checklist[0].text").value("디테일 복습"));
+                .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log.jpg"))
+                .andExpect(jsonPath("$.data.externalLinks[0].type").value("INSTAGRAM"))
+                .andExpect(jsonPath("$.data.externalLinks[0].url").value("https://www.instagram.com/p/triangle"))
+                .andExpect(jsonPath("$.data.checklist[0].text").value("Triangle Review"));
     }
 
     @Test
-    @DisplayName("훈련 기록 목록 조회 API는 accessToken이 없으면 401을 반환한다")
+    @DisplayName("find entries requires authentication")
     void findEntries_withoutAccessToken_returnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/training-logs/me/entries/2026-05-17"))
                 .andExpect(status().isUnauthorized())
@@ -119,12 +135,9 @@ class TrainingLogControllerTest {
     }
 
     @Test
-    @DisplayName("해시태그 자동완성은 인증 사용자면 성공한다")
+    @DisplayName("autocomplete tags returns normalized suggestions for authenticated users")
     void autocompleteTags_withUserToken_returnsOk() throws Exception {
-        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
-        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
-        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
-        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        authenticateUser();
         given(trainingLogService.autocompleteTags(2L, "tri")).willReturn(List.of("triangle", "arm-triangle"));
 
         mockMvc.perform(get("/api/v1/training-logs/me/tags")
@@ -136,15 +149,92 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data[1]").value("arm-triangle"));
     }
 
+    @Test
+    @DisplayName("calendar summary returns aggregated data for authenticated users")
+    void calendar_withUserToken_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogService.getCalendarSummary(2L, 2026)).willReturn(
+                TrainingLogCalendarSummaryResponse.builder()
+                        .year(2026)
+                        .totalTrainingMinutes(180)
+                        .activeDays(3)
+                        .monthlySummaries(List.of(new TrainingLogCalendarMonthlySummary(5, 150, 2)))
+                        .dailySummaries(List.of(new TrainingLogCalendarDailySummary(LocalDate.of(2026, 5, 1), 150, 2)))
+                        .build()
+        );
+
+        mockMvc.perform(get("/api/v1/training-logs/me/calendar")
+                        .header("Authorization", "Bearer user-token")
+                        .param("year", "2026"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.year").value(2026))
+                .andExpect(jsonPath("$.data.totalTrainingMinutes").value(180))
+                .andExpect(jsonPath("$.data.activeDays").value(3))
+                .andExpect(jsonPath("$.data.monthlySummaries[0].month").value(5));
+    }
+
+    @Test
+    @DisplayName("recent endpoint returns ordered entries for authenticated users")
+    void recent_withUserToken_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogService.findRecentEntries(2L)).willReturn(List.of(response(2L), response(1L)));
+
+        mockMvc.perform(get("/api/v1/training-logs/me/recent")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(2))
+                .andExpect(jsonPath("$.data[1].id").value(1));
+    }
+
+    @Test
+    @DisplayName("upload URL endpoint returns presigned URL metadata for authenticated users")
+    void createUploadUrl_withUserToken_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogImageUploadService.createUploadUrl(any())).willReturn(
+                TrainingLogImageUploadUrlResponse.builder()
+                        .uploadUrl("https://upload.test/presigned")
+                        .imageKey("training/logs/images/sample.jpg")
+                        .imageUrl("https://cdn.test.com/training/logs/images/sample.jpg")
+                        .expiresAt(LocalDateTime.of(2026, 5, 17, 12, 15))
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/training-logs/me/upload-url")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fileName": "training-log.jpg",
+                                  "contentType": "image/jpeg"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.uploadUrl").value("https://upload.test/presigned"))
+                .andExpect(jsonPath("$.data.imageKey").value("training/logs/images/sample.jpg"))
+                .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training/logs/images/sample.jpg"));
+    }
+
+    private void authenticateUser() {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+    }
+
     private TrainingLogEntryResponse response(Long id) {
         return TrainingLogEntryResponse.builder()
                 .id(id)
                 .trainingDate(LocalDate.of(2026, 5, 17))
                 .category(TrainingLogCategory.TECHNIQUE)
-                .title("암 트라이앵글 디테일")
-                .content("무릎 각도와 팔 위치를 정리했다.")
-                .checklist(List.of(new TrainingLogChecklistItem("디테일 복습", true)))
+                .title("Arm Triangle Details")
+                .content("Finished details for knee angle and arm position.")
+                .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true)))
                 .hashtags(List.of("triangle"))
+                .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
+                .imageUrl("https://cdn.test.com/training-log.jpg")
                 .trainingMinutes(90)
                 .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .updatedAt(LocalDateTime.of(2026, 5, 17, 12, 0))
@@ -159,6 +249,11 @@ class TrainingLogControllerTest {
         @Bean
         TrainingLogService trainingLogService() {
             return mock(TrainingLogService.class);
+        }
+
+        @Bean
+        TrainingLogImageUploadService trainingLogImageUploadService() {
+            return mock(TrainingLogImageUploadService.class);
         }
 
         @Bean
