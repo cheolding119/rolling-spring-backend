@@ -1,10 +1,10 @@
 package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -47,14 +47,16 @@ public class TrainingLogEntryCreateRequest {
     @Schema(description = "외부 링크 목록")
     private List<TrainingLogExternalLinkRequest> externalLinks;
 
+    @Size(max = 10, message = "이미지는 최대 10장까지 입력할 수 있습니다")
+    @Schema(description = "이미지 목록", example = "[\"https://cdn.rolling.com/training/logs/images/1.jpg\", \"https://cdn.rolling.com/training/logs/images/2.jpg\"]")
+    private List<String> imageUrls;
+
     @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
-    @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
+    @Schema(description = "대표 이미지 URL. 하위 호환용 단일 이미지 입력값", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
     private String imageUrl;
 
-    @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
-    @Max(value = 600, message = "훈련 시간은 600 이하여야 합니다")
-    @Schema(description = "훈련 시간(분)", example = "90")
-    private Integer trainingMinutes;
+    @Schema(description = "기록 색상", example = "BLUE")
+    private TrainingLogColor color;
 
     @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
     private BeltColor beltColor;

@@ -1,6 +1,7 @@
 package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -24,6 +25,9 @@ public class TrainingLogEntryResponse {
     @Schema(description = "기록 카테고리", example = "TECHNIQUE")
     private TrainingLogCategory category;
 
+    @Schema(description = "기록 색상", example = "BLUE")
+    private TrainingLogColor color;
+
     @Schema(description = "기록 제목", example = "암 트라이앵글 디테일 정리")
     private String title;
 
@@ -39,11 +43,11 @@ public class TrainingLogEntryResponse {
     @Schema(description = "외부 링크 목록")
     private List<TrainingLogExternalLink> externalLinks;
 
+    @Schema(description = "이미지 목록")
+    private List<String> imageUrls;
+
     @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
     private String imageUrl;
-
-    @Schema(description = "훈련 시간(분)", example = "90")
-    private Integer trainingMinutes;
 
     @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
     private BeltColor beltColor;

@@ -3,10 +3,10 @@ package com.rolling.api.domain.traininglog.dto;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -53,20 +53,25 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean externalLinksFieldPresent;
 
+    @Size(max = 10, message = "이미지는 최대 10장까지 입력할 수 있습니다")
+    @Schema(description = "이미지 목록. 빈 배열 또는 null을 보내면 비운다.", example = "[\"https://cdn.rolling.com/training/logs/images/1.jpg\", \"https://cdn.rolling.com/training/logs/images/2.jpg\"]")
+    private List<String> imageUrls;
+
+    @JsonIgnore
+    private boolean imageUrlsFieldPresent;
+
     @Size(max = 1000, message = "imageUrl은 1000자 이하여야 합니다")
-    @Schema(description = "대표 이미지 URL. null을 보내면 비운다.", example = "https://cdn.rolling.com/training/logs/images/sample.jpg", nullable = true)
+    @Schema(description = "대표 이미지 URL. 하위 호환용 단일 입력값. null을 보내면 비운다.", example = "https://cdn.rolling.com/training/logs/images/sample.jpg", nullable = true)
     private String imageUrl;
 
     @JsonIgnore
     private boolean imageUrlFieldPresent;
 
-    @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
-    @Max(value = 600, message = "훈련 시간은 600 이하여야 합니다")
-    @Schema(description = "훈련 시간(분). null을 보내면 비운다.", example = "90", nullable = true)
-    private Integer trainingMinutes;
+    @Schema(description = "기록 색상. null을 보내면 비운다.", example = "BLUE", nullable = true)
+    private TrainingLogColor color;
 
     @JsonIgnore
-    private boolean trainingMinutesFieldPresent;
+    private boolean colorFieldPresent;
 
     @Schema(description = "승급 기록 전용 벨트 색상. null을 보내면 비운다.", example = "BLUE", nullable = true)
     private BeltColor beltColor;
@@ -99,16 +104,22 @@ public class TrainingLogEntryUpdateRequest {
         this.externalLinksFieldPresent = true;
     }
 
+    @JsonSetter("imageUrls")
+    public void setImageUrls(List<String> imageUrls) {
+        this.imageUrls = imageUrls;
+        this.imageUrlsFieldPresent = true;
+    }
+
     @JsonSetter("imageUrl")
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
         this.imageUrlFieldPresent = true;
     }
 
-    @JsonSetter("trainingMinutes")
-    public void setTrainingMinutes(Integer trainingMinutes) {
-        this.trainingMinutes = trainingMinutes;
-        this.trainingMinutesFieldPresent = true;
+    @JsonSetter("color")
+    public void setColor(TrainingLogColor color) {
+        this.color = color;
+        this.colorFieldPresent = true;
     }
 
     @JsonSetter("beltColor")
@@ -139,13 +150,18 @@ public class TrainingLogEntryUpdateRequest {
     }
 
     @JsonIgnore
+    public boolean hasImageUrlsField() {
+        return imageUrlsFieldPresent;
+    }
+
+    @JsonIgnore
     public boolean hasImageUrlField() {
         return imageUrlFieldPresent;
     }
 
     @JsonIgnore
-    public boolean hasTrainingMinutesField() {
-        return trainingMinutesFieldPresent;
+    public boolean hasColorField() {
+        return colorFieldPresent;
     }
 
     @JsonIgnore

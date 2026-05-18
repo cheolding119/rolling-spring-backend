@@ -8,6 +8,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
 import com.rolling.api.domain.traininglog.service.TrainingLogService;
@@ -101,28 +102,38 @@ class TrainingLogControllerTest {
                                   "checklist": [
                                     {
                                       "text": "Triangle Review",
-                                      "checked": true
+                                      "checked": true,
+                                      "favorite": true,
+                                      "emoji": "🔥"
                                     }
                                   ],
                                   "hashtags": ["triangle"],
+                                  "imageUrls": [
+                                    "https://cdn.test.com/training-log-1.jpg",
+                                    "https://cdn.test.com/training-log-2.jpg"
+                                  ],
+                                  "color": "BLUE",
                                   "externalLinks": [
                                     {
                                       "type": "INSTAGRAM",
                                       "url": "www.instagram.com/p/triangle"
                                     }
-                                  ],
-                                  "imageUrl": "https://cdn.test.com/training-log.jpg",
-                                  "trainingMinutes": 90
+                                  ]
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
-                .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log.jpg"))
+                .andExpect(jsonPath("$.data.color").value("BLUE"))
+                .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
+                .andExpect(jsonPath("$.data.imageUrls[1]").value("https://cdn.test.com/training-log-2.jpg"))
                 .andExpect(jsonPath("$.data.externalLinks[0].type").value("INSTAGRAM"))
                 .andExpect(jsonPath("$.data.externalLinks[0].url").value("https://www.instagram.com/p/triangle"))
-                .andExpect(jsonPath("$.data.checklist[0].text").value("Triangle Review"));
+                .andExpect(jsonPath("$.data.checklist[0].text").value("Triangle Review"))
+                .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
+                .andExpect(jsonPath("$.data.checklist[0].emoji").value("🔥"));
     }
 
     @Test
@@ -229,13 +240,17 @@ class TrainingLogControllerTest {
                 .id(id)
                 .trainingDate(LocalDate.of(2026, 5, 17))
                 .category(TrainingLogCategory.TECHNIQUE)
+                .color(TrainingLogColor.BLUE)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
-                .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true)))
+                .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true, true, "🔥")))
                 .hashtags(List.of("triangle"))
+                .imageUrls(List.of(
+                        "https://cdn.test.com/training-log-1.jpg",
+                        "https://cdn.test.com/training-log-2.jpg"
+                ))
                 .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
-                .imageUrl("https://cdn.test.com/training-log.jpg")
-                .trainingMinutes(90)
+                .imageUrl("https://cdn.test.com/training-log-1.jpg")
                 .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .updatedAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .build();
