@@ -8,6 +8,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
@@ -78,10 +79,13 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
         ReflectionTestUtils.setField(request, "title", "  Arm Triangle Details  ");
         ReflectionTestUtils.setField(request, "content", "  Finished details for knee angle and arm position.  ");
-        ReflectionTestUtils.setField(request, "trainingMinutes", 90);
-        ReflectionTestUtils.setField(request, "imageUrl", "  https://cdn.test.com/training-log.jpg  ");
+        ReflectionTestUtils.setField(request, "imageUrls", List.of(
+                "  https://cdn.test.com/training-log-1.jpg  ",
+                "https://cdn.test.com/training-log-2.jpg"
+        ));
+        ReflectionTestUtils.setField(request, "color", TrainingLogColor.BLUE);
         ReflectionTestUtils.setField(request, "checklist", List.of(
-                checklistItem("  Triangle Review  ", true),
+                checklistItem("  Triangle Review  ", true, true, "🔥"),
                 checklistItem("Live Roll Application", null)
         ));
         ReflectionTestUtils.setField(request, "hashtags", List.of(" Triangle ", "#Arm-Triangle", "triangle", " "));
@@ -107,21 +111,29 @@ class TrainingLogServiceTest {
         assertThat(saved.getTitle()).isEqualTo("Arm Triangle Details");
         assertThat(saved.getContent()).isEqualTo("Finished details for knee angle and arm position.");
         assertThat(saved.getChecklistJson())
-                .isEqualTo("[{\"text\":\"Triangle Review\",\"checked\":true},{\"text\":\"Live Roll Application\",\"checked\":false}]");
+                .isEqualTo("[{\"text\":\"Triangle Review\",\"checked\":true,\"favorite\":true,\"emoji\":\"🔥\"},{\"text\":\"Live Roll Application\",\"checked\":false,\"favorite\":false}]");
         assertThat(saved.getHashtagsJson()).isEqualTo("[\"triangle\",\"arm-triangle\"]");
         assertThat(saved.getExternalLinksJson()).isEqualTo(
                 "[{\"type\":\"INSTAGRAM\",\"url\":\"https://www.instagram.com/p/abc123/\"},{\"type\":\"YOUTUBE\",\"url\":\"https://youtu.be/xyz789\"}]"
         );
-        assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
-        assertThat(saved.getTrainingMinutes()).isEqualTo(90);
+        assertThat(saved.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
+        assertThat(saved.getImageUrlsJson()).isEqualTo(
+                "[\"https://cdn.test.com/training-log-1.jpg\",\"https://cdn.test.com/training-log-2.jpg\"]"
+        );
 
         assertThat(response.getId()).isEqualTo(100L);
+        assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(response.getChecklist()).hasSize(2);
         assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
         assertThat(response.getHashtags()).containsExactly("triangle", "arm-triangle");
         assertThat(response.getExternalLinks()).extracting(TrainingLogExternalLink::type)
                 .containsExactly(TrainingLogLinkType.INSTAGRAM, TrainingLogLinkType.YOUTUBE);
-        assertThat(response.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
+        assertThat(response.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
+        assertThat(response.getImageUrls()).containsExactly(
+                "https://cdn.test.com/training-log-1.jpg",
+                "https://cdn.test.com/training-log-2.jpg"
+        );
     }
 
     @Test
@@ -193,6 +205,7 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "title", "Technique");
         ReflectionTestUtils.setField(request, "content", "Normal training note");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(request, "color", TrainingLogColor.RED);
 
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
 
@@ -213,7 +226,7 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("update can clear checklist image and training minutes while normalizing hashtags")
+    @DisplayName("update can clear checklist and images while normalizing hashtags")
     void update_clearsOptionalFieldsAndNormalizesHashtags() {
         User user = createUser(10L);
         TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
@@ -223,9 +236,11 @@ class TrainingLogServiceTest {
                 "Original Content",
                 "[{\"text\":\"Existing Checklist\",\"checked\":true}]",
                 "[\"triangle\"]",
-                60,
-                "https://cdn.test.com/original.jpg",
                 null,
+                "https://cdn.test.com/original.jpg",
+                "[\"https://cdn.test.com/original.jpg\"]",
+                null,
+                TrainingLogColor.BLUE,
                 null,
                 null
         );
@@ -237,8 +252,7 @@ class TrainingLogServiceTest {
         request.setExternalLinks(List.of(
                 externalLink(TrainingLogLinkType.INSTAGRAM, "instagram.com/p/guardpass")
         ));
-        request.setImageUrl(null);
-        request.setTrainingMinutes(null);
+        request.setImageUrls(List.of());
         ReflectionTestUtils.setField(request, "title", "  Updated Title  ");
         ReflectionTestUtils.setField(request, "content", "  Updated Content  ");
 
@@ -252,14 +266,15 @@ class TrainingLogServiceTest {
                 "[{\"type\":\"INSTAGRAM\",\"url\":\"https://instagram.com/p/guardpass\"}]"
         );
         assertThat(entry.getImageUrl()).isNull();
-        assertThat(entry.getTrainingMinutes()).isNull();
+        assertThat(entry.getImageUrlsJson()).isNull();
 
         assertThat(response.getChecklist()).isEmpty();
         assertThat(response.getHashtags()).containsExactly("guard-pass", "back-take");
         assertThat(response.getExternalLinks()).extracting(TrainingLogExternalLink::type)
                 .containsExactly(TrainingLogLinkType.INSTAGRAM);
         assertThat(response.getImageUrl()).isNull();
-        assertThat(response.getTrainingMinutes()).isNull();
+        assertThat(response.getImageUrls()).isEmpty();
+        assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
     }
 
     @Test
@@ -273,7 +288,7 @@ class TrainingLogServiceTest {
                 "Promotion Content",
                 null,
                 null,
-                30,
+                null,
                 null,
                 null,
                 BeltColor.BLUE,
@@ -322,7 +337,7 @@ class TrainingLogServiceTest {
                 "Blue belt promotion",
                 null,
                 null,
-                30,
+                null,
                 null,
                 null,
                 BeltColor.BLUE,
@@ -335,7 +350,7 @@ class TrainingLogServiceTest {
                 "Purple belt promotion",
                 null,
                 null,
-                20,
+                null,
                 null,
                 null,
                 BeltColor.PURPLE,
@@ -434,9 +449,15 @@ class TrainingLogServiceTest {
     }
 
     private TrainingLogChecklistItemRequest checklistItem(String text, Boolean checked) {
+        return checklistItem(text, checked, null, null);
+    }
+
+    private TrainingLogChecklistItemRequest checklistItem(String text, Boolean checked, Boolean favorite, String emoji) {
         TrainingLogChecklistItemRequest item = new TrainingLogChecklistItemRequest();
         ReflectionTestUtils.setField(item, "text", text);
         ReflectionTestUtils.setField(item, "checked", checked);
+        ReflectionTestUtils.setField(item, "favorite", favorite);
+        ReflectionTestUtils.setField(item, "emoji", emoji);
         return item;
     }
 

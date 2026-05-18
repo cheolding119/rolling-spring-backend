@@ -41,7 +41,7 @@
 
 - MVP는 “캘린더에서 날짜를 고르고 바로 기록을 남기는 흐름”에 집중한다.
 - 핵심 구조는 `카테고리 -> 항목 -> 내용 -> 체크리스트 -> 해시태그 -> 외부 링크`다.
-- 이미지와 외부 링크는 선택 입력으로 둔다.
+- 이미지는 복수 입력을 허용하고, 외부 링크는 선택 입력으로 둔다.
 - 주간/월간/연간 집계는 기록 복기를 돕는 보조 기능으로 제공한다.
 - 공유, 공개 피드, 좋아요, 관리자 운영 화면은 이번 범위에서 제외한다.
 
@@ -87,7 +87,7 @@
 | 기록 | 체크리스트 입력 | 공통 입력 |
 | 기록 | 해시태그 입력 | 공통 입력 |
 | 기록 | 외부 링크 입력 | `INSTAGRAM`, `YOUTUBE` |
-| 기록 | 이미지 업로드 URL 발급 및 조회 | 이미지 1장 기준 |
+| 기록 | 이미지 업로드 URL 발급 및 조회 | 이미지 복수 기준 |
 | 집계 | 월간/연간 훈련 집계 조회 | 날짜별 총합, 월별 총합, 카테고리별 총합 |
 | 탐색 | 최근 기록 조회 | 최근 작성한 기록 목록 |
 | 벨트 | 현재 벨트 동기화 | 최신 `PROMOTION` 기록 기준 `User.beltColor` 반영 |
@@ -109,6 +109,13 @@
 - 공개 피드, 공유, 좋아요
 - 관리자 운영 도구
 
+### 5.4 카테고리 색상 팔레트
+
+- 카테고리 표시용 색상은 `TrainingLogColor` enum으로 분리한다.
+- enum raw value는 `RED`, `ORANGE`, `YELLOW`, `GREEN`, `BLUE`, `NAVY`, `PURPLE`, `PINK`, `TEAL`, `BROWN`, `GRAY`, `BLACK`을 사용한다.
+- 실제 hex 또는 디자인 토큰은 프론트 UI 레이어에서 결정한다.
+- 기록 응답의 `color`는 `TrainingLogCategory`에서 파생한 표시용 색상이다.
+
 ## 6. 도메인 모델
 
 ### 6.1 `TrainingLogEntry`
@@ -124,8 +131,9 @@
 | `checklistJson` | `String?` | 체크리스트 JSON |
 | `hashtagsJson` | `String?` | 해시태그 목록 JSON |
 | `externalLinksJson` | `String?` | 외부 링크 목록 JSON |
-| `imageUrl` | `String?` | 첨부 이미지 URL |
-| `trainingMinutes` | `Integer?` | 총 훈련 시간(분) |
+| `imageUrl` | `String?` | 대표 이미지 URL |
+| `imageUrlsJson` | `String?` | 이미지 목록 JSON |
+| `color` | `TrainingLogColor?` | 기록 색상 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -151,7 +159,6 @@ public enum TrainingLogCategory {
 - 모든 기록은 하나의 `TrainingLogEntry`로 처리한다.
 - 카테고리에 따라 일부 필드는 선택적으로 사용한다.
 - `PROMOTION` 카테고리에서만 `beltColor`, `stripeCount`를 사용한다.
-- 집계용으로 `trainingMinutes`를 저장한다.
 
 권장 외부 링크 enum:
 
@@ -200,7 +207,8 @@ public enum TrainingLogLinkType {
 ### 7.3 응답 방향
 
 - 캘린더 집계 응답에는 연간 총합, 활성 일수, 월별 집계, 일별 집계를 포함한다.
-- 기록 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지, 훈련 시간, 승급 정보가 포함된다.
+- 기록 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 승급 정보가 포함된다.
+- 체크리스트 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - 엔티티는 직접 노출하지 않고 별도 DTO로 반환한다.
 
 응답 예시 필드:
@@ -232,7 +240,6 @@ public enum TrainingLogLinkType {
 - 체크리스트는 최대 20개를 권장한다.
 - 해시태그는 최대 10개를 권장한다.
 - 외부 링크는 최대 3개를 권장한다.
-- `trainingMinutes`는 0 이상 600 이하를 권장한다.
 
 ### 8.3 해시태그 규칙
 
@@ -332,7 +339,6 @@ public enum TrainingLogLinkType {
 - [x] `hashtags_json` 컬럼 추가
 - [x] `image_url` 컬럼 추가
 - [x] `external_links_json` 컬럼 추가
-- [x] `training_minutes` 컬럼 추가
 - [x] `belt_color`, `stripe_count` 컬럼 추가
 - [x] `TrainingLogEntry` 엔티티 추가 또는 정비
 - [x] `TrainingLogCategory` enum 추가
@@ -348,7 +354,6 @@ public enum TrainingLogLinkType {
 - [x] 본인 데이터만 접근 가능하도록 권한 처리
 - [x] 미래 날짜 저장 제한 적용
 - [x] `title`, `content` 필수 검증 적용
-- [x] `trainingMinutes` 범위 검증 적용
 
 ### Phase 3. 체크리스트 및 해시태그
 
@@ -426,7 +431,6 @@ public enum TrainingLogLinkType {
 - 사용자는 오늘 날짜 또는 과거 날짜의 훈련 기록을 남길 수 있다.
 - 사용자는 기록에 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크를 입력할 수 있다.
 - 사용자는 필요하면 이미지를 첨부할 수 있다.
-- 사용자는 월간/연간 훈련량을 수치로 확인할 수 있다.
 - 사용자는 최근 기록을 통해 반복 패턴을 확인할 수 있다.
 
 ### 12.2 승급
@@ -453,7 +457,8 @@ public enum TrainingLogLinkType {
 | 하루 기록 개수 | 1개 / 여러 개 | 여러 개 권장 |
 | 체크리스트 저장 방식 | JSON / 별도 테이블 | MVP는 JSON |
 | 해시태그 저장 방식 | JSON / 별도 테이블 | MVP는 JSON |
-| 이미지 개수 | 1장 / 다중 | MVP는 1장 |
+| 이미지 개수 | 1장 / 다중 | MVP는 다중 허용 |
+| 색상 지정 | 카테고리 연동 / 독립 필드 | MVP는 독립 필드 |
 | 외부 링크 저장 방식 | `externalLinksJson` / 별도 테이블 | MVP는 `externalLinksJson` |
 | 벨트 변경 진입점 | 프로필 수정 / `PROMOTION` 기록 | 신규 입력은 `PROMOTION` 기록 우선 |
 
