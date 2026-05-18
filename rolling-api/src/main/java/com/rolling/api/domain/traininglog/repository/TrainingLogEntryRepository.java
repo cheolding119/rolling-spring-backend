@@ -15,6 +15,11 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
 
     List<TrainingLogEntry> findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(Long userId, Pageable pageable);
 
+    java.util.Optional<TrainingLogEntry> findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
+            Long userId,
+            com.rolling.api.domain.traininglog.entity.TrainingLogCategory category
+    );
+
     @Query("""
             select new com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection(
                 entry.trainingDate,

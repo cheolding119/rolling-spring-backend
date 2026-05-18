@@ -2,11 +2,11 @@
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
-- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~6이다.
+- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10이다.
 
 ## 1. 도메인 개요
 
-훈련 기록은 로그인한 사용자가 특정 날짜에 카테고리 기반 기록을 남기고, 같은 날짜의 기록 목록을 조회하거나 수정/삭제하고, 자신의 해시태그를 자동완성하며, 연간 캘린더 집계와 최근 기록 목록을 조회할 수 있는 도메인이다.
+훈련 기록은 로그인한 사용자가 특정 날짜에 카테고리 기반 기록을 남기고, 같은 날짜의 기록 목록을 조회하거나 수정/삭제하고, 해시태그를 자동완성하며, 연간 캘린더 집계와 최근 기록 목록을 조회하고, 이미지 업로드용 presigned URL을 발급받는 도메인이다.
 
 현재 구현 범위:
 
@@ -17,51 +17,59 @@
 - 본인 데이터 소유권 검증
 - 체크리스트 JSON 저장/조회
 - 해시태그 정규화, 중복 제거, 자동완성
-- 연간 캘린더 요약 조회
+- 외부 링크 JSON 저장/조회
+- 연간 캘린더 집계 조회
 - 최근 훈련 기록 조회
 - 이미지 업로드용 presigned URL 발급
-- `PROMOTION` 카테고리 전용 검증
-
-후속 Phase 범위:
-
-- 외부 링크 JSON 구조 및 검증
-- 최신 `PROMOTION` 기준 `User.beltColor` 동기화
-- DTO/Swagger 추가 정리
+- `PROMOTION` 카테고리 전용 검증 및 최신 벨트 동기화
 
 ## 2. 도메인 모델
 
-### 2.1 TrainingLogEntryModel
+### 2.1 `TrainingLogEntry`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | `Long` | 훈련 기록 ID |
-| `trainingDate` | `Date` | 훈련 날짜 |
+| `user` | `User` | 소유 사용자 |
+| `trainingDate` | `LocalDate` | 기록 날짜 |
 | `category` | `TrainingLogCategory` | 기록 카테고리 |
 | `title` | `String` | 기록 제목 |
-| `content` | `String` | 기록 내용 |
-| `checklist` | `List<TrainingLogChecklistItem>` | 체크리스트 목록 |
-| `hashtags` | `List<String>` | 정규화된 해시태그 목록 |
+| `content` | `String` | 기록 본문 |
+| `checklistJson` | `String?` | 체크리스트 JSON |
+| `hashtagsJson` | `String?` | 해시태그 JSON |
+| `externalLinksJson` | `String?` | 외부 링크 JSON |
 | `imageUrl` | `String?` | 대표 이미지 URL |
-| `trainingMinutes` | `Integer?` | 훈련 시간(분) |
-| `beltColor` | `BeltColor?` | `PROMOTION` 전용 벨트 색상 |
-| `stripeCount` | `Integer?` | `PROMOTION` 전용 stripe 수 |
-| `createdAt` | `DateTime` | 생성 시각 |
-| `updatedAt` | `DateTime` | 수정 시각 |
+| `imageUrlsJson` | `String?` | 이미지 목록 JSON |
+| `color` | `TrainingLogColor?` | 기록 색상 |
+| `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
+| `stripeCount` | `Integer?` | `PROMOTION` 전용 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
 
 구현 메모:
 
-- DB에는 `checklist_json`, `hashtags_json` 문자열 컬럼으로 저장한다.
-- `external_links_json` 컬럼은 존재하지만 현재 API request/response에는 포함하지 않는다.
-- `imageUrl`, `beltColor`, `stripeCount`는 현재 public DTO에 노출된다.
+- DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
+- `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
+- `imageUrl`, `imageUrls`, `color`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
-### 2.2 TrainingLogChecklistItem
+### 2.2 `TrainingLogChecklistItem`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `text` | `String` | 체크리스트 항목 내용 |
-| `checked` | `Boolean` | 완료 여부 |
+| `checked` | `boolean` | 완료 여부 |
+| `favorite` | `boolean` | 즐겨찾기 여부 |
+| `emoji` | `String?` | 즐겨찾기 표시 이모지 |
 
-### 2.3 TrainingLogCalendarSummaryModel
+### 2.3 `TrainingLogExternalLink`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `type` | `TrainingLogLinkType` | 링크 타입 |
+| `url` | `String` | 정규화된 링크 URL |
+
+### 2.4 `TrainingLogCalendarSummaryResponse`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
@@ -71,7 +79,7 @@
 | `monthlySummaries` | `List<TrainingLogCalendarMonthlySummary>` | 월별 요약 목록 |
 | `dailySummaries` | `List<TrainingLogCalendarDailySummary>` | 일별 요약 목록 |
 
-### 2.4 TrainingLogCalendarMonthlySummary
+### 2.5 `TrainingLogCalendarMonthlySummary`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
@@ -79,26 +87,26 @@
 | `totalMinutes` | `Integer` | 해당 월의 총 훈련 시간 |
 | `activeDays` | `Integer` | 해당 월의 활동 일수 |
 
-### 2.5 TrainingLogCalendarDailySummary
+### 2.6 `TrainingLogCalendarDailySummary`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
-| `date` | `Date` | 훈련 날짜 |
+| `date` | `LocalDate` | 훈련 날짜 |
 | `totalMinutes` | `Integer` | 해당 일자의 총 훈련 시간 |
 | `recordCount` | `Integer` | 해당 일자의 기록 수 |
 
-### 2.6 TrainingLogImageUploadUrlModel
+### 2.7 `TrainingLogImageUploadUrlResponse`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `uploadUrl` | `String` | S3 업로드용 presigned URL |
 | `imageKey` | `String` | 서버 저장용 S3 object key |
 | `imageUrl` | `String` | 업로드 후 접근 가능한 공개 이미지 URL |
-| `expiresAt` | `DateTime` | presigned URL 만료 시각 |
+| `expiresAt` | `LocalDateTime` | presigned URL 만료 시각 |
 
 ## 3. Enum
 
-### 3.1 TrainingLogCategory
+### 3.1 `TrainingLogCategory`
 
 | Raw value | 설명 |
 | --- | --- |
@@ -115,9 +123,7 @@
 - API와 DB 모두 enum raw value를 그대로 사용한다.
 - JPA 저장 방식은 `EnumType.STRING`이다.
 
-### 3.2 TrainingLogLinkType
-
-후속 외부 링크 Phase에서 사용할 raw value는 아래 두 값으로 고정되어 있다.
+### 3.2 `TrainingLogLinkType`
 
 | Raw value | 설명 |
 | --- | --- |
@@ -126,7 +132,29 @@
 
 구현 메모:
 
-- enum과 DB 컬럼은 추가되었지만 외부 링크 request/response와 검증 로직은 아직 구현하지 않았다.
+- 외부 링크 요청/응답과 저장 JSON에서 이 두 값만 사용한다.
+
+### 3.3 `TrainingLogColor`
+
+| Raw value | 설명 |
+| --- | --- |
+| `RED` | 기본 색상 |
+| `ORANGE` | 기본 색상 |
+| `YELLOW` | 기본 색상 |
+| `GREEN` | 기본 색상 |
+| `BLUE` | 기본 색상 |
+| `NAVY` | 기본 색상 |
+| `PURPLE` | 기본 색상 |
+| `PINK` | 기본 색상 |
+| `TEAL` | 기본 색상 |
+| `BROWN` | 기본 색상 |
+| `GRAY` | 기본 색상 |
+| `BLACK` | 기본 색상 |
+
+구현 메모:
+
+- 카테고리 표시용 색상 값은 이 enum raw value를 사용한다.
+- 실제 색상 코드 매핑은 프론트 UI 레이어에서 관리한다.
 
 ## 4. 공통 정책
 
@@ -148,8 +176,6 @@
 
 - `title`, `content`는 생성 시 필수다.
 - 수정 시 `title`, `content`를 보내면 trim 후 저장한다.
-- `trainingMinutes`는 `0..600` 범위만 허용한다.
-- 수정 시 `trainingMinutes: null`을 명시하면 기존 값을 비운다.
 
 ### 4.4 체크리스트
 
@@ -168,14 +194,21 @@
 - 자동완성은 본인 데이터 기준으로만 수행한다.
 - 자동완성은 저장된 해시태그 JSON을 최근 생성 순으로 순회하며 최대 20개를 반환한다.
 
-### 4.6 카테고리별 검증
+### 4.6 외부 링크
+
+- 허용 타입은 `INSTAGRAM`, `YOUTUBE` 두 가지다.
+- 허용 도메인은 `instagram.com`, `youtube.com`, `youtu.be` 및 `www.` 접두어가 붙은 변형이다.
+- URL은 `https://` 기준으로 정규화한다.
+- 기록당 외부 링크는 최대 3개까지 허용한다.
+
+### 4.7 카테고리별 검증
 
 - `PROMOTION`에서는 `beltColor`가 필수다.
 - `PROMOTION`에서 `stripeCount`를 보내면 0 이상이어야 한다.
 - `PROMOTION`이 아닌 카테고리에서 `beltColor`, `stripeCount`를 보내면 `VALIDATION_ERROR`를 반환한다.
-- 현재 구현은 `PROMOTION` 전용 필드를 기록에만 저장하며, `User.beltColor` 동기화는 아직 수행하지 않는다.
+- `PROMOTION` 기록의 생성/수정/삭제 시 최신 `PROMOTION` 기록을 기준으로 `User.beltColor`를 동기화한다.
 
-### 4.7 이미지 업로드
+### 4.8 이미지 업로드
 
 - 업로드 API는 presigned PUT URL을 발급한다.
 - 허용 파일 형식은 `jpg`, `jpeg`, `png`와 대응 content type(`image/jpeg`, `image/jpg`, `image/png`)이다.
@@ -189,41 +222,37 @@
 `GET /api/v1/training-logs/me/entries/{date}`
 
 - 인증: 필요
-- Response data: `List<TrainingLogEntryModel>`
-
-Path parameters:
-
-| 파라미터 | 타입 | 설명 |
-| --- | --- | --- |
-| `date` | `Date` | 조회할 훈련 날짜 |
+- Response data: `List<TrainingLogEntryResponse>`
 
 ### 5.2 특정 날짜 훈련 기록 생성
 
 `POST /api/v1/training-logs/me/entries/{date}`
 
 - 인증: 필요
-- Response data: `TrainingLogEntryModel`
+- Response data: `TrainingLogEntryResponse`
 
 Request body:
 
-| 필드 | 타입 | 필수 |
-| --- | --- | --- |
-| `category` | `TrainingLogCategory` | O |
-| `title` | `String` | O |
-| `content` | `String` | O |
-| `checklist` | `List<TrainingLogChecklistItemRequest>?` | - |
-| `hashtags` | `List<String>?` | - |
-| `imageUrl` | `String?` | - |
-| `trainingMinutes` | `Integer?` | - |
-| `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 |
-| `stripeCount` | `Integer?` | - |
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `category` | `TrainingLogCategory` | O | 기록 카테고리 |
+| `title` | `String` | O | 기록 제목 |
+| `content` | `String` | O | 기록 본문 |
+| `checklist` | `List<TrainingLogChecklistItemRequest>?` | - | 체크리스트 목록 |
+| `hashtags` | `List<String>?` | - | 해시태그 목록 |
+| `externalLinks` | `List<TrainingLogExternalLinkRequest>?` | - | 외부 링크 목록 |
+| `imageUrls` | `List<String>?` | - | 이미지 목록 |
+| `imageUrl` | `String?` | - | 대표 이미지 URL |
+| `color` | `TrainingLogColor?` | - | 기록 색상 |
+| `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
+| `stripeCount` | `Integer?` | - | 승급 기록 전용 |
 
 ### 5.3 훈련 기록 수정
 
 `PATCH /api/v1/training-logs/me/entries/{id}`
 
 - 인증: 필요
-- Response data: `TrainingLogEntryModel`
+- Response data: `TrainingLogEntryResponse`
 
 Request body:
 
@@ -234,8 +263,10 @@ Request body:
 | `content` | `String?` | 전달 시 trim 후 반영 |
 | `checklist` | `List<TrainingLogChecklistItemRequest>?` | `[]` 또는 `null`이면 비움 |
 | `hashtags` | `List<String>?` | `[]` 또는 `null`이면 비움 |
+| `externalLinks` | `List<TrainingLogExternalLinkRequest>?` | `[]` 또는 `null`이면 비움 |
+| `imageUrls` | `List<String>?` | `[]` 또는 `null`이면 비움 |
 | `imageUrl` | `String?` | `null`이면 비움 |
-| `trainingMinutes` | `Integer?` | `null`이면 비움 |
+| `color` | `TrainingLogColor?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
 
@@ -263,20 +294,14 @@ Request body:
 `GET /api/v1/training-logs/me/calendar?year=2026`
 
 - 인증: 필요
-- Response data: `TrainingLogCalendarSummaryModel`
-
-Query parameters:
-
-| 파라미터 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `year` | `Integer` | O | 조회 연도 |
+- Response data: `TrainingLogCalendarSummaryResponse`
 
 ### 5.7 최근 훈련 기록 조회
 
 `GET /api/v1/training-logs/me/recent`
 
 - 인증: 필요
-- Response data: `List<TrainingLogEntryModel>`
+- Response data: `List<TrainingLogEntryResponse>`
 - 최대 10건 반환
 
 ### 5.8 이미지 업로드 URL 발급
@@ -284,7 +309,7 @@ Query parameters:
 `POST /api/v1/training-logs/me/upload-url`
 
 - 인증: 필요
-- Response data: `TrainingLogImageUploadUrlModel`
+- Response data: `TrainingLogImageUploadUrlResponse`
 
 Request body:
 
@@ -292,3 +317,34 @@ Request body:
 | --- | --- | --- | --- |
 | `fileName` | `String` | O | 원본 파일명 |
 | `contentType` | `String` | O | 업로드 파일 content type |
+
+## 6. DTO 노트
+
+### 6.1 `TrainingLogEntryResponse`
+
+- `checklist`는 `List<TrainingLogChecklistItem>`이다.
+- `hashtags`는 정규화된 `List<String>`이다.
+- `externalLinks`는 `List<TrainingLogExternalLink>`이다.
+- `color`는 기록 색상이다.
+- `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`가 함께 반환된다.
+
+### 6.2 `TrainingLogExternalLinkRequest`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `type` | `TrainingLogLinkType` | 링크 타입 |
+| `url` | `String` | 원본 링크 URL |
+
+### 6.3 `TrainingLogChecklistItemRequest`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `text` | `String` | 체크리스트 항목 내용 |
+| `checked` | `Boolean?` | 완료 여부 |
+
+## 7. 구현 메모
+
+- `TrainingLogEntryRepository`는 날짜 조회, 최근 조회, 캘린더 집계, 해시태그 자동완성용 쿼리를 분리한다.
+- 이미지 업로드는 `TrainingLogImageUploadService`가 담당한다.
+- 외부 링크는 서비스 계층에서 도메인과 URL을 검증하고 `https://`로 정규화한다.
+- 벨트 동기화는 `PROMOTION` 기록의 최신값을 기준으로 처리한다.

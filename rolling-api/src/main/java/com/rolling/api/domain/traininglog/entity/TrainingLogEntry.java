@@ -64,8 +64,15 @@ public class TrainingLogEntry extends BaseTimeEntity {
     @Column(name = "image_url", length = 1000)
     private String imageUrl;
 
+    @Column(name = "image_urls_json", columnDefinition = "TEXT")
+    private String imageUrlsJson;
+
     @Column(name = "external_links_json", columnDefinition = "TEXT")
     private String externalLinksJson;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "color")
+    private TrainingLogColor color;
 
     @Column(name = "training_minutes")
     private Integer trainingMinutes;
@@ -87,7 +94,9 @@ public class TrainingLogEntry extends BaseTimeEntity {
             String checklistJson,
             String hashtagsJson,
             String imageUrl,
+            String imageUrlsJson,
             String externalLinksJson,
+            TrainingLogColor color,
             Integer trainingMinutes,
             BeltColor beltColor,
             Integer stripeCount
@@ -100,7 +109,9 @@ public class TrainingLogEntry extends BaseTimeEntity {
         this.checklistJson = checklistJson;
         this.hashtagsJson = hashtagsJson;
         this.imageUrl = imageUrl;
+        this.imageUrlsJson = imageUrlsJson;
         this.externalLinksJson = externalLinksJson;
+        this.color = color;
         this.trainingMinutes = trainingMinutes;
         this.beltColor = beltColor;
         this.stripeCount = stripeCount;
@@ -114,7 +125,9 @@ public class TrainingLogEntry extends BaseTimeEntity {
             String hashtagsJson,
             Integer trainingMinutes,
             String imageUrl,
+            String imageUrlsJson,
             String externalLinksJson,
+            TrainingLogColor color,
             BeltColor beltColor,
             Integer stripeCount
     ) {
@@ -125,8 +138,67 @@ public class TrainingLogEntry extends BaseTimeEntity {
         this.hashtagsJson = hashtagsJson;
         this.trainingMinutes = trainingMinutes;
         this.imageUrl = imageUrl;
+        this.imageUrlsJson = imageUrlsJson;
         this.externalLinksJson = externalLinksJson;
+        this.color = color;
         this.beltColor = beltColor;
         this.stripeCount = stripeCount;
+    }
+
+    public void update(
+            TrainingLogCategory category,
+            String title,
+            String content,
+            String checklistJson,
+            String hashtagsJson,
+            String imageUrl,
+            String imageUrlsJson,
+            String externalLinksJson,
+            TrainingLogColor color,
+            BeltColor beltColor,
+            Integer stripeCount
+    ) {
+        update(
+                category,
+                title,
+                content,
+                checklistJson,
+                hashtagsJson,
+                null,
+                imageUrl,
+                imageUrlsJson,
+                externalLinksJson,
+                color,
+                beltColor,
+                stripeCount
+        );
+    }
+
+    public void update(
+            TrainingLogCategory category,
+            String title,
+            String content,
+            String checklistJson,
+            String hashtagsJson,
+            String imageUrl,
+            String externalLinksJson,
+            TrainingLogColor color,
+            BeltColor beltColor,
+            Integer stripeCount
+    ) {
+        update(
+                category,
+                title,
+                content,
+                checklistJson,
+                hashtagsJson,
+                null,
+                imageUrl,
+                null,
+                externalLinksJson,
+                color,
+                beltColor,
+                stripeCount
+        );
     }
 }

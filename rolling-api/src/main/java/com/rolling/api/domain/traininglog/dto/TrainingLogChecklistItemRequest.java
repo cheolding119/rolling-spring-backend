@@ -16,4 +16,11 @@ public class TrainingLogChecklistItemRequest {
 
     @Schema(description = "완료 여부", example = "false")
     private Boolean checked;
+
+    @Schema(description = "즐겨찾기 여부", example = "false")
+    private Boolean favorite;
+
+    @Size(max = 32, message = "이모지는 32자 이하여야 합니다")
+    @Schema(description = "즐겨찾기 표시 이모지", example = "🔥", nullable = true)
+    private String emoji;
 }

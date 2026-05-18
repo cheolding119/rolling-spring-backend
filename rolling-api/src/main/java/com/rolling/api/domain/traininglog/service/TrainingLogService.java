@@ -3,6 +3,8 @@ package com.rolling.api.domain.traininglog.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
+import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarDailySummary;
@@ -13,6 +15,8 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
@@ -26,11 +30,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
@@ -39,11 +47,19 @@ public class TrainingLogService {
 
     private static final int MAX_CHECKLIST_ITEMS = 20;
     private static final int MAX_HASHTAGS = 10;
+    private static final int MAX_EXTERNAL_LINKS = 3;
+    private static final int MAX_IMAGE_URLS = 10;
     private static final int TAG_AUTOCOMPLETE_LIMIT = 20;
     private static final int RECENT_LIMIT = 10;
     private static final Pattern HASHTAG_PATTERN = Pattern.compile("^[0-9a-z가-힣-]+$");
     private static final TypeReference<List<TrainingLogChecklistItem>> CHECKLIST_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<String>> HASHTAG_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<String>> IMAGE_URLS_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<TrainingLogExternalLink>> EXTERNAL_LINK_TYPE = new TypeReference<>() {};
+    private static final Map<TrainingLogLinkType, Set<String>> ALLOWED_EXTERNAL_LINK_HOSTS = Map.of(
+            TrainingLogLinkType.INSTAGRAM, Set.of("instagram.com"),
+            TrainingLogLinkType.YOUTUBE, Set.of("youtube.com", "youtu.be")
+    );
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final TrainingLogEntryRepository trainingLogEntryRepository;
@@ -107,7 +123,9 @@ public class TrainingLogService {
         TrainingLogCategory category = requireCategory(request.getCategory());
         List<TrainingLogChecklistItem> checklist = normalizeChecklist(request.getChecklist());
         List<String> hashtags = normalizeHashtags(request.getHashtags());
-        String imageUrl = normalizeOptionalText(request.getImageUrl());
+        List<TrainingLogExternalLink> externalLinks = normalizeExternalLinks(request.getExternalLinks());
+        List<String> imageUrls = resolveImageUrls(request.getImageUrls(), request.getImageUrl());
+        String imageUrl = firstImageUrl(imageUrls);
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
@@ -119,13 +137,18 @@ public class TrainingLogService {
                         .content(requireText(request.getContent(), "기록 내용은 필수입니다"))
                         .checklistJson(writeChecklistJson(checklist))
                         .hashtagsJson(writeHashtagsJson(hashtags))
+                        .imageUrlsJson(writeImageUrlsJson(imageUrls))
+                        .externalLinksJson(writeExternalLinksJson(externalLinks))
+                        .color(request.getColor())
                         .imageUrl(imageUrl)
-                        .trainingMinutes(request.getTrainingMinutes())
                         .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
                         .stripeCount(category == TrainingLogCategory.PROMOTION ? request.getStripeCount() : null)
                         .build()
         );
 
+        if (category == TrainingLogCategory.PROMOTION) {
+            syncUserBeltColor(userId);
+        }
         return toResponse(saved);
     }
 
@@ -133,6 +156,7 @@ public class TrainingLogService {
     public TrainingLogEntryResponse update(Long userId, Long entryId, TrainingLogEntryUpdateRequest request) {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
+        TrainingLogCategory previousCategory = entry.getCategory();
 
         TrainingLogCategory category = request.getCategory() != null ? request.getCategory() : entry.getCategory();
         String title = request.getTitle() != null
@@ -147,12 +171,12 @@ public class TrainingLogService {
         List<String> hashtags = request.hasHashtagsField()
                 ? normalizeHashtags(request.getHashtags())
                 : readHashtags(entry.getHashtagsJson());
-        String imageUrl = request.hasImageUrlField()
-                ? normalizeOptionalText(request.getImageUrl())
-                : entry.getImageUrl();
-        Integer trainingMinutes = request.hasTrainingMinutesField()
-                ? request.getTrainingMinutes()
-                : entry.getTrainingMinutes();
+        List<TrainingLogExternalLink> externalLinks = request.hasExternalLinksField()
+                ? normalizeExternalLinks(request.getExternalLinks())
+                : readExternalLinks(entry.getExternalLinksJson());
+        List<String> imageUrls = resolveImageUrls(entry, request);
+        String imageUrl = firstImageUrl(imageUrls);
+        TrainingLogColor color = request.hasColorField() ? request.getColor() : entry.getColor();
         BeltColor beltColor = resolveBeltColor(entry, request, category);
         Integer stripeCount = resolveStripeCount(entry, request, category);
         validateCategoryFields(category, beltColor, stripeCount);
@@ -163,13 +187,17 @@ public class TrainingLogService {
                 content,
                 writeChecklistJson(checklist),
                 writeHashtagsJson(hashtags),
-                trainingMinutes,
                 imageUrl,
-                entry.getExternalLinksJson(),
+                writeImageUrlsJson(imageUrls),
+                writeExternalLinksJson(externalLinks),
+                color,
                 beltColor,
                 stripeCount
         );
 
+        if (previousCategory == TrainingLogCategory.PROMOTION || category == TrainingLogCategory.PROMOTION) {
+            syncUserBeltColor(userId);
+        }
         return toResponse(entry);
     }
 
@@ -178,6 +206,9 @@ public class TrainingLogService {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
         trainingLogEntryRepository.delete(entry);
+        if (entry.getCategory() == TrainingLogCategory.PROMOTION) {
+            syncUserBeltColor(userId);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -207,12 +238,14 @@ public class TrainingLogService {
                 .id(entry.getId())
                 .trainingDate(entry.getTrainingDate())
                 .category(entry.getCategory())
+                .color(entry.getColor())
                 .title(entry.getTitle())
                 .content(entry.getContent())
                 .checklist(readChecklist(entry.getChecklistJson()))
                 .hashtags(readHashtags(entry.getHashtagsJson()))
+                .externalLinks(readExternalLinks(entry.getExternalLinksJson()))
+                .imageUrls(readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl()))
                 .imageUrl(entry.getImageUrl())
-                .trainingMinutes(entry.getTrainingMinutes())
                 .beltColor(entry.getBeltColor())
                 .stripeCount(entry.getStripeCount())
                 .createdAt(entry.getCreatedAt())
@@ -291,6 +324,115 @@ public class TrainingLogService {
         return value.trim();
     }
 
+    private List<String> resolveImageUrls(List<String> imageUrls, String imageUrl) {
+        if (imageUrls != null) {
+            return normalizeImageUrls(imageUrls);
+        }
+        if (StringUtils.hasText(imageUrl)) {
+            return List.of(normalizeOptionalText(imageUrl));
+        }
+        return List.of();
+    }
+
+    private List<String> resolveImageUrls(TrainingLogEntry entry, TrainingLogEntryUpdateRequest request) {
+        if (request.hasImageUrlsField()) {
+            return normalizeImageUrls(request.getImageUrls());
+        }
+        if (request.hasImageUrlField()) {
+            return resolveImageUrls(null, request.getImageUrl());
+        }
+        return readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl());
+    }
+
+    private List<String> normalizeImageUrls(List<String> imageUrls) {
+        if (imageUrls == null) {
+            return List.of();
+        }
+        if (imageUrls.size() > MAX_IMAGE_URLS) {
+            throw BusinessException.badRequest("이미지는 최대 10장까지 입력할 수 있습니다");
+        }
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String imageUrl : imageUrls) {
+            String normalizedValue = normalizeOptionalText(imageUrl);
+            if (normalizedValue != null) {
+                normalized.add(normalizedValue);
+            }
+        }
+        return List.copyOf(normalized);
+    }
+
+    private String firstImageUrl(List<String> imageUrls) {
+        return imageUrls.isEmpty() ? null : imageUrls.get(0);
+    }
+
+    private List<TrainingLogExternalLink> normalizeExternalLinks(List<TrainingLogExternalLinkRequest> externalLinks) {
+        if (externalLinks == null) {
+            return List.of();
+        }
+        if (externalLinks.size() > MAX_EXTERNAL_LINKS) {
+            throw BusinessException.badRequest("외부 링크는 최대 3개까지 입력할 수 있습니다");
+        }
+        return externalLinks.stream()
+                .map(this::normalizeExternalLink)
+                .toList();
+    }
+
+    private TrainingLogExternalLink normalizeExternalLink(TrainingLogExternalLinkRequest request) {
+        if (request == null) {
+            throw BusinessException.badRequest("외부 링크는 필수입니다");
+        }
+        if (request.getType() == null) {
+            throw BusinessException.badRequest("외부 링크 타입은 필수입니다");
+        }
+
+        String normalizedUrl = normalizeExternalLinkUrl(request.getType(), request.getUrl());
+        return new TrainingLogExternalLink(request.getType(), normalizedUrl);
+    }
+
+    private String normalizeExternalLinkUrl(TrainingLogLinkType type, String url) {
+        String normalized = requireText(url, "외부 링크 URL은 필수입니다");
+        if (!normalized.contains("://")) {
+            normalized = "https://" + normalized;
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(normalized);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.badRequest("외부 링크 URL이 올바르지 않습니다");
+        }
+
+        String host = uri.getHost();
+        if (!StringUtils.hasText(host)) {
+            throw BusinessException.badRequest("외부 링크 URL이 올바르지 않습니다");
+        }
+
+        String lowerHost = host.toLowerCase(Locale.ROOT);
+        if (!isAllowedExternalLinkHost(type, lowerHost)) {
+            throw BusinessException.badRequest("허용된 외부 링크 도메인만 사용할 수 있습니다");
+        }
+
+        try {
+            return new URI(
+                    "https",
+                    uri.getUserInfo(),
+                    lowerHost,
+                    uri.getPort(),
+                    uri.getPath(),
+                    uri.getQuery(),
+                    uri.getFragment()
+            ).toString();
+        } catch (URISyntaxException e) {
+            throw BusinessException.badRequest("외부 링크 URL이 올바르지 않습니다");
+        }
+    }
+
+    private boolean isAllowedExternalLinkHost(TrainingLogLinkType type, String host) {
+        String normalizedHost = host.startsWith("www.") ? host.substring(4) : host;
+        return ALLOWED_EXTERNAL_LINK_HOSTS.getOrDefault(type, Set.of()).contains(normalizedHost);
+    }
+
     private BeltColor resolveBeltColor(
             TrainingLogEntry entry,
             TrainingLogEntryUpdateRequest request,
@@ -347,7 +489,9 @@ public class TrainingLogService {
     private TrainingLogChecklistItem normalizeChecklistItem(TrainingLogChecklistItemRequest item) {
         return new TrainingLogChecklistItem(
                 requireText(item.getText(), "체크리스트 항목 내용은 필수입니다"),
-                Boolean.TRUE.equals(item.getChecked())
+                Boolean.TRUE.equals(item.getChecked()),
+                Boolean.TRUE.equals(item.getFavorite()),
+                normalizeOptionalText(item.getEmoji())
         );
     }
 
@@ -410,6 +554,37 @@ public class TrainingLogService {
 
     private List<String> readHashtags(String hashtagsJson) {
         return readJsonList(hashtagsJson, HASHTAG_TYPE);
+    }
+
+    private String writeImageUrlsJson(List<String> imageUrls) {
+        return writeJsonOrNull(imageUrls);
+    }
+
+    private List<String> readImageUrls(String imageUrlsJson, String imageUrl) {
+        List<String> imageUrls = readJsonList(imageUrlsJson, IMAGE_URLS_TYPE);
+        if (!imageUrls.isEmpty()) {
+            return imageUrls;
+        }
+        if (StringUtils.hasText(imageUrl)) {
+            return List.of(imageUrl);
+        }
+        return List.of();
+    }
+
+    private String writeExternalLinksJson(List<TrainingLogExternalLink> externalLinks) {
+        return writeJsonOrNull(externalLinks);
+    }
+
+    private List<TrainingLogExternalLink> readExternalLinks(String externalLinksJson) {
+        return readJsonList(externalLinksJson, EXTERNAL_LINK_TYPE);
+    }
+
+    private void syncUserBeltColor(Long userId) {
+        User user = getActiveUser(userId);
+        trainingLogEntryRepository
+                .findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(userId, TrainingLogCategory.PROMOTION)
+                .map(TrainingLogEntry::getBeltColor)
+                .ifPresent(user::updateBeltColor);
     }
 
     private String writeJsonOrNull(Object value) {

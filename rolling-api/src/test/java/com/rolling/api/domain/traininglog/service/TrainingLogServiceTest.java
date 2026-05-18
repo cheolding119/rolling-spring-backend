@@ -2,11 +2,15 @@ package com.rolling.api.domain.traininglog.service;
 
 import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
+import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
@@ -37,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.lenient;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,23 +65,34 @@ class TrainingLogServiceTest {
                 userRepository,
                 fixedClock
         );
+        lenient().when(trainingLogEntryRepository.findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
+                any(),
+                any(TrainingLogCategory.class)
+        )).thenReturn(Optional.empty());
     }
 
     @Test
-    @DisplayName("create normalizes checklist hashtags and optional image URL")
-    void create_normalizesChecklistHashtagsAndImageUrl() {
+    @DisplayName("create normalizes checklist hashtags external links and optional image URL")
+    void create_normalizesChecklistHashtagsExternalLinksAndImageUrl() {
         User user = createUser(10L);
         TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
         ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
         ReflectionTestUtils.setField(request, "title", "  Arm Triangle Details  ");
         ReflectionTestUtils.setField(request, "content", "  Finished details for knee angle and arm position.  ");
-        ReflectionTestUtils.setField(request, "trainingMinutes", 90);
-        ReflectionTestUtils.setField(request, "imageUrl", "  https://cdn.test.com/training-log.jpg  ");
+        ReflectionTestUtils.setField(request, "imageUrls", List.of(
+                "  https://cdn.test.com/training-log-1.jpg  ",
+                "https://cdn.test.com/training-log-2.jpg"
+        ));
+        ReflectionTestUtils.setField(request, "color", TrainingLogColor.BLUE);
         ReflectionTestUtils.setField(request, "checklist", List.of(
-                checklistItem("  Triangle Review  ", true),
+                checklistItem("  Triangle Review  ", true, true, "🔥"),
                 checklistItem("Live Roll Application", null)
         ));
         ReflectionTestUtils.setField(request, "hashtags", List.of(" Triangle ", "#Arm-Triangle", "triangle", " "));
+        ReflectionTestUtils.setField(request, "externalLinks", List.of(
+                externalLink(TrainingLogLinkType.INSTAGRAM, "  www.instagram.com/p/abc123/  "),
+                externalLink(TrainingLogLinkType.YOUTUBE, "http://youtu.be/xyz789")
+        ));
 
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
         given(trainingLogEntryRepository.save(any(TrainingLogEntry.class))).willAnswer(invocation -> {
@@ -95,16 +111,60 @@ class TrainingLogServiceTest {
         assertThat(saved.getTitle()).isEqualTo("Arm Triangle Details");
         assertThat(saved.getContent()).isEqualTo("Finished details for knee angle and arm position.");
         assertThat(saved.getChecklistJson())
-                .isEqualTo("[{\"text\":\"Triangle Review\",\"checked\":true},{\"text\":\"Live Roll Application\",\"checked\":false}]");
+                .isEqualTo("[{\"text\":\"Triangle Review\",\"checked\":true,\"favorite\":true,\"emoji\":\"🔥\"},{\"text\":\"Live Roll Application\",\"checked\":false,\"favorite\":false}]");
         assertThat(saved.getHashtagsJson()).isEqualTo("[\"triangle\",\"arm-triangle\"]");
-        assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
-        assertThat(saved.getTrainingMinutes()).isEqualTo(90);
+        assertThat(saved.getExternalLinksJson()).isEqualTo(
+                "[{\"type\":\"INSTAGRAM\",\"url\":\"https://www.instagram.com/p/abc123/\"},{\"type\":\"YOUTUBE\",\"url\":\"https://youtu.be/xyz789\"}]"
+        );
+        assertThat(saved.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
+        assertThat(saved.getImageUrlsJson()).isEqualTo(
+                "[\"https://cdn.test.com/training-log-1.jpg\",\"https://cdn.test.com/training-log-2.jpg\"]"
+        );
 
         assertThat(response.getId()).isEqualTo(100L);
+        assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(response.getChecklist()).hasSize(2);
         assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
         assertThat(response.getHashtags()).containsExactly("triangle", "arm-triangle");
-        assertThat(response.getImageUrl()).isEqualTo("https://cdn.test.com/training-log.jpg");
+        assertThat(response.getExternalLinks()).extracting(TrainingLogExternalLink::type)
+                .containsExactly(TrainingLogLinkType.INSTAGRAM, TrainingLogLinkType.YOUTUBE);
+        assertThat(response.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
+        assertThat(response.getImageUrls()).containsExactly(
+                "https://cdn.test.com/training-log-1.jpg",
+                "https://cdn.test.com/training-log-2.jpg"
+        );
+    }
+
+    @Test
+    @DisplayName("create synchronizes user belt color from latest promotion record")
+    void create_promotionSynchronizesUserBeltColor() {
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.PROMOTION);
+        ReflectionTestUtils.setField(request, "title", "Promotion");
+        ReflectionTestUtils.setField(request, "content", "Blue belt promotion");
+        ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(request, "stripeCount", 1);
+
+        TrainingLogEntry[] savedHolder = new TrainingLogEntry[1];
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+        given(trainingLogEntryRepository.save(any(TrainingLogEntry.class))).willAnswer(invocation -> {
+            TrainingLogEntry entry = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entry, "id", 101L);
+            ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 12, 0));
+            ReflectionTestUtils.setField(entry, "updatedAt", LocalDateTime.of(2026, 5, 17, 12, 0));
+            savedHolder[0] = entry;
+            return entry;
+        });
+        given(trainingLogEntryRepository.findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(10L, TrainingLogCategory.PROMOTION))
+                .willAnswer(invocation -> Optional.of(savedHolder[0]));
+
+        TrainingLogEntryResponse response = trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request);
+
+        assertThat(user.getBeltColor()).isEqualTo(BeltColor.BLUE);
+        assertThat(response.getBeltColor()).isEqualTo(BeltColor.BLUE);
+        assertThat(response.getStripeCount()).isEqualTo(1);
     }
 
     @Test
@@ -145,6 +205,7 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "title", "Technique");
         ReflectionTestUtils.setField(request, "content", "Normal training note");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(request, "color", TrainingLogColor.RED);
 
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
 
@@ -165,7 +226,7 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("update can clear checklist image and training minutes while normalizing hashtags")
+    @DisplayName("update can clear checklist and images while normalizing hashtags")
     void update_clearsOptionalFieldsAndNormalizesHashtags() {
         User user = createUser(10L);
         TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
@@ -175,9 +236,11 @@ class TrainingLogServiceTest {
                 "Original Content",
                 "[{\"text\":\"Existing Checklist\",\"checked\":true}]",
                 "[\"triangle\"]",
-                60,
-                "https://cdn.test.com/original.jpg",
                 null,
+                "https://cdn.test.com/original.jpg",
+                "[\"https://cdn.test.com/original.jpg\"]",
+                null,
+                TrainingLogColor.BLUE,
                 null,
                 null
         );
@@ -186,8 +249,10 @@ class TrainingLogServiceTest {
         TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
         request.setChecklist(List.of());
         request.setHashtags(List.of(" Guard-Pass ", "guard-pass", "#Back-Take"));
-        request.setImageUrl(null);
-        request.setTrainingMinutes(null);
+        request.setExternalLinks(List.of(
+                externalLink(TrainingLogLinkType.INSTAGRAM, "instagram.com/p/guardpass")
+        ));
+        request.setImageUrls(List.of());
         ReflectionTestUtils.setField(request, "title", "  Updated Title  ");
         ReflectionTestUtils.setField(request, "content", "  Updated Content  ");
 
@@ -197,13 +262,19 @@ class TrainingLogServiceTest {
         assertThat(entry.getContent()).isEqualTo("Updated Content");
         assertThat(entry.getChecklistJson()).isNull();
         assertThat(entry.getHashtagsJson()).isEqualTo("[\"guard-pass\",\"back-take\"]");
+        assertThat(entry.getExternalLinksJson()).isEqualTo(
+                "[{\"type\":\"INSTAGRAM\",\"url\":\"https://instagram.com/p/guardpass\"}]"
+        );
         assertThat(entry.getImageUrl()).isNull();
-        assertThat(entry.getTrainingMinutes()).isNull();
+        assertThat(entry.getImageUrlsJson()).isNull();
 
         assertThat(response.getChecklist()).isEmpty();
         assertThat(response.getHashtags()).containsExactly("guard-pass", "back-take");
+        assertThat(response.getExternalLinks()).extracting(TrainingLogExternalLink::type)
+                .containsExactly(TrainingLogLinkType.INSTAGRAM);
         assertThat(response.getImageUrl()).isNull();
-        assertThat(response.getTrainingMinutes()).isNull();
+        assertThat(response.getImageUrls()).isEmpty();
+        assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
     }
 
     @Test
@@ -217,13 +288,14 @@ class TrainingLogServiceTest {
                 "Promotion Content",
                 null,
                 null,
-                30,
+                null,
                 null,
                 null,
                 BeltColor.BLUE,
                 2
         );
         given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
 
         TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
         ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
@@ -235,6 +307,64 @@ class TrainingLogServiceTest {
         assertThat(entry.getStripeCount()).isNull();
         assertThat(response.getBeltColor()).isNull();
         assertThat(response.getStripeCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("update rejects external links with unsupported domains")
+    void update_withUnsupportedExternalLinkDomain_throwsValidationError() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
+        request.setExternalLinks(List.of(
+                externalLink(TrainingLogLinkType.INSTAGRAM, "https://youtube.com/watch?v=abc")
+        ));
+
+        assertThatThrownBy(() -> trainingLogService.update(10L, 1L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("허용된 외부 링크 도메인만 사용할 수 있습니다");
+    }
+
+    @Test
+    @DisplayName("delete synchronizes user belt color from the latest remaining promotion record")
+    void delete_promotionSynchronizesLatestRemainingBeltColor() {
+        User user = createUser(10L);
+        TrainingLogEntry deletedEntry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        deletedEntry.update(
+                TrainingLogCategory.PROMOTION,
+                "Promotion",
+                "Blue belt promotion",
+                null,
+                null,
+                null,
+                null,
+                null,
+                BeltColor.BLUE,
+                1
+        );
+        TrainingLogEntry latestPromotion = createEntry(2L, user, LocalDate.of(2026, 5, 10));
+        latestPromotion.update(
+                TrainingLogCategory.PROMOTION,
+                "Previous Promotion",
+                "Purple belt promotion",
+                null,
+                null,
+                null,
+                null,
+                null,
+                BeltColor.PURPLE,
+                0
+        );
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(deletedEntry));
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+        given(trainingLogEntryRepository.findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(10L, TrainingLogCategory.PROMOTION))
+                .willReturn(Optional.of(latestPromotion));
+
+        trainingLogService.delete(10L, 1L);
+
+        verify(trainingLogEntryRepository).delete(deletedEntry);
+        assertThat(user.getBeltColor()).isEqualTo(BeltColor.PURPLE);
     }
 
     @Test
@@ -309,7 +439,8 @@ class TrainingLogServiceTest {
     @Test
     @DisplayName("delete removes owned entries")
     void delete_ownedEntry_deletesEntry() {
-        TrainingLogEntry entry = createEntry(1L, createUser(10L), LocalDate.of(2026, 5, 17));
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
         given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
 
         trainingLogService.delete(10L, 1L);
@@ -318,9 +449,22 @@ class TrainingLogServiceTest {
     }
 
     private TrainingLogChecklistItemRequest checklistItem(String text, Boolean checked) {
+        return checklistItem(text, checked, null, null);
+    }
+
+    private TrainingLogChecklistItemRequest checklistItem(String text, Boolean checked, Boolean favorite, String emoji) {
         TrainingLogChecklistItemRequest item = new TrainingLogChecklistItemRequest();
         ReflectionTestUtils.setField(item, "text", text);
         ReflectionTestUtils.setField(item, "checked", checked);
+        ReflectionTestUtils.setField(item, "favorite", favorite);
+        ReflectionTestUtils.setField(item, "emoji", emoji);
+        return item;
+    }
+
+    private TrainingLogExternalLinkRequest externalLink(TrainingLogLinkType type, String url) {
+        TrainingLogExternalLinkRequest item = new TrainingLogExternalLinkRequest();
+        ReflectionTestUtils.setField(item, "type", type);
+        ReflectionTestUtils.setField(item, "url", url);
         return item;
     }
 
