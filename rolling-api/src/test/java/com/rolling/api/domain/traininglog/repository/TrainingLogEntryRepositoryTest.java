@@ -90,6 +90,28 @@ class TrainingLogEntryRepositoryTest {
     }
 
     @Test
+    @DisplayName("monthly range query returns only entries inside the target month in order")
+    void monthlyRangeQuery_returnsOrderedEntriesForTargetMonth() {
+        User owner = userRepository.save(createUser("owner-monthly"));
+        User otherUser = userRepository.save(createUser("other-monthly"));
+
+        TrainingLogEntry first = trainingLogEntryRepository.save(createEntry(owner, LocalDate.of(2026, 5, 1), 60));
+        TrainingLogEntry second = trainingLogEntryRepository.save(createEntry(owner, LocalDate.of(2026, 5, 3), 30));
+        trainingLogEntryRepository.save(createEntry(owner, LocalDate.of(2026, 6, 1), 45));
+        trainingLogEntryRepository.save(createEntry(otherUser, LocalDate.of(2026, 5, 1), 999));
+
+        List<TrainingLogEntry> mayEntries = trainingLogEntryRepository
+                .findAllByUser_IdAndTrainingDateGreaterThanEqualAndTrainingDateLessThanOrderByTrainingDateAscCreatedAtAsc(
+                        owner.getId(),
+                        LocalDate.of(2026, 5, 1),
+                        LocalDate.of(2026, 6, 1)
+                );
+
+        assertThat(mayEntries).extracting(TrainingLogEntry::getId).containsExactly(first.getId(), second.getId());
+        assertThat(mayEntries).allSatisfy(entry -> assertThat(entry.getTrainingDate().getMonthValue()).isEqualTo(5));
+    }
+
+    @Test
     @DisplayName("recent entry query respects page size and descending training date order")
     void findRecentEntries_returnsPagedNewestEntries() {
         User owner = userRepository.save(createUser("owner-recent"));

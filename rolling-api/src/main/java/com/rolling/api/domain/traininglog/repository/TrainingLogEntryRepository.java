@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEntry, Long> {
 
@@ -15,7 +16,13 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
 
     List<TrainingLogEntry> findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(Long userId, Pageable pageable);
 
-    java.util.Optional<TrainingLogEntry> findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
+    List<TrainingLogEntry> findAllByUser_IdAndTrainingDateGreaterThanEqualAndTrainingDateLessThanOrderByTrainingDateAscCreatedAtAsc(
+            Long userId,
+            LocalDate startDate,
+            LocalDate endDateExclusive
+    );
+
+    Optional<TrainingLogEntry> findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
             Long userId,
             com.rolling.api.domain.traininglog.entity.TrainingLogCategory category
     );

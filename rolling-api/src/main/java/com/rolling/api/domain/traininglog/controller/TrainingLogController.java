@@ -2,8 +2,9 @@ package com.rolling.api.domain.traininglog.controller;
 
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
 import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
@@ -42,18 +43,18 @@ public class TrainingLogController {
     private final TrainingLogService trainingLogService;
     private final TrainingLogImageUploadService trainingLogImageUploadService;
 
-    @Operation(summary = "특정 날짜 훈련 기록 목록 조회", description = "현재 로그인한 사용자의 특정 날짜 훈련 기록 목록을 조회합니다.")
+    @Operation(summary = "특정 날짜 훈련 기록 요약 카드 목록 조회", description = "현재 로그인한 사용자의 특정 날짜 훈련 기록 요약 카드 목록을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
-    @GetMapping("/entries/{date}")
-    public ResponseEntity<ApiResponse<List<TrainingLogEntryResponse>>> findEntries(
+    @GetMapping("/entries")
+    public ResponseEntity<ApiResponse<List<TrainingLogEntrySummaryResponse>>> findEntries(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
-        List<TrainingLogEntryResponse> response = trainingLogService.findEntries(requireUserId(principal), date);
+        List<TrainingLogEntrySummaryResponse> response = trainingLogService.findEntrySummaries(requireUserId(principal), date);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -71,6 +72,23 @@ public class TrainingLogController {
             @Valid @RequestBody TrainingLogEntryCreateRequest request
     ) {
         TrainingLogEntryResponse response = trainingLogService.create(requireUserId(principal), date, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "훈련 기록 상세 조회", description = "현재 로그인한 사용자의 특정 훈련 기록 상세를 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 기록이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "기록 없음")
+    })
+    @GetMapping("/entries/{id}")
+    public ResponseEntity<ApiResponse<TrainingLogEntryResponse>> findEntryDetail(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id
+    ) {
+        TrainingLogEntryResponse response = trainingLogService.findEntryDetail(requireUserId(principal), id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -126,18 +144,19 @@ public class TrainingLogController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "훈련 기록 연간 캘린더 요약 조회", description = "현재 로그인한 사용자의 연간 훈련 기록 집계를 조회합니다.")
+    @Operation(summary = "훈련 기록 월간 캘린더 요약 조회", description = "현재 로그인한 사용자의 월간 훈련 기록 요약을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @GetMapping("/calendar")
-    public ResponseEntity<ApiResponse<TrainingLogCalendarSummaryResponse>> calendar(
+    public ResponseEntity<ApiResponse<TrainingLogMonthlyCalendarResponse>> calendar(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam int year
+            @RequestParam int year,
+            @RequestParam int month
     ) {
-        TrainingLogCalendarSummaryResponse response = trainingLogService.getCalendarSummary(requireUserId(principal), year);
+        TrainingLogMonthlyCalendarResponse response = trainingLogService.getMonthlyCalendarSummary(requireUserId(principal), year, month);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
