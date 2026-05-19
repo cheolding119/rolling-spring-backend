@@ -2,15 +2,16 @@
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
-- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10이다.
+- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10과 훈련 강도 확장이다.
 
 ## 1. 도메인 개요
 
-훈련 기록은 로그인한 사용자가 특정 날짜에 카테고리 기반 기록을 남기고, 같은 날짜의 기록 목록을 조회하거나 수정/삭제하고, 해시태그를 자동완성하며, 연간 캘린더 집계와 최근 기록 목록을 조회하고, 이미지 업로드용 presigned URL을 발급받는 도메인이다.
+훈련 기록은 로그인한 사용자가 특정 날짜에 카테고리 기반 기록을 남기고, 같은 날짜의 요약 카드 목록이나 기록 상세를 조회/수정/삭제하고, 해시태그를 자동완성하며, 월간 캘린더 요약과 최근 기록 목록을 조회하고, 이미지 업로드용 presigned URL을 발급받는 도메인이다.
 
 현재 구현 범위:
 
-- 특정 날짜 훈련 기록 목록 조회
+- 특정 날짜 훈련 기록 요약 카드 목록 조회
+- 특정 훈련 기록 상세 조회
 - 특정 날짜 훈련 기록 생성
 - 훈련 기록 수정
 - 훈련 기록 삭제
@@ -18,7 +19,7 @@
 - 체크리스트 JSON 저장/조회
 - 해시태그 정규화, 중복 제거, 자동완성
 - 외부 링크 JSON 저장/조회
-- 연간 캘린더 집계 조회
+- 월간 캘린더 요약 조회
 - 최근 훈련 기록 조회
 - 이미지 업로드용 presigned URL 발급
 - `PROMOTION` 카테고리 전용 검증 및 최신 벨트 동기화
@@ -41,6 +42,7 @@
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -50,7 +52,7 @@
 
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
-- `imageUrl`, `imageUrls`, `color`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
 ### 2.2 `TrainingLogChecklistItem`
@@ -69,31 +71,33 @@
 | `type` | `TrainingLogLinkType` | 링크 타입 |
 | `url` | `String` | 정규화된 링크 URL |
 
-### 2.4 `TrainingLogCalendarSummaryResponse`
+### 2.4 `TrainingLogEntrySummaryResponse`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
-| `year` | `Integer` | 조회 연도 |
-| `totalTrainingMinutes` | `Integer` | 해당 연도의 총 훈련 시간 |
-| `activeDays` | `Integer` | 기록이 존재한 일수 |
-| `monthlySummaries` | `List<TrainingLogCalendarMonthlySummary>` | 월별 요약 목록 |
-| `dailySummaries` | `List<TrainingLogCalendarDailySummary>` | 일별 요약 목록 |
+| `id` | `Long` | 기록 ID |
+| `title` | `String` | 기록 제목 |
+| `content` | `String` | 기록 본문 |
+| `category` | `TrainingLogCategory` | 기록 카테고리 |
+| `color` | `TrainingLogColor?` | 기록 색상 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
 
-### 2.5 `TrainingLogCalendarMonthlySummary`
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `month` | `Integer` | 월(1~12) |
-| `totalMinutes` | `Integer` | 해당 월의 총 훈련 시간 |
-| `activeDays` | `Integer` | 해당 월의 활동 일수 |
-
-### 2.6 `TrainingLogCalendarDailySummary`
+### 2.5 `TrainingLogMonthlyCalendarDailySummary`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `date` | `LocalDate` | 훈련 날짜 |
-| `totalMinutes` | `Integer` | 해당 일자의 총 훈련 시간 |
+| `colors` | `List<TrainingLogColor>` | 해당 일자의 색상 목록 |
+| `categories` | `List<TrainingLogCategory>` | 해당 일자의 카테고리 목록 |
 | `recordCount` | `Integer` | 해당 일자의 기록 수 |
+
+### 2.6 `TrainingLogMonthlyCalendarResponse`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `year` | `Integer` | 조회 연도 |
+| `month` | `Integer` | 조회 월 |
+| `dailySummaries` | `List<TrainingLogMonthlyCalendarDailySummary>` | 일별 요약 목록 |
 
 ### 2.7 `TrainingLogImageUploadUrlResponse`
 
@@ -153,7 +157,7 @@
 
 구현 메모:
 
-- 카테고리 표시용 색상 값은 이 enum raw value를 사용한다.
+- `TrainingLogColor`는 기록의 독립 색상 필드로 사용한다.
 - 실제 색상 코드 매핑은 프론트 UI 레이어에서 관리한다.
 
 ## 4. 공통 정책
@@ -167,15 +171,18 @@
 ### 4.2 날짜와 정렬
 
 - `trainingDate` path variable은 `YYYY-MM-DD` 포맷을 사용한다.
-- 특정 날짜 기록 목록은 `createdAt ASC`로 반환한다.
+- 특정 날짜 요약 카드 목록은 `createdAt ASC`로 반환한다.
+- 특정 기록 상세는 `id`로 조회한다.
 - 최근 기록 목록은 `trainingDate DESC`, 같은 날짜에서는 `createdAt DESC` 기준으로 최대 10건 반환한다.
 - 생성 시 `trainingDate`는 미래 날짜일 수 없다.
 - 캘린더 집계 `year`는 `2000..2100` 범위만 허용한다.
+- 월간 캘린더 집계 `month`는 `1..12` 범위만 허용한다.
 
-### 4.3 제목/내용/훈련 시간
+### 4.3 제목/내용/훈련 강도
 
 - `title`, `content`는 생성 시 필수다.
 - 수정 시 `title`, `content`를 보내면 trim 후 저장한다.
+- `trainingIntensity`는 1~5 범위의 선택 값이다.
 
 ### 4.4 체크리스트
 
@@ -217,14 +224,21 @@
 
 ## 5. Training Log API
 
-### 5.1 특정 날짜 훈련 기록 목록 조회
+### 5.1 특정 날짜 훈련 기록 요약 카드 목록 조회
 
-`GET /api/v1/training-logs/me/entries/{date}`
+`GET /api/v1/training-logs/me/entries?date=2026-05-18`
 
 - 인증: 필요
-- Response data: `List<TrainingLogEntryResponse>`
+- Response data: `List<TrainingLogEntrySummaryResponse>`
 
-### 5.2 특정 날짜 훈련 기록 생성
+### 5.2 특정 훈련 기록 상세 조회
+
+`GET /api/v1/training-logs/me/entries/{id}`
+
+- 인증: 필요
+- Response data: `TrainingLogEntryResponse`
+
+### 5.3 특정 날짜 훈련 기록 생성
 
 `POST /api/v1/training-logs/me/entries/{date}`
 
@@ -244,10 +258,11 @@ Request body:
 | `imageUrls` | `List<String>?` | - | 이미지 목록 |
 | `imageUrl` | `String?` | - | 대표 이미지 URL |
 | `color` | `TrainingLogColor?` | - | 기록 색상 |
+| `trainingIntensity` | `Integer?` | - | 훈련 강도 |
 | `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
 | `stripeCount` | `Integer?` | - | 승급 기록 전용 |
 
-### 5.3 훈련 기록 수정
+### 5.4 훈련 기록 수정
 
 `PATCH /api/v1/training-logs/me/entries/{id}`
 
@@ -267,6 +282,7 @@ Request body:
 | `imageUrls` | `List<String>?` | `[]` 또는 `null`이면 비움 |
 | `imageUrl` | `String?` | `null`이면 비움 |
 | `color` | `TrainingLogColor?` | `null`이면 비움 |
+| `trainingIntensity` | `Integer?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
 
@@ -274,7 +290,7 @@ Request body:
 
 - 현재 구현에서는 `trainingDate` 수정은 지원하지 않는다.
 
-### 5.4 훈련 기록 삭제
+### 5.5 훈련 기록 삭제
 
 `DELETE /api/v1/training-logs/me/entries/{id}`
 
@@ -282,21 +298,21 @@ Request body:
 - Response data: `null`
 - 삭제 방식: hard delete
 
-### 5.5 해시태그 자동완성
+### 5.6 해시태그 자동완성
 
 `GET /api/v1/training-logs/me/tags?q=triangle`
 
 - 인증: 필요
 - Response data: `List<String>`
 
-### 5.6 연간 캘린더 집계 조회
+### 5.7 월간 캘린더 요약 조회
 
-`GET /api/v1/training-logs/me/calendar?year=2026`
+`GET /api/v1/training-logs/me/calendar?year=2026&month=5`
 
 - 인증: 필요
-- Response data: `TrainingLogCalendarSummaryResponse`
+- Response data: `TrainingLogMonthlyCalendarResponse`
 
-### 5.7 최근 훈련 기록 조회
+### 5.8 최근 훈련 기록 조회
 
 `GET /api/v1/training-logs/me/recent`
 
@@ -304,7 +320,7 @@ Request body:
 - Response data: `List<TrainingLogEntryResponse>`
 - 최대 10건 반환
 
-### 5.8 이미지 업로드 URL 발급
+### 5.9 이미지 업로드 URL 발급
 
 `POST /api/v1/training-logs/me/upload-url`
 
@@ -328,14 +344,24 @@ Request body:
 - `color`는 기록 색상이다.
 - `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`가 함께 반환된다.
 
-### 6.2 `TrainingLogExternalLinkRequest`
+### 6.2 `TrainingLogEntrySummaryResponse`
+
+- 날짜 선택 후 아래 카드 목록에 사용하는 요약 응답이다.
+- `trainingDate`는 별도 컨텍스트에서 이미 선택되어 있으므로 포함하지 않는다.
+
+### 6.3 `TrainingLogMonthlyCalendarResponse`
+
+- `dailySummaries`는 월간 캘린더의 날짜별 표시 데이터다.
+- 각 항목의 `colors`는 해당 날짜의 기록 색상 목록이다.
+
+### 6.4 `TrainingLogExternalLinkRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `type` | `TrainingLogLinkType` | 링크 타입 |
 | `url` | `String` | 원본 링크 URL |
 
-### 6.3 `TrainingLogChecklistItemRequest`
+### 6.5 `TrainingLogChecklistItemRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |

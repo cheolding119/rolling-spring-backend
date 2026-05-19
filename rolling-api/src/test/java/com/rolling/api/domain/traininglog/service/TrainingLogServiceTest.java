@@ -1,18 +1,18 @@
 package com.rolling.api.domain.traininglog.service;
 
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
-import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
-import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -84,6 +84,7 @@ class TrainingLogServiceTest {
                 "https://cdn.test.com/training-log-2.jpg"
         ));
         ReflectionTestUtils.setField(request, "color", TrainingLogColor.BLUE);
+        ReflectionTestUtils.setField(request, "trainingIntensity", 4);
         ReflectionTestUtils.setField(request, "checklist", List.of(
                 checklistItem("  Triangle Review  ", true, true, "🔥"),
                 checklistItem("Live Roll Application", null)
@@ -117,6 +118,7 @@ class TrainingLogServiceTest {
                 "[{\"type\":\"INSTAGRAM\",\"url\":\"https://www.instagram.com/p/abc123/\"},{\"type\":\"YOUTUBE\",\"url\":\"https://youtu.be/xyz789\"}]"
         );
         assertThat(saved.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(saved.getTrainingIntensity()).isEqualTo(4);
         assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
         assertThat(saved.getImageUrlsJson()).isEqualTo(
                 "[\"https://cdn.test.com/training-log-1.jpg\",\"https://cdn.test.com/training-log-2.jpg\"]"
@@ -124,6 +126,7 @@ class TrainingLogServiceTest {
 
         assertThat(response.getId()).isEqualTo(100L);
         assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(response.getTrainingIntensity()).isEqualTo(4);
         assertThat(response.getChecklist()).hasSize(2);
         assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
         assertThat(response.getHashtags()).containsExactly("triangle", "arm-triangle");
@@ -146,6 +149,7 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "content", "Blue belt promotion");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
         ReflectionTestUtils.setField(request, "stripeCount", 1);
+        ReflectionTestUtils.setField(request, "trainingIntensity", 5);
 
         TrainingLogEntry[] savedHolder = new TrainingLogEntry[1];
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
@@ -206,12 +210,45 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "content", "Normal training note");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
         ReflectionTestUtils.setField(request, "color", TrainingLogColor.RED);
+        ReflectionTestUtils.setField(request, "trainingIntensity", 3);
 
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("beltColor는 PROMOTION 카테고리에서만 사용할 수 있습니다");
+    }
+
+    @Test
+    @DisplayName("create rejects training intensity outside the 1 to 5 range")
+    void create_invalidTrainingIntensity_throwsValidationError() {
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+        ReflectionTestUtils.setField(request, "title", "Technique");
+        ReflectionTestUtils.setField(request, "content", "Normal training note");
+        ReflectionTestUtils.setField(request, "trainingIntensity", 6);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("훈련 강도는 1 이상 5 이하이어야 합니다");
+    }
+
+    @Test
+    @DisplayName("update persists training intensity when the field is present")
+    void update_setsTrainingIntensity() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
+        request.setTrainingIntensity(5);
+
+        TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
+
+        assertThat(entry.getTrainingIntensity()).isEqualTo(5);
     }
 
     @Test
@@ -236,6 +273,7 @@ class TrainingLogServiceTest {
                 "Original Content",
                 "[{\"text\":\"Existing Checklist\",\"checked\":true}]",
                 "[\"triangle\"]",
+                null,
                 null,
                 "https://cdn.test.com/original.jpg",
                 "[\"https://cdn.test.com/original.jpg\"]",
@@ -275,6 +313,7 @@ class TrainingLogServiceTest {
         assertThat(response.getImageUrl()).isNull();
         assertThat(response.getImageUrls()).isEmpty();
         assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(response.getTrainingIntensity()).isNull();
     }
 
     @Test
@@ -368,39 +407,80 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("calendar summary aggregates daily monthly totals and active days")
-    void getCalendarSummary_aggregatesDailyAndMonthlyValues() {
+    @DisplayName("monthly calendar groups day colors and totals")
+    void getMonthlyCalendarSummary_groupsDayColorsAndTotals() {
         given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
-        given(trainingLogEntryRepository.findDailySummariesByUserIdAndTrainingDateBetween(
+        given(trainingLogEntryRepository.findAllByUser_IdAndTrainingDateGreaterThanEqualAndTrainingDateLessThanOrderByTrainingDateAscCreatedAtAsc(
                 10L,
-                LocalDate.of(2026, 1, 1),
-                LocalDate.of(2027, 1, 1)
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 6, 1)
         )).willReturn(List.of(
-                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 5, 1), 150L, 2L),
-                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 5, 3), 0L, 1L),
-                new TrainingLogCalendarDailyProjection(LocalDate.of(2026, 6, 1), 30L, 1L)
-        ));
-        given(trainingLogEntryRepository.findMonthlySummariesByUserIdAndTrainingDateBetween(
-                10L,
-                LocalDate.of(2026, 1, 1),
-                LocalDate.of(2027, 1, 1)
-        )).willReturn(List.of(
-                new TrainingLogCalendarMonthlyProjection(5, 150L, 2L),
-                new TrainingLogCalendarMonthlyProjection(6, 30L, 1L)
+                createEntryWithColor(1L, createUser(10L), LocalDate.of(2026, 5, 1), TrainingLogColor.BLUE, 60),
+                createEntryWithColor(2L, createUser(10L), LocalDate.of(2026, 5, 1), TrainingLogColor.RED, 30, TrainingLogCategory.PROMOTION),
+                createEntryWithColor(3L, createUser(10L), LocalDate.of(2026, 5, 3), TrainingLogColor.GREEN, 0, TrainingLogCategory.TECHNIQUE)
         ));
 
-        TrainingLogCalendarSummaryResponse response = trainingLogService.getCalendarSummary(10L, 2026);
+        TrainingLogMonthlyCalendarResponse response = trainingLogService.getMonthlyCalendarSummary(10L, 2026, 5);
 
         assertThat(response.getYear()).isEqualTo(2026);
-        assertThat(response.getTotalTrainingMinutes()).isEqualTo(180);
-        assertThat(response.getActiveDays()).isEqualTo(3);
-        assertThat(response.getMonthlySummaries()).hasSize(2);
-        assertThat(response.getMonthlySummaries().get(0).month()).isEqualTo(5);
-        assertThat(response.getMonthlySummaries().get(0).totalMinutes()).isEqualTo(150);
-        assertThat(response.getMonthlySummaries().get(0).activeDays()).isEqualTo(2);
-        assertThat(response.getDailySummaries()).hasSize(3);
-        assertThat(response.getDailySummaries().get(1).totalMinutes()).isZero();
+        assertThat(response.getMonth()).isEqualTo(5);
+        assertThat(response.getDailySummaries()).hasSize(2);
+        assertThat(response.getDailySummaries().get(0).date()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(response.getDailySummaries().get(0).colors()).containsExactly(TrainingLogColor.BLUE, TrainingLogColor.RED);
+        assertThat(response.getDailySummaries().get(0).categories()).containsExactly(TrainingLogCategory.TECHNIQUE, TrainingLogCategory.PROMOTION);
+        assertThat(response.getDailySummaries().get(0).recordCount()).isEqualTo(2);
+        assertThat(response.getDailySummaries().get(1).date()).isEqualTo(LocalDate.of(2026, 5, 3));
+        assertThat(response.getDailySummaries().get(1).colors()).containsExactly(TrainingLogColor.GREEN);
+        assertThat(response.getDailySummaries().get(1).categories()).containsExactly(TrainingLogCategory.TECHNIQUE);
         assertThat(response.getDailySummaries().get(1).recordCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("date summary returns summary cards for the selected day")
+    void findEntrySummaries_returnsSummaryCardsForDate() {
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(10L, LocalDate.of(2026, 5, 17)))
+                .willReturn(List.of(
+                        createEntryWithColor(2L, createUser(10L), LocalDate.of(2026, 5, 17), TrainingLogColor.RED, 30),
+                        createEntryWithColor(1L, createUser(10L), LocalDate.of(2026, 5, 17), TrainingLogColor.BLUE, 60)
+                ));
+
+        List<TrainingLogEntrySummaryResponse> response = trainingLogService.findEntrySummaries(10L, LocalDate.of(2026, 5, 17));
+
+        assertThat(response).extracting(TrainingLogEntrySummaryResponse::getId).containsExactly(2L, 1L);
+        assertThat(response.get(0).getCategory()).isEqualTo(TrainingLogCategory.TECHNIQUE);
+        assertThat(response.get(0).getColor()).isEqualTo(TrainingLogColor.RED);
+        assertThat(response.get(1).getCategory()).isEqualTo(TrainingLogCategory.TECHNIQUE);
+        assertThat(response.get(1).getColor()).isEqualTo(TrainingLogColor.BLUE);
+    }
+
+    @Test
+    @DisplayName("detail lookup returns the full response")
+    void findEntryDetail_returnsFullResponse() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        entry.update(
+                TrainingLogCategory.TECHNIQUE,
+                "Original Title",
+                "Original Content",
+                "[{\"text\":\"Existing Checklist\",\"checked\":true,\"favorite\":true,\"emoji\":\"🔥\"}]",
+                "[\"triangle\"]",
+                "https://cdn.test.com/original.jpg",
+                "[\"https://cdn.test.com/original.jpg\"]",
+                null,
+                TrainingLogColor.BLUE,
+                null,
+                null
+        );
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
+
+        assertThat(response.getId()).isEqualTo(1L);
+        assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(response.getChecklist()).hasSize(1);
+        assertThat(response.getChecklist().get(0).favorite()).isTrue();
+        assertThat(response.getImageUrls()).containsExactly("https://cdn.test.com/original.jpg");
     }
 
     @Test
@@ -487,6 +567,26 @@ class TrainingLogServiceTest {
                 .category(TrainingLogCategory.TECHNIQUE)
                 .title("Existing Title")
                 .content("Existing Content")
+                .build();
+        ReflectionTestUtils.setField(entry, "id", id);
+        ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 9, 0));
+        ReflectionTestUtils.setField(entry, "updatedAt", LocalDateTime.of(2026, 5, 17, 9, 0));
+        return entry;
+    }
+
+    private TrainingLogEntry createEntryWithColor(Long id, User user, LocalDate trainingDate, TrainingLogColor color, Integer trainingMinutes) {
+        return createEntryWithColor(id, user, trainingDate, color, trainingMinutes, TrainingLogCategory.TECHNIQUE);
+    }
+
+    private TrainingLogEntry createEntryWithColor(Long id, User user, LocalDate trainingDate, TrainingLogColor color, Integer trainingMinutes, TrainingLogCategory category) {
+        TrainingLogEntry entry = TrainingLogEntry.builder()
+                .user(user)
+                .trainingDate(trainingDate)
+                .category(category)
+                .title("Training " + trainingDate)
+                .content("Training note " + trainingDate)
+                .color(color)
+                .trainingMinutes(trainingMinutes)
                 .build();
         ReflectionTestUtils.setField(entry, "id", id);
         ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 9, 0));

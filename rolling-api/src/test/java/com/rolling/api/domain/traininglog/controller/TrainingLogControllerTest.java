@@ -1,12 +1,12 @@
 package com.rolling.api.domain.traininglog.controller;
 
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarDailySummary;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarMonthlySummary;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
@@ -99,6 +99,7 @@ class TrainingLogControllerTest {
                                   "category": "TECHNIQUE",
                                   "title": "Arm Triangle Details",
                                   "content": "Finished details for knee angle and arm position.",
+                                  "trainingIntensity": 4,
                                   "checklist": [
                                     {
                                       "text": "Triangle Review",
@@ -126,6 +127,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data.color").value("BLUE"))
+                .andExpect(jsonPath("$.data.trainingIntensity").value(4))
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[1]").value("https://cdn.test.com/training-log-2.jpg"))
@@ -139,10 +141,48 @@ class TrainingLogControllerTest {
     @Test
     @DisplayName("find entries requires authentication")
     void findEntries_withoutAccessToken_returnsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/training-logs/me/entries/2026-05-17"))
+        mockMvc.perform(get("/api/v1/training-logs/me/entries")
+                        .param("date", "2026-05-17"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("find entries returns summary cards for authenticated users")
+    void findEntries_withUserToken_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogService.findEntrySummaries(2L, LocalDate.of(2026, 5, 17))).willReturn(List.of(
+                summaryResponse(2L),
+                summaryResponse(1L)
+        ));
+
+        mockMvc.perform(get("/api/v1/training-logs/me/entries")
+                        .header("Authorization", "Bearer user-token")
+                        .param("date", "2026-05-17"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(2))
+                .andExpect(jsonPath("$.data[0].title").value("Arm Triangle Details"))
+                .andExpect(jsonPath("$.data[0].category").value("TECHNIQUE"))
+                .andExpect(jsonPath("$.data[0].color").value("BLUE"))
+                .andExpect(jsonPath("$.data[1].id").value(1));
+    }
+
+    @Test
+    @DisplayName("find entry detail returns full response for authenticated users")
+    void findEntryDetail_withUserToken_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogService.findEntryDetail(2L, 1L)).willReturn(response(1L));
+
+        mockMvc.perform(get("/api/v1/training-logs/me/entries/1")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.trainingDate").value("2026-05-17"))
+                .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
     }
 
     @Test
@@ -161,28 +201,36 @@ class TrainingLogControllerTest {
     }
 
     @Test
-    @DisplayName("calendar summary returns aggregated data for authenticated users")
+    @DisplayName("calendar summary returns month data for authenticated users")
     void calendar_withUserToken_returnsOk() throws Exception {
         authenticateUser();
-        given(trainingLogService.getCalendarSummary(2L, 2026)).willReturn(
-                TrainingLogCalendarSummaryResponse.builder()
-                        .year(2026)
-                        .totalTrainingMinutes(180)
-                        .activeDays(3)
-                        .monthlySummaries(List.of(new TrainingLogCalendarMonthlySummary(5, 150, 2)))
-                        .dailySummaries(List.of(new TrainingLogCalendarDailySummary(LocalDate.of(2026, 5, 1), 150, 2)))
-                        .build()
+        given(trainingLogService.getMonthlyCalendarSummary(2L, 2026, 5)).willReturn(
+                                TrainingLogMonthlyCalendarResponse.builder()
+                                        .year(2026)
+                                        .month(5)
+                                        .dailySummaries(List.of(
+                                                new TrainingLogMonthlyCalendarDailySummary(
+                                                        LocalDate.of(2026, 5, 1),
+                                                        List.of(TrainingLogColor.BLUE, TrainingLogColor.RED),
+                                                        List.of(TrainingLogCategory.TECHNIQUE, TrainingLogCategory.PROMOTION),
+                                                        2
+                                                )
+                                        ))
+                                        .build()
         );
 
         mockMvc.perform(get("/api/v1/training-logs/me/calendar")
                         .header("Authorization", "Bearer user-token")
-                        .param("year", "2026"))
+                        .param("year", "2026")
+                        .param("month", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.year").value(2026))
-                .andExpect(jsonPath("$.data.totalTrainingMinutes").value(180))
-                .andExpect(jsonPath("$.data.activeDays").value(3))
-                .andExpect(jsonPath("$.data.monthlySummaries[0].month").value(5));
+                .andExpect(jsonPath("$.data.month").value(5))
+                .andExpect(jsonPath("$.data.dailySummaries[0].date").value("2026-05-01"))
+                .andExpect(jsonPath("$.data.dailySummaries[0].colors[0]").value("BLUE"))
+                .andExpect(jsonPath("$.data.dailySummaries[0].categories[0]").value("TECHNIQUE"))
+                .andExpect(jsonPath("$.data.dailySummaries[0].recordCount").value(2));
     }
 
     @Test
@@ -241,6 +289,7 @@ class TrainingLogControllerTest {
                 .trainingDate(LocalDate.of(2026, 5, 17))
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
+                .trainingIntensity(4)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
                 .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true, true, "🔥")))
@@ -253,6 +302,17 @@ class TrainingLogControllerTest {
                 .imageUrl("https://cdn.test.com/training-log-1.jpg")
                 .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .updatedAt(LocalDateTime.of(2026, 5, 17, 12, 0))
+                .build();
+    }
+
+    private TrainingLogEntrySummaryResponse summaryResponse(Long id) {
+        return TrainingLogEntrySummaryResponse.builder()
+                .id(id)
+                .title("Arm Triangle Details")
+                .content("Finished details for knee angle and arm position.")
+                .category(TrainingLogCategory.TECHNIQUE)
+                .color(TrainingLogColor.BLUE)
+                .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .build();
     }
 

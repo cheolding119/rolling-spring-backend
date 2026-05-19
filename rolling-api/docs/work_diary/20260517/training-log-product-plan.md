@@ -42,7 +42,7 @@
 - MVP는 “캘린더에서 날짜를 고르고 바로 기록을 남기는 흐름”에 집중한다.
 - 핵심 구조는 `카테고리 -> 항목 -> 내용 -> 체크리스트 -> 해시태그 -> 외부 링크`다.
 - 이미지는 복수 입력을 허용하고, 외부 링크는 선택 입력으로 둔다.
-- 주간/월간/연간 집계는 기록 복기를 돕는 보조 기능으로 제공한다.
+- 월간 캘린더, 날짜별 카드 목록, 상세 조회는 기록 복기를 돕는 보조 기능으로 제공한다.
 - 공유, 공개 피드, 좋아요, 관리자 운영 화면은 이번 범위에서 제외한다.
 
 ## 4. 핵심 사용 흐름
@@ -67,9 +67,9 @@
 
 ### 4.3 기간별 확인
 
-1. 사용자는 “이번 달 / 이번 해 훈련량” 화면에 진입한다.
-2. 백엔드는 날짜 기준 합계, 월별 합계, 일별 합계를 반환한다.
-3. 프론트는 캘린더, 통계 카드, 최근 기록 목록을 함께 보여준다.
+1. 사용자는 “이번 달 훈련량” 화면에 진입한다.
+2. 백엔드는 월간 캘린더 요약, 날짜별 카드 목록, 상세 조회 데이터를 반환한다.
+3. 프론트는 월간 캘린더, 날짜 선택 후 카드 목록, 최근 기록 목록을 함께 보여준다.
 
 ## 5. 이번 범위
 
@@ -81,14 +81,15 @@
 | 진입 | 작성 버튼 기반 생성 진입 | 기록 작성 화면 진입 |
 | 진입 | 카테고리 선택 | 7개 카테고리 사용 |
 | 기록 | 일일 훈련 기록 생성/수정 | 날짜 기준 1건 또는 다건 기록 |
-| 기록 | 일일 훈련 기록 조회 | 날짜 기준 목록 또는 상세 조회 |
+| 기록 | 일일 훈련 기록 조회 | 날짜 기준 요약 카드 목록 또는 상세 조회 |
 | 기록 | 일일 훈련 기록 삭제 | 본인 기록만 삭제 |
 | 기록 | 제목/내용 입력 | 공통 필수 입력 |
+| 기록 | 훈련 강도 입력 | 1~5 선택 값 |
 | 기록 | 체크리스트 입력 | 공통 입력 |
 | 기록 | 해시태그 입력 | 공통 입력 |
 | 기록 | 외부 링크 입력 | `INSTAGRAM`, `YOUTUBE` |
 | 기록 | 이미지 업로드 URL 발급 및 조회 | 이미지 복수 기준 |
-| 집계 | 월간/연간 훈련 집계 조회 | 날짜별 총합, 월별 총합, 카테고리별 총합 |
+| 집계 | 월간 캘린더 조회 | 날짜별 색상, 기록 수 |
 | 탐색 | 최근 기록 조회 | 최근 작성한 기록 목록 |
 | 벨트 | 현재 벨트 동기화 | 최신 `PROMOTION` 기록 기준 `User.beltColor` 반영 |
 
@@ -109,12 +110,12 @@
 - 공개 피드, 공유, 좋아요
 - 관리자 운영 도구
 
-### 5.4 카테고리 색상 팔레트
+### 5.4 기록 색상 팔레트
 
-- 카테고리 표시용 색상은 `TrainingLogColor` enum으로 분리한다.
+- 훈련 기록 표시용 색상은 `TrainingLogColor` enum으로 분리한다.
 - enum raw value는 `RED`, `ORANGE`, `YELLOW`, `GREEN`, `BLUE`, `NAVY`, `PURPLE`, `PINK`, `TEAL`, `BROWN`, `GRAY`, `BLACK`을 사용한다.
 - 실제 hex 또는 디자인 토큰은 프론트 UI 레이어에서 결정한다.
-- 기록 응답의 `color`는 `TrainingLogCategory`에서 파생한 표시용 색상이다.
+- 기록 응답의 `color`는 `TrainingLogColor` 독립 필드다.
 
 ## 6. 도메인 모델
 
@@ -134,6 +135,7 @@
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -195,35 +197,23 @@ public enum TrainingLogLinkType {
 
 | 목적 | Method | Path |
 | --- | --- | --- |
-| 특정 날짜 기록 목록 조회 | `GET` | `/api/v1/training-logs/me/entries/{date}` |
+| 특정 날짜 요약 카드 목록 조회 | `GET` | `/api/v1/training-logs/me/entries?date=2026-05-18` |
+| 특정 기록 상세 조회 | `GET` | `/api/v1/training-logs/me/entries/{id}` |
 | 특정 날짜 기록 생성 | `POST` | `/api/v1/training-logs/me/entries/{date}` |
 | 특정 기록 수정 | `PATCH` | `/api/v1/training-logs/me/entries/{id}` |
 | 특정 기록 삭제 | `DELETE` | `/api/v1/training-logs/me/entries/{id}` |
-| 월간/연간 캘린더 집계 조회 | `GET` | `/api/v1/training-logs/me/calendar?year=2026` |
+| 월간 캘린더 요약 조회 | `GET` | `/api/v1/training-logs/me/calendar?year=2026&month=5` |
 | 최근 기록 목록 조회 | `GET` | `/api/v1/training-logs/me/recent` |
 | 태그 자동완성 조회 | `GET` | `/api/v1/training-logs/me/tags?q=triangle` |
 | 이미지 업로드 URL 발급 | `POST` | `/api/v1/training-logs/me/upload-url` |
 
 ### 7.3 응답 방향
 
-- 캘린더 집계 응답에는 연간 총합, 활성 일수, 월별 집계, 일별 집계를 포함한다.
-- 기록 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 승급 정보가 포함된다.
+- 월간 캘린더 응답에는 날짜별 `colors[]`, `categories[]`, `recordCount`를 포함한다.
+- 날짜 선택 카드 응답에는 `id`, `title`, `content`, `category`, `color`, `createdAt`를 포함한다.
+- 상세 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 훈련 강도, 승급 정보, `trainingDate`가 포함된다.
 - 체크리스트 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - 엔티티는 직접 노출하지 않고 별도 DTO로 반환한다.
-
-응답 예시 필드:
-
-- `year`
-- `totalTrainingMinutes`
-- `activeDays`
-- `monthlySummaries[]`
-  - `month`
-  - `totalMinutes`
-  - `activeDays`
-- `dailySummaries[]`
-  - `date`
-  - `totalMinutes`
-  - `recordCount`
 
 ## 8. 정책 및 검증
 
@@ -312,7 +302,7 @@ public enum TrainingLogLinkType {
 3. 특정 날짜 기록 생성/조회/수정/삭제 API 구현
 4. 체크리스트 JSON 직렬화 및 정규화 구현
 5. 해시태그 정규화 및 자동완성 API 구현
-6. 월간/연간 집계 API 구현
+6. 월간 캘린더 및 조회 API 구현
 7. 최근 기록 조회 API 구현
 8. 이미지 업로드 URL 발급 구현
 9. 외부 링크 검증 및 저장 구조 구현
@@ -364,13 +354,15 @@ public enum TrainingLogLinkType {
 - [x] 해시태그 최대 개수 제한 적용
 - [x] 해시태그 자동완성 API 구현
 
-### Phase 4. 월간/연간 집계
+### Phase 4. 월간 캘린더 / 날짜 요약 / 상세 조회
 
 - [x] 월간 기준 날짜 집계 조회 쿼리 구현
-- [x] 월별 집계 쿼리 구현
-- [x] 훈련 시간 계산 구현
-- [x] activeDays 계산 구현
-- [x] 월간/연간 캘린더 집계 API 구현
+- [x] 날짜별 색상 목록 계산 구현
+- [x] 날짜별 기록 수 계산 구현
+- [x] 날짜별 총 훈련 시간 계산 구현
+- [x] 월간 캘린더 집계 API 구현
+- [x] 선택 날짜 요약 카드 조회 API 구현
+- [x] 기록 상세 조회 API 구현
 - [x] 최근 기록 목록 조회 API 구현
 
 ### Phase 5. 카테고리별 검증
@@ -417,12 +409,19 @@ public enum TrainingLogLinkType {
 
 - [x] 일일 기록 CRUD 통합 테스트
 - [x] 해시태그 정규화 통합 테스트
-- [x] 월간/연간 집계 통합 테스트
+- [x] 월간 캘린더 및 날짜 조회 통합 테스트
 - [x] 최근 기록 조회 통합 테스트
 - [x] 외부 링크 검증 통합 테스트
 - [x] `PROMOTION` 벨트 갱신 통합 테스트
 - [x] 컨트롤러 계층 API 테스트
 - [x] Flutter 연동용 필드 최종 점검
+
+### Phase 11. 훈련 강도
+
+- [x] 훈련 강도 선택 필드 추가
+- [x] 훈련 강도 1~5 범위 검증 적용
+- [x] 생성/수정/상세/요약 응답에 훈련 강도 반영
+- [x] 훈련 강도 문서 반영
 
 ## 12. 사용자 시나리오 초안
 
