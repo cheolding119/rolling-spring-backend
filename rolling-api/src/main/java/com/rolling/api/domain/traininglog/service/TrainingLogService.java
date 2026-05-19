@@ -7,18 +7,16 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarDailySummary;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarMonthlySummary;
-import com.rolling.api.domain.traininglog.dto.TrainingLogCalendarSummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
-import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarDailyProjection;
-import com.rolling.api.domain.traininglog.repository.TrainingLogCalendarMonthlyProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.User;
@@ -34,12 +32,16 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -67,43 +69,43 @@ public class TrainingLogService {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    public List<TrainingLogEntryResponse> findEntries(Long userId, LocalDate trainingDate) {
+    public List<TrainingLogEntrySummaryResponse> findEntrySummaries(Long userId, LocalDate trainingDate) {
         requireActiveUserExists(userId);
         return trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(userId, trainingDate).stream()
-                .map(this::toResponse)
+                .map(this::toSummaryResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public TrainingLogCalendarSummaryResponse getCalendarSummary(Long userId, int year) {
+    public TrainingLogMonthlyCalendarResponse getMonthlyCalendarSummary(Long userId, int year, int month) {
         requireActiveUserExists(userId);
         validateYear(year);
+        validateMonth(month);
 
-        LocalDate startDate = LocalDate.of(year, 1, 1);
-        LocalDate endDateExclusive = startDate.plusYears(1);
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDateExclusive = startDate.plusMonths(1);
 
-        List<TrainingLogCalendarDailySummary> dailySummaries = trainingLogEntryRepository
-                .findDailySummariesByUserIdAndTrainingDateBetween(userId, startDate, endDateExclusive)
-                .stream()
-                .map(this::toDailySummary)
-                .toList();
-        List<TrainingLogCalendarMonthlySummary> monthlySummaries = trainingLogEntryRepository
-                .findMonthlySummariesByUserIdAndTrainingDateBetween(userId, startDate, endDateExclusive)
-                .stream()
-                .map(this::toMonthlySummary)
-                .toList();
+        List<TrainingLogMonthlyCalendarDailySummary> dailySummaries = buildMonthlyDailySummaries(
+                trainingLogEntryRepository.findAllByUser_IdAndTrainingDateGreaterThanEqualAndTrainingDateLessThanOrderByTrainingDateAscCreatedAtAsc(
+                        userId,
+                        startDate,
+                        endDateExclusive
+                )
+        );
 
-        int totalTrainingMinutes = dailySummaries.stream()
-                .map(TrainingLogCalendarDailySummary::totalMinutes)
-                .reduce(0, Integer::sum);
-
-        return TrainingLogCalendarSummaryResponse.builder()
+        return TrainingLogMonthlyCalendarResponse.builder()
                 .year(year)
-                .totalTrainingMinutes(totalTrainingMinutes)
-                .activeDays(dailySummaries.size())
-                .monthlySummaries(monthlySummaries)
+                .month(month)
                 .dailySummaries(dailySummaries)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingLogEntryResponse findEntryDetail(Long userId, Long entryId) {
+        TrainingLogEntry entry = getEntry(entryId);
+        validateOwner(entry, userId);
+        return toResponse(entry);
     }
 
     @Transactional(readOnly = true)
@@ -253,20 +255,52 @@ public class TrainingLogService {
                 .build();
     }
 
-    private TrainingLogCalendarDailySummary toDailySummary(TrainingLogCalendarDailyProjection projection) {
-        return new TrainingLogCalendarDailySummary(
-                projection.date(),
-                safeToInt(projection.totalMinutes()),
-                safeToInt(projection.recordCount())
-        );
+    private TrainingLogEntrySummaryResponse toSummaryResponse(TrainingLogEntry entry) {
+        return TrainingLogEntrySummaryResponse.builder()
+                .id(entry.getId())
+                .title(entry.getTitle())
+                .content(entry.getContent())
+                .color(entry.getColor())
+                .createdAt(entry.getCreatedAt())
+                .build();
     }
 
-    private TrainingLogCalendarMonthlySummary toMonthlySummary(TrainingLogCalendarMonthlyProjection projection) {
-        return new TrainingLogCalendarMonthlySummary(
-                projection.month(),
-                safeToInt(projection.totalMinutes()),
-                safeToInt(projection.activeDays())
-        );
+    private List<TrainingLogMonthlyCalendarDailySummary> buildMonthlyDailySummaries(List<TrainingLogEntry> entries) {
+        if (entries.isEmpty()) {
+            return List.of();
+        }
+
+        Map<LocalDate, List<TrainingLogEntry>> groupedEntries = entries.stream()
+                .collect(Collectors.groupingBy(
+                        TrainingLogEntry::getTrainingDate,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        return groupedEntries.entrySet().stream()
+                .map(entry -> {
+                    List<TrainingLogEntry> dayEntries = entry.getValue();
+                    List<TrainingLogColor> colors = dayEntries.stream()
+                            .map(TrainingLogEntry::getColor)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.collectingAndThen(
+                                    Collectors.toCollection(LinkedHashSet::new),
+                                    List::copyOf
+                            ));
+                    int totalMinutes = dayEntries.stream()
+                            .map(TrainingLogEntry::getTrainingMinutes)
+                            .filter(Objects::nonNull)
+                            .mapToInt(Integer::intValue)
+                            .sum();
+
+                    return new TrainingLogMonthlyCalendarDailySummary(
+                            entry.getKey(),
+                            colors,
+                            dayEntries.size(),
+                            totalMinutes
+                    );
+                })
+                .toList();
     }
 
     private TrainingLogEntry getEntry(Long entryId) {
@@ -300,6 +334,12 @@ public class TrainingLogService {
     private void validateYear(int year) {
         if (year < 2000 || year > 2100) {
             throw BusinessException.badRequest("year는 2000 이상 2100 이하이어야 합니다");
+        }
+    }
+
+    private void validateMonth(int month) {
+        if (month < 1 || month > 12) {
+            throw BusinessException.badRequest("month는 1 이상 12 이하이어야 합니다");
         }
     }
 

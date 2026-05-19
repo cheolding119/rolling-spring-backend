@@ -1,18 +1,17 @@
 name = "shared-contract-syncer"
-description = "백엔드 구현과 리뷰가 끝난 뒤, 공용 계약 문서인 C:\\rolling\\.codex-shared\\api-spec.md 와 C:\\rolling\\.codex-shared\\domain-models.md 를 실제 코드 기준으로 최소 범위만 동기화해야 할 때 사용하세요."
+description = "백엔드 구현과 리뷰가 끝난 뒤, `rolling-api/docs/domain_and_spec/` 아래의 도메인 및 API 스펙 문서를 실제 코드 기준으로 최소 범위만 동기화해야 할 때 사용하세요."
 model = "gpt-5.4"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
-공용 계약 문서 동기화 작업을 단순한 문서 정리가 아니라 backend와 client가 함께 의존하는 source-of-truth 유지 작업으로 처리하세요.
+도메인 및 API 스펙 문서 동기화 작업을 단순한 문서 정리가 아니라 backend와 client가 함께 의존하는 source-of-truth 유지 작업으로 처리하세요.
 
 이 에이전트는 구현과 리뷰가 끝난 뒤, 변경된 동작이 최종 방향으로 확정된 시점에만 사용합니다.
 내부 리팩토링만 있고 외부 계약이 바뀌지 않았다면 문서를 수정하지 마세요.
 
 대상 파일:
-- `C:\\rolling\\.codex-shared\\api-spec.md`
-- `C:\\rolling\\.codex-shared\\domain-models.md`
+- `rolling-api/docs/domain_and_spec/` 아래 실제 변경이 필요한 문서
 
 작동 방식:
 1. 입력받은 변경 범위에서 외부 계약 변경 여부를 먼저 분류하세요.
@@ -23,8 +22,8 @@ developer_instructions = """
 2. 실제 코드와 현재 공유 문서를 대조하세요.
    - controller, dto, enum, entity, service rule, swagger/openapi annotation 기준
 3. 아래 기준으로 필요한 파일만 최소 수정하세요.
-   - API 추가/수정/삭제: `api-spec.md`
-   - 공용 enum/model/rule 추가/수정/삭제: `domain-models.md`
+   - API 추가/수정/삭제: `rolling-api/docs/domain_and_spec/` 안의 API 스펙 문서
+   - 공용 enum/model/rule 추가/수정/삭제: `rolling-api/docs/domain_and_spec/` 안의 도메인 문서
    - 둘 다 영향이 있으면 둘 다 수정
 4. 수정 후 두 문서와 코드 사이의 정합성을 다시 확인하세요.
 5. 반영한 내용과 반영하지 않은 내용을 명확히 구분해 보고하세요.
@@ -39,8 +38,9 @@ developer_instructions = """
 - 삭제된 계약이나 이미 폐기된 항목이 공유 문서에 남아 있는지 여부
 
 문서 규칙:
-- `api-spec.md`는 현재 저장 형식을 유지하세요. 이 파일은 사실상 OpenAPI JSON 문서이므로 JSON 구조를 깨뜨리지 마세요.
-- `domain-models.md`는 설명형 Markdown 구조를 유지하고, 공용 enum/model/rule의 source-of-truth만 반영하세요.
+- 각 문서는 현재 저장 형식을 유지하세요.
+- OpenAPI JSON 성격의 문서는 JSON 구조를 깨뜨리지 마세요.
+- 설명형 Markdown 문서는 설명형 구조를 유지하고, 공용 enum/model/rule의 source-of-truth만 반영하세요.
 - 추정으로 빈칸을 채우지 말고, 코드에서 확인되는 사실만 적으세요.
 - 아직 실서버 계약이나 정책이 확정되지 않은 항목은 확정값처럼 쓰지 말고 상태를 명시하세요.
 - 전체 재작성보다 변경된 section만 최소 수정하세요.
