@@ -1,6 +1,7 @@
 package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,6 +21,9 @@ public class TrainingLogEntrySummaryResponse {
 
     @Schema(description = "기록 내용")
     private String content;
+
+    @Schema(description = "기록 카테고리", example = "TECHNIQUE")
+    private TrainingLogCategory category;
 
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;

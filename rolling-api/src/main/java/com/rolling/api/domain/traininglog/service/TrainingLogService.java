@@ -128,6 +128,7 @@ public class TrainingLogService {
         List<TrainingLogExternalLink> externalLinks = normalizeExternalLinks(request.getExternalLinks());
         List<String> imageUrls = resolveImageUrls(request.getImageUrls(), request.getImageUrl());
         String imageUrl = firstImageUrl(imageUrls);
+        Integer trainingIntensity = validateTrainingIntensity(request.getTrainingIntensity());
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
@@ -142,6 +143,7 @@ public class TrainingLogService {
                         .imageUrlsJson(writeImageUrlsJson(imageUrls))
                         .externalLinksJson(writeExternalLinksJson(externalLinks))
                         .color(request.getColor())
+                        .trainingIntensity(trainingIntensity)
                         .imageUrl(imageUrl)
                         .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
                         .stripeCount(category == TrainingLogCategory.PROMOTION ? request.getStripeCount() : null)
@@ -179,6 +181,9 @@ public class TrainingLogService {
         List<String> imageUrls = resolveImageUrls(entry, request);
         String imageUrl = firstImageUrl(imageUrls);
         TrainingLogColor color = request.hasColorField() ? request.getColor() : entry.getColor();
+        Integer trainingIntensity = request.hasTrainingIntensityField()
+                ? validateTrainingIntensity(request.getTrainingIntensity())
+                : entry.getTrainingIntensity();
         BeltColor beltColor = resolveBeltColor(entry, request, category);
         Integer stripeCount = resolveStripeCount(entry, request, category);
         validateCategoryFields(category, beltColor, stripeCount);
@@ -189,6 +194,8 @@ public class TrainingLogService {
                 content,
                 writeChecklistJson(checklist),
                 writeHashtagsJson(hashtags),
+                null,
+                trainingIntensity,
                 imageUrl,
                 writeImageUrlsJson(imageUrls),
                 writeExternalLinksJson(externalLinks),
@@ -241,6 +248,7 @@ public class TrainingLogService {
                 .trainingDate(entry.getTrainingDate())
                 .category(entry.getCategory())
                 .color(entry.getColor())
+                .trainingIntensity(entry.getTrainingIntensity())
                 .title(entry.getTitle())
                 .content(entry.getContent())
                 .checklist(readChecklist(entry.getChecklistJson()))
@@ -260,6 +268,7 @@ public class TrainingLogService {
                 .id(entry.getId())
                 .title(entry.getTitle())
                 .content(entry.getContent())
+                .category(entry.getCategory())
                 .color(entry.getColor())
                 .createdAt(entry.getCreatedAt())
                 .build();
@@ -287,17 +296,18 @@ public class TrainingLogService {
                                     Collectors.toCollection(LinkedHashSet::new),
                                     List::copyOf
                             ));
-                    int totalMinutes = dayEntries.stream()
-                            .map(TrainingLogEntry::getTrainingMinutes)
+                    List<TrainingLogCategory> categories = dayEntries.stream()
+                            .map(TrainingLogEntry::getCategory)
                             .filter(Objects::nonNull)
-                            .mapToInt(Integer::intValue)
-                            .sum();
-
+                            .collect(Collectors.collectingAndThen(
+                                    Collectors.toCollection(LinkedHashSet::new),
+                                    List::copyOf
+                            ));
                     return new TrainingLogMonthlyCalendarDailySummary(
                             entry.getKey(),
                             colors,
-                            dayEntries.size(),
-                            totalMinutes
+                            categories,
+                            dayEntries.size()
                     );
                 })
                 .toList();
@@ -341,6 +351,16 @@ public class TrainingLogService {
         if (month < 1 || month > 12) {
             throw BusinessException.badRequest("month는 1 이상 12 이하이어야 합니다");
         }
+    }
+
+    private Integer validateTrainingIntensity(Integer trainingIntensity) {
+        if (trainingIntensity == null) {
+            return null;
+        }
+        if (trainingIntensity < 1 || trainingIntensity > 5) {
+            throw BusinessException.badRequest("훈련 강도는 1 이상 5 이하이어야 합니다");
+        }
+        return trainingIntensity;
     }
 
     private TrainingLogCategory requireCategory(TrainingLogCategory category) {

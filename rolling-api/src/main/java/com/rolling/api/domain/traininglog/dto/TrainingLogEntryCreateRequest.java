@@ -5,6 +5,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -57,6 +58,11 @@ public class TrainingLogEntryCreateRequest {
 
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;
+
+    @Min(value = 1, message = "훈련 강도는 1 이상이어야 합니다")
+    @Max(value = 5, message = "훈련 강도는 5 이하이어야 합니다")
+    @Schema(description = "훈련 강도", example = "3")
+    private Integer trainingIntensity;
 
     @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
     private BeltColor beltColor;

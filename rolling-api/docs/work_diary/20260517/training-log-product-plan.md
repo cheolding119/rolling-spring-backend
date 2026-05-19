@@ -84,11 +84,12 @@
 | 기록 | 일일 훈련 기록 조회 | 날짜 기준 요약 카드 목록 또는 상세 조회 |
 | 기록 | 일일 훈련 기록 삭제 | 본인 기록만 삭제 |
 | 기록 | 제목/내용 입력 | 공통 필수 입력 |
+| 기록 | 훈련 강도 입력 | 1~5 선택 값 |
 | 기록 | 체크리스트 입력 | 공통 입력 |
 | 기록 | 해시태그 입력 | 공통 입력 |
 | 기록 | 외부 링크 입력 | `INSTAGRAM`, `YOUTUBE` |
 | 기록 | 이미지 업로드 URL 발급 및 조회 | 이미지 복수 기준 |
-| 집계 | 월간 캘린더 조회 | 날짜별 색상, 기록 수, 총 훈련 시간 |
+| 집계 | 월간 캘린더 조회 | 날짜별 색상, 기록 수 |
 | 탐색 | 최근 기록 조회 | 최근 작성한 기록 목록 |
 | 벨트 | 현재 벨트 동기화 | 최신 `PROMOTION` 기록 기준 `User.beltColor` 반영 |
 
@@ -134,6 +135,7 @@
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -207,9 +209,9 @@ public enum TrainingLogLinkType {
 
 ### 7.3 응답 방향
 
-- 월간 캘린더 응답에는 날짜별 `colors[]`, `recordCount`, `totalMinutes`를 포함한다.
-- 날짜 선택 카드 응답에는 `id`, `title`, `content`, `color`, `createdAt`를 포함한다.
-- 상세 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 승급 정보, `trainingDate`가 포함된다.
+- 월간 캘린더 응답에는 날짜별 `colors[]`, `categories[]`, `recordCount`를 포함한다.
+- 날짜 선택 카드 응답에는 `id`, `title`, `content`, `category`, `color`, `createdAt`를 포함한다.
+- 상세 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 훈련 강도, 승급 정보, `trainingDate`가 포함된다.
 - 체크리스트 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - 엔티티는 직접 노출하지 않고 별도 DTO로 반환한다.
 
@@ -413,6 +415,13 @@ public enum TrainingLogLinkType {
 - [x] `PROMOTION` 벨트 갱신 통합 테스트
 - [x] 컨트롤러 계층 API 테스트
 - [x] Flutter 연동용 필드 최종 점검
+
+### Phase 11. 훈련 강도
+
+- [x] 훈련 강도 선택 필드 추가
+- [x] 훈련 강도 1~5 범위 검증 적용
+- [x] 생성/수정/상세/요약 응답에 훈련 강도 반영
+- [x] 훈련 강도 문서 반영
 
 ## 12. 사용자 시나리오 초안
 

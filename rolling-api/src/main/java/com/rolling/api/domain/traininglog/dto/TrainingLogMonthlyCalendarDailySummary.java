@@ -1,6 +1,7 @@
 package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -12,9 +13,9 @@ public record TrainingLogMonthlyCalendarDailySummary(
         LocalDate date,
         @Schema(description = "해당 일자의 색상 목록")
         List<TrainingLogColor> colors,
+        @Schema(description = "해당 일자의 카테고리 목록")
+        List<TrainingLogCategory> categories,
         @Schema(description = "해당 일자의 기록 수", example = "2")
-        Integer recordCount,
-        @Schema(description = "해당 일자의 총 훈련 시간(분)", example = "120")
-        Integer totalMinutes
+        Integer recordCount
 ) {
 }
