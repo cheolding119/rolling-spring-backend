@@ -74,6 +74,9 @@ public class TrainingLogEntry extends BaseTimeEntity {
     @Column(name = "color")
     private TrainingLogColor color;
 
+    @Column(name = "training_intensity")
+    private Integer trainingIntensity;
+
     @Column(name = "training_minutes")
     private Integer trainingMinutes;
 
@@ -97,6 +100,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
             String imageUrlsJson,
             String externalLinksJson,
             TrainingLogColor color,
+            Integer trainingIntensity,
             Integer trainingMinutes,
             BeltColor beltColor,
             Integer stripeCount
@@ -112,6 +116,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
         this.imageUrlsJson = imageUrlsJson;
         this.externalLinksJson = externalLinksJson;
         this.color = color;
+        this.trainingIntensity = trainingIntensity;
         this.trainingMinutes = trainingMinutes;
         this.beltColor = beltColor;
         this.stripeCount = stripeCount;
@@ -124,6 +129,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
             String checklistJson,
             String hashtagsJson,
             Integer trainingMinutes,
+            Integer trainingIntensity,
             String imageUrl,
             String imageUrlsJson,
             String externalLinksJson,
@@ -137,6 +143,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
         this.checklistJson = checklistJson;
         this.hashtagsJson = hashtagsJson;
         this.trainingMinutes = trainingMinutes;
+        this.trainingIntensity = trainingIntensity;
         this.imageUrl = imageUrl;
         this.imageUrlsJson = imageUrlsJson;
         this.externalLinksJson = externalLinksJson;
@@ -165,6 +172,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
                 checklistJson,
                 hashtagsJson,
                 null,
+                null,
                 imageUrl,
                 imageUrlsJson,
                 externalLinksJson,
@@ -192,6 +200,7 @@ public class TrainingLogEntry extends BaseTimeEntity {
                 content,
                 checklistJson,
                 hashtagsJson,
+                null,
                 null,
                 imageUrl,
                 null,

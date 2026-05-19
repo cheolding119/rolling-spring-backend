@@ -7,6 +7,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -73,6 +74,14 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean colorFieldPresent;
 
+    @Min(value = 1, message = "훈련 강도는 1 이상이어야 합니다")
+    @Max(value = 5, message = "훈련 강도는 5 이하이어야 합니다")
+    @Schema(description = "훈련 강도. null을 보내면 비운다.", example = "3", nullable = true)
+    private Integer trainingIntensity;
+
+    @JsonIgnore
+    private boolean trainingIntensityFieldPresent;
+
     @Schema(description = "승급 기록 전용 벨트 색상. null을 보내면 비운다.", example = "BLUE", nullable = true)
     private BeltColor beltColor;
 
@@ -122,6 +131,12 @@ public class TrainingLogEntryUpdateRequest {
         this.colorFieldPresent = true;
     }
 
+    @JsonSetter("trainingIntensity")
+    public void setTrainingIntensity(Integer trainingIntensity) {
+        this.trainingIntensity = trainingIntensity;
+        this.trainingIntensityFieldPresent = true;
+    }
+
     @JsonSetter("beltColor")
     public void setBeltColor(BeltColor beltColor) {
         this.beltColor = beltColor;
@@ -162,6 +177,11 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasColorField() {
         return colorFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasTrainingIntensityField() {
+        return trainingIntensityFieldPresent;
     }
 
     @JsonIgnore

@@ -32,6 +32,7 @@ developer_instructions = """
 - path, method, security, response code, request body, schema required 필드
 - enum raw value와 앱 표현값
 - public DTO 필드 추가/삭제 및 optional 여부 변화
+- public DTO 필드 추가/삭제 및 optional 여부 변화, 예를 들면 훈련 강도 같은 1~5 선택 필드
 - 인증/인가 요구사항 변화
 - 클라이언트가 의존하는 도메인 상태 전이와 비즈니스 규칙
 - soft delete/hard delete, visibility rule, owner/admin 전용 제약

@@ -99,6 +99,7 @@ class TrainingLogControllerTest {
                                   "category": "TECHNIQUE",
                                   "title": "Arm Triangle Details",
                                   "content": "Finished details for knee angle and arm position.",
+                                  "trainingIntensity": 4,
                                   "checklist": [
                                     {
                                       "text": "Triangle Review",
@@ -126,6 +127,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data.color").value("BLUE"))
+                .andExpect(jsonPath("$.data.trainingIntensity").value(4))
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[1]").value("https://cdn.test.com/training-log-2.jpg"))
@@ -162,6 +164,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].id").value(2))
                 .andExpect(jsonPath("$.data[0].title").value("Arm Triangle Details"))
+                .andExpect(jsonPath("$.data[0].category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data[0].color").value("BLUE"))
                 .andExpect(jsonPath("$.data[1].id").value(1));
     }
@@ -202,18 +205,18 @@ class TrainingLogControllerTest {
     void calendar_withUserToken_returnsOk() throws Exception {
         authenticateUser();
         given(trainingLogService.getMonthlyCalendarSummary(2L, 2026, 5)).willReturn(
-                TrainingLogMonthlyCalendarResponse.builder()
-                        .year(2026)
-                        .month(5)
-                        .dailySummaries(List.of(
-                                new TrainingLogMonthlyCalendarDailySummary(
-                                        LocalDate.of(2026, 5, 1),
-                                        List.of(TrainingLogColor.BLUE, TrainingLogColor.RED),
-                                        2,
-                                        150
-                                )
-                        ))
-                        .build()
+                                TrainingLogMonthlyCalendarResponse.builder()
+                                        .year(2026)
+                                        .month(5)
+                                        .dailySummaries(List.of(
+                                                new TrainingLogMonthlyCalendarDailySummary(
+                                                        LocalDate.of(2026, 5, 1),
+                                                        List.of(TrainingLogColor.BLUE, TrainingLogColor.RED),
+                                                        List.of(TrainingLogCategory.TECHNIQUE, TrainingLogCategory.PROMOTION),
+                                                        2
+                                                )
+                                        ))
+                                        .build()
         );
 
         mockMvc.perform(get("/api/v1/training-logs/me/calendar")
@@ -226,8 +229,8 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.month").value(5))
                 .andExpect(jsonPath("$.data.dailySummaries[0].date").value("2026-05-01"))
                 .andExpect(jsonPath("$.data.dailySummaries[0].colors[0]").value("BLUE"))
-                .andExpect(jsonPath("$.data.dailySummaries[0].recordCount").value(2))
-                .andExpect(jsonPath("$.data.dailySummaries[0].totalMinutes").value(150));
+                .andExpect(jsonPath("$.data.dailySummaries[0].categories[0]").value("TECHNIQUE"))
+                .andExpect(jsonPath("$.data.dailySummaries[0].recordCount").value(2));
     }
 
     @Test
@@ -286,6 +289,7 @@ class TrainingLogControllerTest {
                 .trainingDate(LocalDate.of(2026, 5, 17))
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
+                .trainingIntensity(4)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
                 .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true, true, "🔥")))
@@ -306,6 +310,7 @@ class TrainingLogControllerTest {
                 .id(id)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
+                .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
                 .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .build();

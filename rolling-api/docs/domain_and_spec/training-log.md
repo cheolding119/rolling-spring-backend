@@ -2,7 +2,7 @@
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
-- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10이다.
+- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10과 훈련 강도 확장이다.
 
 ## 1. 도메인 개요
 
@@ -42,6 +42,7 @@
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -51,7 +52,7 @@
 
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
-- `imageUrl`, `imageUrls`, `color`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
 ### 2.2 `TrainingLogChecklistItem`
@@ -77,6 +78,7 @@
 | `id` | `Long` | 기록 ID |
 | `title` | `String` | 기록 제목 |
 | `content` | `String` | 기록 본문 |
+| `category` | `TrainingLogCategory` | 기록 카테고리 |
 | `color` | `TrainingLogColor?` | 기록 색상 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
 
@@ -86,8 +88,8 @@
 | --- | --- | --- |
 | `date` | `LocalDate` | 훈련 날짜 |
 | `colors` | `List<TrainingLogColor>` | 해당 일자의 색상 목록 |
+| `categories` | `List<TrainingLogCategory>` | 해당 일자의 카테고리 목록 |
 | `recordCount` | `Integer` | 해당 일자의 기록 수 |
-| `totalMinutes` | `Integer` | 해당 일자의 총 훈련 시간 |
 
 ### 2.6 `TrainingLogMonthlyCalendarResponse`
 
@@ -176,10 +178,11 @@
 - 캘린더 집계 `year`는 `2000..2100` 범위만 허용한다.
 - 월간 캘린더 집계 `month`는 `1..12` 범위만 허용한다.
 
-### 4.3 제목/내용/훈련 시간
+### 4.3 제목/내용/훈련 강도
 
 - `title`, `content`는 생성 시 필수다.
 - 수정 시 `title`, `content`를 보내면 trim 후 저장한다.
+- `trainingIntensity`는 1~5 범위의 선택 값이다.
 
 ### 4.4 체크리스트
 
@@ -255,6 +258,7 @@ Request body:
 | `imageUrls` | `List<String>?` | - | 이미지 목록 |
 | `imageUrl` | `String?` | - | 대표 이미지 URL |
 | `color` | `TrainingLogColor?` | - | 기록 색상 |
+| `trainingIntensity` | `Integer?` | - | 훈련 강도 |
 | `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
 | `stripeCount` | `Integer?` | - | 승급 기록 전용 |
 
@@ -278,6 +282,7 @@ Request body:
 | `imageUrls` | `List<String>?` | `[]` 또는 `null`이면 비움 |
 | `imageUrl` | `String?` | `null`이면 비움 |
 | `color` | `TrainingLogColor?` | `null`이면 비움 |
+| `trainingIntensity` | `Integer?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
 

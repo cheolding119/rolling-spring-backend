@@ -28,6 +28,9 @@ public class TrainingLogEntryResponse {
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;
 
+    @Schema(description = "훈련 강도", example = "3")
+    private Integer trainingIntensity;
+
     @Schema(description = "기록 제목", example = "암 트라이앵글 디테일 정리")
     private String title;
 
