@@ -43,6 +43,7 @@
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
 | `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
+| `trainingMinutes` | `Integer?` | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -52,7 +53,7 @@
 
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
-- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
 ### 2.2 `TrainingLogChecklistItem`
@@ -259,6 +260,7 @@ Request body:
 | `imageUrl` | `String?` | - | 대표 이미지 URL |
 | `color` | `TrainingLogColor?` | - | 기록 색상 |
 | `trainingIntensity` | `Integer?` | - | 훈련 강도 |
+| `trainingMinutes` | `Integer?` | - | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
 | `stripeCount` | `Integer?` | - | 승급 기록 전용 |
 
@@ -283,6 +285,7 @@ Request body:
 | `imageUrl` | `String?` | `null`이면 비움 |
 | `color` | `TrainingLogColor?` | `null`이면 비움 |
 | `trainingIntensity` | `Integer?` | `null`이면 비움 |
+| `trainingMinutes` | `Integer?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
 
@@ -342,7 +345,7 @@ Request body:
 - `hashtags`는 정규화된 `List<String>`이다.
 - `externalLinks`는 `List<TrainingLogExternalLink>`이다.
 - `color`는 기록 색상이다.
-- `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`가 함께 반환된다.
+- `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`, `trainingMinutes`가 함께 반환된다.
 
 ### 6.2 `TrainingLogEntrySummaryResponse`
 

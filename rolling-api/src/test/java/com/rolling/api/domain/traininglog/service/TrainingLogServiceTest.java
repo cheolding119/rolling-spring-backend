@@ -85,6 +85,7 @@ class TrainingLogServiceTest {
         ));
         ReflectionTestUtils.setField(request, "color", TrainingLogColor.BLUE);
         ReflectionTestUtils.setField(request, "trainingIntensity", 4);
+        ReflectionTestUtils.setField(request, "trainingMinutes", 90);
         ReflectionTestUtils.setField(request, "checklist", List.of(
                 checklistItem("  Triangle Review  ", true, true, "🔥"),
                 checklistItem("Live Roll Application", null)
@@ -119,6 +120,7 @@ class TrainingLogServiceTest {
         );
         assertThat(saved.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(saved.getTrainingIntensity()).isEqualTo(4);
+        assertThat(saved.getTrainingMinutes()).isEqualTo(90);
         assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
         assertThat(saved.getImageUrlsJson()).isEqualTo(
                 "[\"https://cdn.test.com/training-log-1.jpg\",\"https://cdn.test.com/training-log-2.jpg\"]"
@@ -127,6 +129,7 @@ class TrainingLogServiceTest {
         assertThat(response.getId()).isEqualTo(100L);
         assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(response.getTrainingIntensity()).isEqualTo(4);
+        assertThat(response.getTrainingMinutes()).isEqualTo(90);
         assertThat(response.getChecklist()).hasSize(2);
         assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
         assertThat(response.getHashtags()).containsExactly("triangle", "arm-triangle");
@@ -150,6 +153,7 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
         ReflectionTestUtils.setField(request, "stripeCount", 1);
         ReflectionTestUtils.setField(request, "trainingIntensity", 5);
+        ReflectionTestUtils.setField(request, "trainingMinutes", 120);
 
         TrainingLogEntry[] savedHolder = new TrainingLogEntry[1];
         given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
@@ -169,6 +173,7 @@ class TrainingLogServiceTest {
         assertThat(user.getBeltColor()).isEqualTo(BeltColor.BLUE);
         assertThat(response.getBeltColor()).isEqualTo(BeltColor.BLUE);
         assertThat(response.getStripeCount()).isEqualTo(1);
+        assertThat(response.getTrainingMinutes()).isEqualTo(120);
     }
 
     @Test
@@ -245,10 +250,13 @@ class TrainingLogServiceTest {
 
         TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
         request.setTrainingIntensity(5);
+        request.setTrainingMinutes(75);
 
         TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
 
         assertThat(entry.getTrainingIntensity()).isEqualTo(5);
+        assertThat(entry.getTrainingMinutes()).isEqualTo(75);
+        assertThat(response.getTrainingMinutes()).isEqualTo(75);
     }
 
     @Test

@@ -82,6 +82,13 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean trainingIntensityFieldPresent;
 
+    @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
+    @Schema(description = "훈련 시간(분). null을 보내면 비운다.", example = "90", nullable = true)
+    private Integer trainingMinutes;
+
+    @JsonIgnore
+    private boolean trainingMinutesFieldPresent;
+
     @Schema(description = "승급 기록 전용 벨트 색상. null을 보내면 비운다.", example = "BLUE", nullable = true)
     private BeltColor beltColor;
 
@@ -137,6 +144,12 @@ public class TrainingLogEntryUpdateRequest {
         this.trainingIntensityFieldPresent = true;
     }
 
+    @JsonSetter("trainingMinutes")
+    public void setTrainingMinutes(Integer trainingMinutes) {
+        this.trainingMinutes = trainingMinutes;
+        this.trainingMinutesFieldPresent = true;
+    }
+
     @JsonSetter("beltColor")
     public void setBeltColor(BeltColor beltColor) {
         this.beltColor = beltColor;
@@ -182,6 +195,11 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasTrainingIntensityField() {
         return trainingIntensityFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasTrainingMinutesField() {
+        return trainingMinutesFieldPresent;
     }
 
     @JsonIgnore
