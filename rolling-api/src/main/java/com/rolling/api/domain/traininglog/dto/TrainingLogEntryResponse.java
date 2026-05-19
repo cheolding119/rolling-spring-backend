@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -30,6 +29,9 @@ public class TrainingLogEntryResponse {
 
     @Schema(description = "훈련 강도", example = "3")
     private Integer trainingIntensity;
+
+    @Schema(description = "훈련 시간(분)", example = "90")
+    private Integer trainingMinutes;
 
     @Schema(description = "기록 제목", example = "암 트라이앵글 디테일 정리")
     private String title;
@@ -58,9 +60,4 @@ public class TrainingLogEntryResponse {
     @Schema(description = "승급 기록 전용 stripe 수", example = "1")
     private Integer stripeCount;
 
-    @Schema(description = "생성 시각")
-    private LocalDateTime createdAt;
-
-    @Schema(description = "수정 시각")
-    private LocalDateTime updatedAt;
 }
