@@ -129,6 +129,7 @@ public class TrainingLogService {
         List<String> imageUrls = resolveImageUrls(request.getImageUrls(), request.getImageUrl());
         String imageUrl = firstImageUrl(imageUrls);
         Integer trainingIntensity = validateTrainingIntensity(request.getTrainingIntensity());
+        Integer trainingMinutes = request.getTrainingMinutes();
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
@@ -144,6 +145,7 @@ public class TrainingLogService {
                         .externalLinksJson(writeExternalLinksJson(externalLinks))
                         .color(request.getColor())
                         .trainingIntensity(trainingIntensity)
+                        .trainingMinutes(trainingMinutes)
                         .imageUrl(imageUrl)
                         .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
                         .stripeCount(category == TrainingLogCategory.PROMOTION ? request.getStripeCount() : null)
@@ -184,6 +186,9 @@ public class TrainingLogService {
         Integer trainingIntensity = request.hasTrainingIntensityField()
                 ? validateTrainingIntensity(request.getTrainingIntensity())
                 : entry.getTrainingIntensity();
+        Integer trainingMinutes = request.hasTrainingMinutesField()
+                ? request.getTrainingMinutes()
+                : entry.getTrainingMinutes();
         BeltColor beltColor = resolveBeltColor(entry, request, category);
         Integer stripeCount = resolveStripeCount(entry, request, category);
         validateCategoryFields(category, beltColor, stripeCount);
@@ -194,7 +199,7 @@ public class TrainingLogService {
                 content,
                 writeChecklistJson(checklist),
                 writeHashtagsJson(hashtags),
-                null,
+                trainingMinutes,
                 trainingIntensity,
                 imageUrl,
                 writeImageUrlsJson(imageUrls),
@@ -256,10 +261,9 @@ public class TrainingLogService {
                 .externalLinks(readExternalLinks(entry.getExternalLinksJson()))
                 .imageUrls(readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl()))
                 .imageUrl(entry.getImageUrl())
+                .trainingMinutes(entry.getTrainingMinutes())
                 .beltColor(entry.getBeltColor())
                 .stripeCount(entry.getStripeCount())
-                .createdAt(entry.getCreatedAt())
-                .updatedAt(entry.getUpdatedAt())
                 .build();
     }
 

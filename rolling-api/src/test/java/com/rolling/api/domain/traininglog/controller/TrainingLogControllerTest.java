@@ -100,6 +100,7 @@ class TrainingLogControllerTest {
                                   "title": "Arm Triangle Details",
                                   "content": "Finished details for knee angle and arm position.",
                                   "trainingIntensity": 4,
+                                  "trainingMinutes": 90,
                                   "checklist": [
                                     {
                                       "text": "Triangle Review",
@@ -128,6 +129,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data.color").value("BLUE"))
                 .andExpect(jsonPath("$.data.trainingIntensity").value(4))
+                .andExpect(jsonPath("$.data.trainingMinutes").value(90))
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[1]").value("https://cdn.test.com/training-log-2.jpg"))
@@ -181,6 +183,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.trainingDate").value("2026-05-17"))
+                .andExpect(jsonPath("$.data.trainingMinutes").value(90))
                 .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
     }
@@ -290,6 +293,7 @@ class TrainingLogControllerTest {
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
                 .trainingIntensity(4)
+                .trainingMinutes(90)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
                 .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true, true, "🔥")))
@@ -298,11 +302,9 @@ class TrainingLogControllerTest {
                         "https://cdn.test.com/training-log-1.jpg",
                         "https://cdn.test.com/training-log-2.jpg"
                 ))
-                .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
-                .imageUrl("https://cdn.test.com/training-log-1.jpg")
-                .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
-                .updatedAt(LocalDateTime.of(2026, 5, 17, 12, 0))
-                .build();
+                        .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
+                        .imageUrl("https://cdn.test.com/training-log-1.jpg")
+                        .build();
     }
 
     private TrainingLogEntrySummaryResponse summaryResponse(Long id) {

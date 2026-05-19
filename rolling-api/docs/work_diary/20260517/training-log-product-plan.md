@@ -136,6 +136,7 @@
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
 | `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
+| `trainingMinutes` | `Integer?` | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -211,7 +212,7 @@ public enum TrainingLogLinkType {
 
 - 월간 캘린더 응답에는 날짜별 `colors[]`, `categories[]`, `recordCount`를 포함한다.
 - 날짜 선택 카드 응답에는 `id`, `title`, `content`, `category`, `color`, `createdAt`를 포함한다.
-- 상세 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 훈련 강도, 승급 정보, `trainingDate`가 포함된다.
+- 상세 응답에는 카테고리, 제목, 내용, 체크리스트, 해시태그, 외부 링크, 이미지 목록, 색상, 훈련 강도, 훈련 시간, 승급 정보, `trainingDate`가 포함된다.
 - 체크리스트 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - 엔티티는 직접 노출하지 않고 별도 DTO로 반환한다.
 

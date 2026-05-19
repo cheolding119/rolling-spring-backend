@@ -64,6 +64,10 @@ public class TrainingLogEntryCreateRequest {
     @Schema(description = "훈련 강도", example = "3")
     private Integer trainingIntensity;
 
+    @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
+    @Schema(description = "훈련 시간(분)", example = "90")
+    private Integer trainingMinutes;
+
     @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
     private BeltColor beltColor;
 
