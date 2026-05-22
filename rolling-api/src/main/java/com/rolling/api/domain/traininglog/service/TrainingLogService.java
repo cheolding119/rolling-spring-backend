@@ -129,6 +129,7 @@ public class TrainingLogService {
         List<String> imageUrls = resolveImageUrls(request.getImageUrls(), request.getImageUrl());
         String imageUrl = firstImageUrl(imageUrls);
         Integer trainingIntensity = validateTrainingIntensity(request.getTrainingIntensity());
+        Integer condition = validateCondition(request.getCondition());
         Integer trainingMinutes = request.getTrainingMinutes();
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
@@ -145,6 +146,8 @@ public class TrainingLogService {
                         .externalLinksJson(writeExternalLinksJson(externalLinks))
                         .color(request.getColor())
                         .trainingIntensity(trainingIntensity)
+                        .gymAttendance(request.getGymAttendance())
+                        .condition(condition)
                         .trainingMinutes(trainingMinutes)
                         .imageUrl(imageUrl)
                         .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
@@ -186,6 +189,12 @@ public class TrainingLogService {
         Integer trainingIntensity = request.hasTrainingIntensityField()
                 ? validateTrainingIntensity(request.getTrainingIntensity())
                 : entry.getTrainingIntensity();
+        Boolean gymAttendance = request.hasGymAttendanceField()
+                ? request.getGymAttendance()
+                : entry.getGymAttendance();
+        Integer condition = request.hasConditionField()
+                ? validateCondition(request.getCondition())
+                : entry.getCondition();
         Integer trainingMinutes = request.hasTrainingMinutesField()
                 ? request.getTrainingMinutes()
                 : entry.getTrainingMinutes();
@@ -201,6 +210,8 @@ public class TrainingLogService {
                 writeHashtagsJson(hashtags),
                 trainingMinutes,
                 trainingIntensity,
+                gymAttendance,
+                condition,
                 imageUrl,
                 writeImageUrlsJson(imageUrls),
                 writeExternalLinksJson(externalLinks),
@@ -254,6 +265,8 @@ public class TrainingLogService {
                 .category(entry.getCategory())
                 .color(entry.getColor())
                 .trainingIntensity(entry.getTrainingIntensity())
+                .gymAttendance(entry.getGymAttendance())
+                .condition(entry.getCondition())
                 .title(entry.getTitle())
                 .content(entry.getContent())
                 .checklist(readChecklist(entry.getChecklistJson()))
@@ -365,6 +378,16 @@ public class TrainingLogService {
             throw BusinessException.badRequest("훈련 강도는 1 이상 5 이하이어야 합니다");
         }
         return trainingIntensity;
+    }
+
+    private Integer validateCondition(Integer condition) {
+        if (condition == null) {
+            return null;
+        }
+        if (condition < 1 || condition > 5) {
+            throw BusinessException.badRequest("컨디션은 1 이상 5 이하이어야 합니다");
+        }
+        return condition;
     }
 
     private TrainingLogCategory requireCategory(TrainingLogCategory category) {

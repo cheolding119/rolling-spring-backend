@@ -30,6 +30,12 @@ public class TrainingLogEntryResponse {
     @Schema(description = "훈련 강도", example = "3")
     private Integer trainingIntensity;
 
+    @Schema(description = "체육관 출석 여부", example = "true")
+    private Boolean gymAttendance;
+
+    @Schema(description = "컨디션", example = "4")
+    private Integer condition;
+
     @Schema(description = "훈련 시간(분)", example = "90")
     private Integer trainingMinutes;
 

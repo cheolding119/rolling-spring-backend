@@ -42,6 +42,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,6 +101,8 @@ class TrainingLogControllerTest {
                                   "title": "Arm Triangle Details",
                                   "content": "Finished details for knee angle and arm position.",
                                   "trainingIntensity": 4,
+                                  "gymAttendance": true,
+                                  "condition": 3,
                                   "trainingMinutes": 90,
                                   "checklist": [
                                     {
@@ -129,6 +132,8 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data.color").value("BLUE"))
                 .andExpect(jsonPath("$.data.trainingIntensity").value(4))
+                .andExpect(jsonPath("$.data.gymAttendance").value(true))
+                .andExpect(jsonPath("$.data.condition").value(3))
                 .andExpect(jsonPath("$.data.trainingMinutes").value(90))
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
@@ -183,9 +188,32 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.trainingDate").value("2026-05-17"))
+                .andExpect(jsonPath("$.data.gymAttendance").value(true))
+                .andExpect(jsonPath("$.data.condition").value(3))
                 .andExpect(jsonPath("$.data.trainingMinutes").value(90))
                 .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
+    }
+
+    @Test
+    @DisplayName("update accepts training attendance and condition fields")
+    void update_withTrainingStatusFields_returnsOk() throws Exception {
+        authenticateUser();
+        given(trainingLogService.update(any(), any(), any())).willReturn(response(1L));
+
+        mockMvc.perform(patch("/api/v1/training-logs/me/entries/1")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gymAttendance": true,
+                                  "condition": 3
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.gymAttendance").value(true))
+                .andExpect(jsonPath("$.data.condition").value(3));
     }
 
     @Test
@@ -293,6 +321,8 @@ class TrainingLogControllerTest {
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
                 .trainingIntensity(4)
+                .gymAttendance(true)
+                .condition(3)
                 .trainingMinutes(90)
                 .title("Arm Triangle Details")
                 .content("Finished details for knee angle and arm position.")
