@@ -20,11 +20,11 @@
 
 ## 1.1 하네스 실행 규칙
 
-- 복잡한 기능 추가, 새 도메인 추가, API 계약 변경, 보안/권한 변경, 운영 영향이 있는 작업은 구현 전 `harness-orchestrator` preflight로 컨텍스트, 실패 로그, 도메인 계약, 테스트 범위, 문서 동기화 후보를 먼저 정리한다.
-- 구현 후에는 `harness-orchestrator` postflight로 테스트 누락, 문서 동기화, 보안/운영 영향, Failure Log 반영 필요 여부를 확인한다.
-- 실제 Spring Boot 구현은 `spring-boot-engineer`, API 계약 문서 동기화는 `shared-contract-syncer`, 보안 집중 점검은 `security-auditor`, 코드 품질 리뷰는 `code-reviewer`를 사용한다.
+- 복잡한 기능 추가, 새 도메인 추가, API 계약 변경, 보안/권한 변경, 운영 영향이 있는 작업은 구현 전 컨텍스트, 실패 로그, 도메인 계약, 테스트 범위, 문서 동기화 후보를 먼저 정리한다.
+- 구현 후에는 테스트 누락, 문서 동기화, 보안/운영 영향, Failure Log 반영 필요 여부를 확인한다.
+- 전문 에이전트나 하네스 도구가 현재 세션에 명시적으로 제공된 경우에만 사용한다. 제공되지 않은 도구 이름을 전제로 작업을 멈추지 않는다.
 - 컨텍스트가 큰 작업은 파일 전체를 한 번에 읽지 말고 클래스명, endpoint, public method, DTO 필드, 테스트명으로 구조를 먼저 파악한 뒤 필요한 구현부만 깊게 읽는다.
-- 작업 체크리스트는 [hanes/AI_WORKFLOW_CHECKLIST.md](hanes/AI_WORKFLOW_CHECKLIST.md), 테스트 선택 기준은 [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)를 따른다.
+- 테스트 선택 기준은 [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md), 과거 실패 사례는 [hanes/FAILURE_LOG.md](hanes/FAILURE_LOG.md)를 따른다.
 
 ## 2. 실행과 검증 명령
 
@@ -101,35 +101,28 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 
 ## 7. 문서 Source Of Truth
 
-- 하네스 도입 계획: [hanes/HARNESS_ENGINEERING_PLAN.md](hanes/HARNESS_ENGINEERING_PLAN.md)
-- 하네스 사용 가이드: [hanes/HARNESS_USAGE_GUIDE.md](hanes/HARNESS_USAGE_GUIDE.md)
-- AI 작업 체크리스트: [hanes/AI_WORKFLOW_CHECKLIST.md](hanes/AI_WORKFLOW_CHECKLIST.md)
 - 테스트 매트릭스: [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)
-- 운영 smoke test 계획: [hanes/SMOKE_TEST_PLAN.md](hanes/SMOKE_TEST_PLAN.md)
 - 실패 로그: [hanes/FAILURE_LOG.md](hanes/FAILURE_LOG.md)
 - 도메인/API 공통: [domain_and_spec/shared/common-models.md](domain_and_spec/shared/common-models.md)
-- 오픈매트: [domain_and_spec/open-mat.md](domain_and_spec/open-mat.md)
-- 대회: [domain_and_spec/tournament.md](domain_and_spec/tournament.md)
 - 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
+- 세미나 제품 계획: [domain_and_spec/seminar-product-plan.md](domain_and_spec/seminar-product-plan.md)
 - 훈련 기록: [domain_and_spec/training-log.md](domain_and_spec/training-log.md)
 - 커뮤니티: [domain_and_spec/community.md](domain_and_spec/community.md)
-- 인증 정책: [auth/AUTH_POLICY.md](auth/AUTH_POLICY.md)
-- 보안 정책: [security/SECURITY_POLICY.md](security/SECURITY_POLICY.md)
-- 운영 워크플로: [workflow/WORKFLOW_POLICY.md](workflow/WORKFLOW_POLICY.md)
-- 신고 운영: [report/REPORT_OPERATION_POLICY.md](report/REPORT_OPERATION_POLICY.md)
-- 사용자 제재: [usersanction/USER_SANCTION_POLICY.md](usersanction/USER_SANCTION_POLICY.md)
-- 관리자 정책: [rollingadmin/ROLLING_ADMIN_POLICY.md](rollingadmin/ROLLING_ADMIN_POLICY.md)
+- 알림 배지 롤아웃: [domain_and_spec/notification-badge-rollout.md](domain_and_spec/notification-badge-rollout.md)
+- 관리자 웹 React API: [rollingadmin/ADMIN_WEB_REACT_API.md](rollingadmin/ADMIN_WEB_REACT_API.md)
 - 커밋 규칙: [convention/COMMIT_CONVENTION.md](convention/COMMIT_CONVENTION.md)
-- 공용 enum, 공용 모델, 공용 도메인 규칙의 source of truth는 [domain-models.md](/C:/rolling/.codex-shared/domain-models.md)다.
+- 공용 enum, 공용 모델, 공용 도메인 규칙의 source of truth는 로컬 공유 문서 [domain-models.md](../../../.codex-shared/domain-models.md)다. 이 경로가 없는 환경에서는 `C:\rolling\.codex-shared\domain-models.md`를 확인한다.
 
 ## 8. 문서 맵
 
 - [shared/common-models.md](domain_and_spec/shared/common-models.md): 공통 모델, 인증/사용자/알림/공지/문의 API, 날짜/시간 형식
-- [open-mat.md](domain_and_spec/open-mat.md): 오픈매트 도메인 모델 + API 스펙
-- [tournament.md](domain_and_spec/tournament.md): 대회 도메인 모델 + API 스펙
 - [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
+- [seminar-product-plan.md](domain_and_spec/seminar-product-plan.md): 세미나 제품 범위와 출시 계획
 - [training-log.md](domain_and_spec/training-log.md): 훈련 기록 도메인 모델 + API 스펙
 - [community.md](domain_and_spec/community.md): 커뮤니티 도메인 모델 + API 스펙
+- [notification-badge-rollout.md](domain_and_spec/notification-badge-rollout.md): 알림 배지 기능 rollout 계획
+- [ADMIN_WEB_REACT_API.md](rollingadmin/ADMIN_WEB_REACT_API.md): 관리자 웹 React API 계약
+- [COMMIT_CONVENTION.md](convention/COMMIT_CONVENTION.md): 커밋 메시지 규칙
 
 ## 9. 도메인 핵심 메모
 
