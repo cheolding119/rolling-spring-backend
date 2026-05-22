@@ -82,6 +82,20 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean trainingIntensityFieldPresent;
 
+    @Schema(description = "체육관 출석 여부. null을 보내면 비운다.", example = "true", nullable = true)
+    private Boolean gymAttendance;
+
+    @JsonIgnore
+    private boolean gymAttendanceFieldPresent;
+
+    @Min(value = 1, message = "컨디션은 1 이상이어야 합니다")
+    @Max(value = 5, message = "컨디션은 5 이하이어야 합니다")
+    @Schema(description = "컨디션. null을 보내면 비운다.", example = "4", nullable = true)
+    private Integer condition;
+
+    @JsonIgnore
+    private boolean conditionFieldPresent;
+
     @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
     @Schema(description = "훈련 시간(분). null을 보내면 비운다.", example = "90", nullable = true)
     private Integer trainingMinutes;
@@ -144,6 +158,18 @@ public class TrainingLogEntryUpdateRequest {
         this.trainingIntensityFieldPresent = true;
     }
 
+    @JsonSetter("gymAttendance")
+    public void setGymAttendance(Boolean gymAttendance) {
+        this.gymAttendance = gymAttendance;
+        this.gymAttendanceFieldPresent = true;
+    }
+
+    @JsonSetter("condition")
+    public void setCondition(Integer condition) {
+        this.condition = condition;
+        this.conditionFieldPresent = true;
+    }
+
     @JsonSetter("trainingMinutes")
     public void setTrainingMinutes(Integer trainingMinutes) {
         this.trainingMinutes = trainingMinutes;
@@ -195,6 +221,16 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasTrainingIntensityField() {
         return trainingIntensityFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasGymAttendanceField() {
+        return gymAttendanceFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasConditionField() {
+        return conditionFieldPresent;
     }
 
     @JsonIgnore
