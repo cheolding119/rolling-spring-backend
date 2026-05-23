@@ -27,7 +27,25 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByIdAndIsWithdrawnFalse(Long id);
 
+    Optional<User> findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(Long id, AccountStatus accountStatus);
+
     List<User> findAllByIdInAndIsWithdrawnFalse(Collection<Long> ids);
+
+    @Query("""
+            select user
+            from User user
+            where user.isWithdrawn = false
+              and user.withdrawalPending = false
+              and user.accountStatus = com.rolling.api.domain.user.entity.AccountStatus.ACTIVE
+              and user.id <> :viewerUserId
+              and lower(user.nickname) like concat('%', lower(:keyword), '%')
+            order by user.nickname asc, user.id asc
+            """)
+    List<User> searchFriendCandidates(
+            @Param("viewerUserId") Long viewerUserId,
+            @Param("keyword") String keyword,
+            org.springframework.data.domain.Pageable pageable
+    );
 
     List<User> findAllByAccountStatusAndSuspensionUntilLessThanEqual(AccountStatus accountStatus, LocalDateTime suspensionUntil);
 
