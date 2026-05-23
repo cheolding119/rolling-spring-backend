@@ -77,6 +77,12 @@ public class TrainingLogEntry extends BaseTimeEntity {
     @Column(name = "training_intensity")
     private Integer trainingIntensity;
 
+    @Column(name = "gym_attendance")
+    private Boolean gymAttendance;
+
+    @Column(name = "condition")
+    private Integer condition;
+
     @Column(name = "training_minutes")
     private Integer trainingMinutes;
 
@@ -101,6 +107,8 @@ public class TrainingLogEntry extends BaseTimeEntity {
             String externalLinksJson,
             TrainingLogColor color,
             Integer trainingIntensity,
+            Boolean gymAttendance,
+            Integer condition,
             Integer trainingMinutes,
             BeltColor beltColor,
             Integer stripeCount
@@ -117,7 +125,43 @@ public class TrainingLogEntry extends BaseTimeEntity {
         this.externalLinksJson = externalLinksJson;
         this.color = color;
         this.trainingIntensity = trainingIntensity;
+        this.gymAttendance = gymAttendance;
+        this.condition = condition;
         this.trainingMinutes = trainingMinutes;
+        this.beltColor = beltColor;
+        this.stripeCount = stripeCount;
+    }
+
+    public void update(
+            TrainingLogCategory category,
+            String title,
+            String content,
+            String checklistJson,
+            String hashtagsJson,
+            Integer trainingMinutes,
+            Integer trainingIntensity,
+            Boolean gymAttendance,
+            Integer condition,
+            String imageUrl,
+            String imageUrlsJson,
+            String externalLinksJson,
+            TrainingLogColor color,
+            BeltColor beltColor,
+            Integer stripeCount
+    ) {
+        this.category = category;
+        this.title = title;
+        this.content = content;
+        this.checklistJson = checklistJson;
+        this.hashtagsJson = hashtagsJson;
+        this.trainingMinutes = trainingMinutes;
+        this.trainingIntensity = trainingIntensity;
+        this.gymAttendance = gymAttendance;
+        this.condition = condition;
+        this.imageUrl = imageUrl;
+        this.imageUrlsJson = imageUrlsJson;
+        this.externalLinksJson = externalLinksJson;
+        this.color = color;
         this.beltColor = beltColor;
         this.stripeCount = stripeCount;
     }
@@ -137,19 +181,23 @@ public class TrainingLogEntry extends BaseTimeEntity {
             BeltColor beltColor,
             Integer stripeCount
     ) {
-        this.category = category;
-        this.title = title;
-        this.content = content;
-        this.checklistJson = checklistJson;
-        this.hashtagsJson = hashtagsJson;
-        this.trainingMinutes = trainingMinutes;
-        this.trainingIntensity = trainingIntensity;
-        this.imageUrl = imageUrl;
-        this.imageUrlsJson = imageUrlsJson;
-        this.externalLinksJson = externalLinksJson;
-        this.color = color;
-        this.beltColor = beltColor;
-        this.stripeCount = stripeCount;
+        update(
+                category,
+                title,
+                content,
+                checklistJson,
+                hashtagsJson,
+                trainingMinutes,
+                trainingIntensity,
+                null,
+                null,
+                imageUrl,
+                imageUrlsJson,
+                externalLinksJson,
+                color,
+                beltColor,
+                stripeCount
+        );
     }
 
     public void update(
@@ -171,6 +219,8 @@ public class TrainingLogEntry extends BaseTimeEntity {
                 content,
                 checklistJson,
                 hashtagsJson,
+                null,
+                null,
                 null,
                 null,
                 imageUrl,
@@ -200,6 +250,8 @@ public class TrainingLogEntry extends BaseTimeEntity {
                 content,
                 checklistJson,
                 hashtagsJson,
+                null,
+                null,
                 null,
                 null,
                 imageUrl,

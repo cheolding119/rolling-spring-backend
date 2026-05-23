@@ -2,7 +2,7 @@
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
-- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10과 훈련 강도 확장이다.
+- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10, 훈련 강도/체육관 출석/컨디션 확장, 365일 출석 잔디와 주간/월간 인사이트 조회다.
 
 ## 1. 도메인 개요
 
@@ -22,6 +22,8 @@
 - 월간 캘린더 요약 조회
 - 최근 훈련 기록 조회
 - 이미지 업로드용 presigned URL 발급
+- 365일 출석 잔디 조회
+- 주간/월간 훈련 인사이트 조회
 - `PROMOTION` 카테고리 전용 검증 및 최신 벨트 동기화
 
 ## 2. 도메인 모델
@@ -43,6 +45,8 @@
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
 | `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
+| `gymAttendance` | `Boolean?` | 체육관 출석 여부 |
+| `condition` | `Integer?` | 컨디션(1~5) |
 | `trainingMinutes` | `Integer?` | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용 |
@@ -53,7 +57,7 @@
 
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
-- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `gymAttendance`, `condition`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
 ### 2.2 `TrainingLogChecklistItem`
@@ -179,11 +183,13 @@
 - 캘린더 집계 `year`는 `2000..2100` 범위만 허용한다.
 - 월간 캘린더 집계 `month`는 `1..12` 범위만 허용한다.
 
-### 4.3 제목/내용/훈련 강도
+### 4.3 제목/내용/훈련 강도/체육관 출석/컨디션
 
 - `title`, `content`는 생성 시 필수다.
 - 수정 시 `title`, `content`를 보내면 trim 후 저장한다.
 - `trainingIntensity`는 1~5 범위의 선택 값이다.
+- `gymAttendance`는 체육관 출석 여부를 나타내는 선택 값이다.
+- `condition`은 1~5 범위의 선택 값이며 훈련 당일 컨디션을 나타낸다.
 
 ### 4.4 체크리스트
 
@@ -260,6 +266,8 @@ Request body:
 | `imageUrl` | `String?` | - | 대표 이미지 URL |
 | `color` | `TrainingLogColor?` | - | 기록 색상 |
 | `trainingIntensity` | `Integer?` | - | 훈련 강도 |
+| `gymAttendance` | `Boolean?` | - | 체육관 출석 여부 |
+| `condition` | `Integer?` | - | 컨디션(1~5) |
 | `trainingMinutes` | `Integer?` | - | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
 | `stripeCount` | `Integer?` | - | 승급 기록 전용 |
@@ -285,6 +293,8 @@ Request body:
 | `imageUrl` | `String?` | `null`이면 비움 |
 | `color` | `TrainingLogColor?` | `null`이면 비움 |
 | `trainingIntensity` | `Integer?` | `null`이면 비움 |
+| `gymAttendance` | `Boolean?` | `null`이면 비움 |
+| `condition` | `Integer?` | `null`이면 비움 |
 | `trainingMinutes` | `Integer?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
@@ -337,6 +347,25 @@ Request body:
 | `fileName` | `String` | O | 원본 파일명 |
 | `contentType` | `String` | O | 업로드 파일 content type |
 
+### 5.10 365일 출석 잔디 조회
+
+`GET /api/v1/training-logs/me/attendance-grass?date=2026-05-22`
+
+- 인증: 필요
+- Response data: `TrainingLogAttendanceGrassResponse`
+- 상세 계산 규칙과 응답 필드는 [training-log-insight.md](training-log-insight.md)를 따른다.
+
+### 5.11 주간/월간 훈련 인사이트 조회
+
+`GET /api/v1/training-logs/me/insights?period=WEEK&date=2026-05-22`
+
+`GET /api/v1/training-logs/me/insights?period=MONTH&date=2026-05-22`
+
+- 인증: 필요
+- `period`: `WEEK` 또는 `MONTH`
+- Response data: `TrainingLogInsightResponse`
+- 상세 계산 규칙과 응답 필드는 [training-log-insight.md](training-log-insight.md)를 따른다.
+
 ## 6. DTO 노트
 
 ### 6.1 `TrainingLogEntryResponse`
@@ -345,6 +374,7 @@ Request body:
 - `hashtags`는 정규화된 `List<String>`이다.
 - `externalLinks`는 `List<TrainingLogExternalLink>`이다.
 - `color`는 기록 색상이다.
+- `trainingIntensity`, `gymAttendance`, `condition`은 훈련 상태 메타데이터로 함께 반환된다.
 - `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`, `trainingMinutes`가 함께 반환된다.
 
 ### 6.2 `TrainingLogEntrySummaryResponse`
@@ -357,14 +387,19 @@ Request body:
 - `dailySummaries`는 월간 캘린더의 날짜별 표시 데이터다.
 - 각 항목의 `colors`는 해당 날짜의 기록 색상 목록이다.
 
-### 6.4 `TrainingLogExternalLinkRequest`
+### 6.4 `TrainingLogAttendanceGrassResponse`, `TrainingLogInsightResponse`
+
+- 365일 출석 잔디와 주간/월간 인사이트 응답 DTO다.
+- DTO 필드와 집계 규칙의 source of truth는 [training-log-insight.md](training-log-insight.md)다.
+
+### 6.5 `TrainingLogExternalLinkRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `type` | `TrainingLogLinkType` | 링크 타입 |
 | `url` | `String` | 원본 링크 URL |
 
-### 6.5 `TrainingLogChecklistItemRequest`
+### 6.6 `TrainingLogChecklistItemRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |

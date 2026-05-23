@@ -64,6 +64,14 @@ public class TrainingLogEntryCreateRequest {
     @Schema(description = "훈련 강도", example = "3")
     private Integer trainingIntensity;
 
+    @Schema(description = "체육관 출석 여부", example = "true")
+    private Boolean gymAttendance;
+
+    @Min(value = 1, message = "컨디션은 1 이상이어야 합니다")
+    @Max(value = 5, message = "컨디션은 5 이하이어야 합니다")
+    @Schema(description = "컨디션", example = "4")
+    private Integer condition;
+
     @Min(value = 0, message = "훈련 시간은 0 이상이어야 합니다")
     @Schema(description = "훈련 시간(분)", example = "90")
     private Integer trainingMinutes;

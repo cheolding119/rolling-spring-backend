@@ -4,10 +4,14 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogAttendanceGrassResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogInsightPeriod;
+import com.rolling.api.domain.traininglog.dto.TrainingLogInsightResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
 import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
+import com.rolling.api.domain.traininglog.service.TrainingLogInsightService;
 import com.rolling.api.domain.traininglog.service.TrainingLogService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
@@ -41,7 +45,40 @@ import java.util.List;
 public class TrainingLogController {
 
     private final TrainingLogService trainingLogService;
+    private final TrainingLogInsightService trainingLogInsightService;
     private final TrainingLogImageUploadService trainingLogImageUploadService;
+
+    @Operation(summary = "365일 훈련 출석 잔디 조회", description = "현재 로그인한 사용자의 기준 날짜 포함 최근 365일 출석 잔디 데이터를 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/attendance-grass")
+    public ResponseEntity<ApiResponse<TrainingLogAttendanceGrassResponse>> attendanceGrass(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        TrainingLogAttendanceGrassResponse response = trainingLogInsightService.getAttendanceGrass(requireUserId(principal), date);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "주간/월간 훈련 인사이트 조회", description = "현재 로그인한 사용자의 기준 날짜가 포함된 주간 또는 월간 훈련 인사이트를 조회합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/insights")
+    public ResponseEntity<ApiResponse<TrainingLogInsightResponse>> insights(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam TrainingLogInsightPeriod period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        TrainingLogInsightResponse response = trainingLogInsightService.getInsights(requireUserId(principal), period, date);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     @Operation(summary = "특정 날짜 훈련 기록 요약 카드 목록 조회", description = "현재 로그인한 사용자의 특정 날짜 훈련 기록 요약 카드 목록을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")

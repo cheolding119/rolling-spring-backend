@@ -85,6 +85,8 @@ class TrainingLogServiceTest {
         ));
         ReflectionTestUtils.setField(request, "color", TrainingLogColor.BLUE);
         ReflectionTestUtils.setField(request, "trainingIntensity", 4);
+        ReflectionTestUtils.setField(request, "gymAttendance", true);
+        ReflectionTestUtils.setField(request, "condition", 3);
         ReflectionTestUtils.setField(request, "trainingMinutes", 90);
         ReflectionTestUtils.setField(request, "checklist", List.of(
                 checklistItem("  Triangle Review  ", true, true, "🔥"),
@@ -120,6 +122,8 @@ class TrainingLogServiceTest {
         );
         assertThat(saved.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(saved.getTrainingIntensity()).isEqualTo(4);
+        assertThat(saved.getGymAttendance()).isTrue();
+        assertThat(saved.getCondition()).isEqualTo(3);
         assertThat(saved.getTrainingMinutes()).isEqualTo(90);
         assertThat(saved.getImageUrl()).isEqualTo("https://cdn.test.com/training-log-1.jpg");
         assertThat(saved.getImageUrlsJson()).isEqualTo(
@@ -129,6 +133,8 @@ class TrainingLogServiceTest {
         assertThat(response.getId()).isEqualTo(100L);
         assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
         assertThat(response.getTrainingIntensity()).isEqualTo(4);
+        assertThat(response.getGymAttendance()).isTrue();
+        assertThat(response.getCondition()).isEqualTo(3);
         assertThat(response.getTrainingMinutes()).isEqualTo(90);
         assertThat(response.getChecklist()).hasSize(2);
         assertThat(response.getChecklist().get(0).text()).isEqualTo("Triangle Review");
@@ -242,20 +248,44 @@ class TrainingLogServiceTest {
     }
 
     @Test
-    @DisplayName("update persists training intensity when the field is present")
-    void update_setsTrainingIntensity() {
+    @DisplayName("create rejects condition outside the 1 to 5 range")
+    void create_invalidCondition_throwsValidationError() {
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+        ReflectionTestUtils.setField(request, "title", "Technique");
+        ReflectionTestUtils.setField(request, "content", "Normal training note");
+        ReflectionTestUtils.setField(request, "condition", 0);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("컨디션은 1 이상 5 이하이어야 합니다");
+    }
+
+    @Test
+    @DisplayName("update persists training status fields when present")
+    void update_setsTrainingStatusFields() {
         User user = createUser(10L);
         TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
         given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
 
         TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
         request.setTrainingIntensity(5);
+        request.setGymAttendance(true);
+        request.setCondition(2);
         request.setTrainingMinutes(75);
 
         TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
 
         assertThat(entry.getTrainingIntensity()).isEqualTo(5);
+        assertThat(entry.getGymAttendance()).isTrue();
+        assertThat(entry.getCondition()).isEqualTo(2);
         assertThat(entry.getTrainingMinutes()).isEqualTo(75);
+        assertThat(response.getTrainingIntensity()).isEqualTo(5);
+        assertThat(response.getGymAttendance()).isTrue();
+        assertThat(response.getCondition()).isEqualTo(2);
         assertThat(response.getTrainingMinutes()).isEqualTo(75);
     }
 
