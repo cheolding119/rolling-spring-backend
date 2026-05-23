@@ -107,6 +107,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
 - 세미나 제품 계획: [domain_and_spec/seminar-product-plan.md](domain_and_spec/seminar-product-plan.md)
 - 훈련 기록: [domain_and_spec/training-log.md](domain_and_spec/training-log.md)
+- 훈련 기록 인사이트: [domain_and_spec/training-log-insight.md](domain_and_spec/training-log-insight.md)
 - 커뮤니티: [domain_and_spec/community.md](domain_and_spec/community.md)
 - 알림 배지 롤아웃: [domain_and_spec/notification-badge-rollout.md](domain_and_spec/notification-badge-rollout.md)
 - 관리자 웹 React API: [rollingadmin/ADMIN_WEB_REACT_API.md](rollingadmin/ADMIN_WEB_REACT_API.md)
@@ -119,6 +120,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
 - [seminar-product-plan.md](domain_and_spec/seminar-product-plan.md): 세미나 제품 범위와 출시 계획
 - [training-log.md](domain_and_spec/training-log.md): 훈련 기록 도메인 모델 + API 스펙
+- [training-log-insight.md](domain_and_spec/training-log-insight.md): 훈련 기록 출석 잔디와 주간/월간 인사이트 도메인/API 스펙
 - [community.md](domain_and_spec/community.md): 커뮤니티 도메인 모델 + API 스펙
 - [notification-badge-rollout.md](domain_and_spec/notification-badge-rollout.md): 알림 배지 기능 rollout 계획
 - [ADMIN_WEB_REACT_API.md](rollingadmin/ADMIN_WEB_REACT_API.md): 관리자 웹 React API 계약

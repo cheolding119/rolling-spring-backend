@@ -2,7 +2,7 @@
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
-- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10과 훈련 강도, 체육관 출석, 컨디션 확장이다.
+- 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10, 훈련 강도/체육관 출석/컨디션 확장, 365일 출석 잔디와 주간/월간 인사이트 조회다.
 
 ## 1. 도메인 개요
 
@@ -22,6 +22,8 @@
 - 월간 캘린더 요약 조회
 - 최근 훈련 기록 조회
 - 이미지 업로드용 presigned URL 발급
+- 365일 출석 잔디 조회
+- 주간/월간 훈련 인사이트 조회
 - `PROMOTION` 카테고리 전용 검증 및 최신 벨트 동기화
 
 ## 2. 도메인 모델
@@ -345,6 +347,25 @@ Request body:
 | `fileName` | `String` | O | 원본 파일명 |
 | `contentType` | `String` | O | 업로드 파일 content type |
 
+### 5.10 365일 출석 잔디 조회
+
+`GET /api/v1/training-logs/me/attendance-grass?date=2026-05-22`
+
+- 인증: 필요
+- Response data: `TrainingLogAttendanceGrassResponse`
+- 상세 계산 규칙과 응답 필드는 [training-log-insight.md](training-log-insight.md)를 따른다.
+
+### 5.11 주간/월간 훈련 인사이트 조회
+
+`GET /api/v1/training-logs/me/insights?period=WEEK&date=2026-05-22`
+
+`GET /api/v1/training-logs/me/insights?period=MONTH&date=2026-05-22`
+
+- 인증: 필요
+- `period`: `WEEK` 또는 `MONTH`
+- Response data: `TrainingLogInsightResponse`
+- 상세 계산 규칙과 응답 필드는 [training-log-insight.md](training-log-insight.md)를 따른다.
+
 ## 6. DTO 노트
 
 ### 6.1 `TrainingLogEntryResponse`
@@ -366,14 +387,19 @@ Request body:
 - `dailySummaries`는 월간 캘린더의 날짜별 표시 데이터다.
 - 각 항목의 `colors`는 해당 날짜의 기록 색상 목록이다.
 
-### 6.4 `TrainingLogExternalLinkRequest`
+### 6.4 `TrainingLogAttendanceGrassResponse`, `TrainingLogInsightResponse`
+
+- 365일 출석 잔디와 주간/월간 인사이트 응답 DTO다.
+- DTO 필드와 집계 규칙의 source of truth는 [training-log-insight.md](training-log-insight.md)다.
+
+### 6.5 `TrainingLogExternalLinkRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
 | `type` | `TrainingLogLinkType` | 링크 타입 |
 | `url` | `String` | 원본 링크 URL |
 
-### 6.5 `TrainingLogChecklistItemRequest`
+### 6.6 `TrainingLogChecklistItemRequest`
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
