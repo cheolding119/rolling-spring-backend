@@ -14,7 +14,10 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
@@ -54,6 +57,12 @@ class TrainingLogServiceTest {
     private TrainingLogEntryRepository trainingLogEntryRepository;
 
     @Mock
+    private TrainingLogLikeRepository trainingLogLikeRepository;
+
+    @Mock
+    private TrainingLogCommentRepository trainingLogCommentRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     private TrainingLogService trainingLogService;
@@ -63,6 +72,8 @@ class TrainingLogServiceTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-05-17T03:00:00Z"), SEOUL_ZONE);
         trainingLogService = new TrainingLogService(
                 trainingLogEntryRepository,
+                trainingLogLikeRepository,
+                trainingLogCommentRepository,
                 userRepository,
                 fixedClock
         );
@@ -529,6 +540,8 @@ class TrainingLogServiceTest {
                 null
         );
         given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+        given(trainingLogLikeRepository.countByEntryIds(List.of(1L))).willReturn(List.of(countProjection(1L, 3L)));
+        given(trainingLogCommentRepository.countActiveByEntryIds(List.of(1L))).willReturn(List.of(countProjection(1L, 5L)));
 
         TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
 
@@ -537,6 +550,10 @@ class TrainingLogServiceTest {
         assertThat(response.getChecklist()).hasSize(1);
         assertThat(response.getChecklist().get(0).favorite()).isTrue();
         assertThat(response.getImageUrls()).containsExactly("https://cdn.test.com/original.jpg");
+        assertThat(response.getLikeCount()).isEqualTo(3L);
+        assertThat(response.getCommentCount()).isEqualTo(5L);
+        assertThat(response.getLikedByMe()).isFalse();
+        assertThat(response.getCommentableByMe()).isFalse();
     }
 
     @Test
@@ -602,6 +619,20 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(item, "type", type);
         ReflectionTestUtils.setField(item, "url", url);
         return item;
+    }
+
+    private TrainingLogCountProjection countProjection(Long entryId, Long count) {
+        return new TrainingLogCountProjection() {
+            @Override
+            public Long getEntryId() {
+                return entryId;
+            }
+
+            @Override
+            public Long getCount() {
+                return count;
+            }
+        };
     }
 
     private User createUser(Long id) {

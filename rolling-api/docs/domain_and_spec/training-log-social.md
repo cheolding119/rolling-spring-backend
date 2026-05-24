@@ -431,6 +431,19 @@ Query parameters:
 - `NOT_FOUND`
 - `FORBIDDEN`
 
+### 5.6.1 본인 기록 상세의 소셜 메타 확장
+
+`GET /api/v1/training-logs/me/entries/{id}`
+
+- 인증: 필요
+- Response data: `TrainingLogEntryResponse`
+
+구현 메모:
+
+- 본인 상세 조회도 친구 상세와 동일한 읽기 메타 필드 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 포함한다.
+- 댓글 목록 조회, 댓글 작성/수정/삭제, 좋아요/좋아요 취소 API는 아래 소셜 액션 API를 그대로 재사용한다.
+- 현재 정책 기준 본인 기록 상세에서는 `likedByMe = false`, `commentableByMe = false`로 반환한다.
+
 ### 5.7 호환용 친구 피드 조회
 
 `GET /api/v1/training-logs/friends`

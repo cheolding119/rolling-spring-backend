@@ -219,6 +219,45 @@ class AuthServiceLifecycleTest {
     }
 
     @Test
+    @DisplayName("기존 사용자는 소셜 프로필 닉네임으로 덮어쓰지 않는다")
+    void login_existingUserKeepsAppNickname() {
+        SocialLoginRequest request = new SocialLoginRequest();
+        ReflectionTestUtils.setField(request, "provider", "GOOGLE");
+        ReflectionTestUtils.setField(request, "accessToken", "google-token");
+
+        GoogleUserResponse googleUserResponse = new GoogleUserResponse();
+        ReflectionTestUtils.setField(googleUserResponse, "sub", "social-keep-nickname");
+        ReflectionTestUtils.setField(googleUserResponse, "name", "소셜이름");
+        ReflectionTestUtils.setField(googleUserResponse, "email", "updated@example.com");
+
+        User existingUser = User.builder()
+                .socialId("social-keep-nickname")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("앱수정닉네임")
+                .email("old@example.com")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(existingUser, "id", 72L);
+
+        ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiry", 1209600000L);
+
+        when(googleClient.getUserInfo("google-token")).thenReturn(googleUserResponse);
+        when(userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse("social-keep-nickname", SocialProvider.GOOGLE))
+                .thenReturn(Optional.of(existingUser));
+        when(jwtTokenProvider.createAccessToken(72L)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(72L)).thenReturn("refresh-token");
+        when(adminAccessConfig.isAdmin(72L)).thenReturn(false);
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(existingUser.getNickname()).isEqualTo("앱수정닉네임");
+        assertThat(existingUser.getEmail()).isEqualTo("updated@example.com");
+        assertThat(response.getName()).isEqualTo("앱수정닉네임");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     @DisplayName("토큰 갱신 응답에 관리자 여부를 포함한다")
     void refresh_includesIsAdmin() {
         ReflectionTestUtils.setField(authService, "accessTokenExpiry", 1800000L);

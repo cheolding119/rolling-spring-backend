@@ -326,7 +326,6 @@ public class AuthService {
     private User findOrCreateUser(String socialId, SocialProvider provider, String nickname, String email, boolean[] isNewUser) {
         return userRepository.findBySocialIdAndSocialProviderAndIsWithdrawnFalse(socialId, provider)
                 .map(existingUser -> {
-                    existingUser.updateNickname(nickname);
                     existingUser.updateEmail(email);
                     log.debug("Existing user updated: {}", existingUser.getId());
                     return existingUser;
