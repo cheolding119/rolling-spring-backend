@@ -2,6 +2,7 @@ package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -26,6 +27,9 @@ public class TrainingLogEntryResponse {
 
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;
+
+    @Schema(description = "기록 공개 범위", example = "PRIVATE")
+    private TrainingLogVisibility visibility;
 
     @Schema(description = "훈련 강도", example = "3")
     private Integer trainingIntensity;

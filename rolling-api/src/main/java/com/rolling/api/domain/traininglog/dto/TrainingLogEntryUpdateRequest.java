@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -73,6 +74,12 @@ public class TrainingLogEntryUpdateRequest {
 
     @JsonIgnore
     private boolean colorFieldPresent;
+
+    @Schema(description = "기록 공개 범위. null을 보내면 기본값 PRIVATE로 설정한다.", example = "FRIENDS", nullable = true)
+    private TrainingLogVisibility visibility;
+
+    @JsonIgnore
+    private boolean visibilityFieldPresent;
 
     @Min(value = 1, message = "훈련 강도는 1 이상이어야 합니다")
     @Max(value = 5, message = "훈련 강도는 5 이하이어야 합니다")
@@ -152,6 +159,12 @@ public class TrainingLogEntryUpdateRequest {
         this.colorFieldPresent = true;
     }
 
+    @JsonSetter("visibility")
+    public void setVisibility(TrainingLogVisibility visibility) {
+        this.visibility = visibility;
+        this.visibilityFieldPresent = true;
+    }
+
     @JsonSetter("trainingIntensity")
     public void setTrainingIntensity(Integer trainingIntensity) {
         this.trainingIntensity = trainingIntensity;
@@ -216,6 +229,11 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasColorField() {
         return colorFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasVisibilityField() {
+        return visibilityFieldPresent;
     }
 
     @JsonIgnore

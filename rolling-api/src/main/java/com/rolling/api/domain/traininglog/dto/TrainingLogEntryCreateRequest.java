@@ -2,6 +2,7 @@ package com.rolling.api.domain.traininglog.dto;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.user.entity.BeltColor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -58,6 +59,9 @@ public class TrainingLogEntryCreateRequest {
 
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;
+
+    @Schema(description = "기록 공개 범위", example = "PRIVATE", allowableValues = {"PRIVATE", "FRIENDS"})
+    private TrainingLogVisibility visibility;
 
     @Min(value = 1, message = "훈련 강도는 1 이상이어야 합니다")
     @Max(value = 5, message = "훈련 강도는 5 이하이어야 합니다")

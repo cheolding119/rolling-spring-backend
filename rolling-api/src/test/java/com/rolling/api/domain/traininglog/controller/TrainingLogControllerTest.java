@@ -18,6 +18,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.service.TrainingLogImageUploadService;
 import com.rolling.api.domain.traininglog.service.TrainingLogInsightService;
 import com.rolling.api.domain.traininglog.service.TrainingLogService;
@@ -142,6 +143,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data.color").value("BLUE"))
+                .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
                 .andExpect(jsonPath("$.data.trainingIntensity").value(4))
                 .andExpect(jsonPath("$.data.gymAttendance").value(true))
                 .andExpect(jsonPath("$.data.condition").value(3))
@@ -314,6 +316,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.trainingDate").value("2026-05-17"))
+                .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
                 .andExpect(jsonPath("$.data.gymAttendance").value(true))
                 .andExpect(jsonPath("$.data.condition").value(3))
                 .andExpect(jsonPath("$.data.trainingMinutes").value(90))
@@ -446,6 +449,7 @@ class TrainingLogControllerTest {
                 .trainingDate(LocalDate.of(2026, 5, 17))
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
+                .visibility(TrainingLogVisibility.PRIVATE)
                 .trainingIntensity(4)
                 .gymAttendance(true)
                 .condition(3)
