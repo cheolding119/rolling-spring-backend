@@ -70,4 +70,16 @@ public class TrainingLogEntryResponse {
     @Schema(description = "승급 기록 전용 stripe 수", example = "1")
     private Integer stripeCount;
 
+    @Schema(description = "좋아요 수", example = "3")
+    private Long likeCount;
+
+    @Schema(description = "댓글 수", example = "5")
+    private Long commentCount;
+
+    @Schema(description = "현재 로그인 사용자의 좋아요 여부", example = "false")
+    private Boolean likedByMe;
+
+    @Schema(description = "현재 로그인 사용자의 댓글 작성 가능 여부", example = "false")
+    private Boolean commentableByMe;
+
 }

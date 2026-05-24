@@ -308,7 +308,7 @@ class TrainingLogControllerTest {
     @DisplayName("find entry detail returns full response for authenticated users")
     void findEntryDetail_withUserToken_returnsOk() throws Exception {
         authenticateUser();
-        given(trainingLogService.findEntryDetail(2L, 1L)).willReturn(response(1L));
+        given(trainingLogService.findEntryDetail(2L, 1L)).willReturn(detailResponse(1L));
 
         mockMvc.perform(get("/api/v1/training-logs/me/entries/1")
                         .header("Authorization", "Bearer user-token"))
@@ -320,6 +320,10 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.gymAttendance").value(true))
                 .andExpect(jsonPath("$.data.condition").value(3))
                 .andExpect(jsonPath("$.data.trainingMinutes").value(90))
+                .andExpect(jsonPath("$.data.likeCount").value(3))
+                .andExpect(jsonPath("$.data.commentCount").value(5))
+                .andExpect(jsonPath("$.data.likedByMe").value(false))
+                .andExpect(jsonPath("$.data.commentableByMe").value(false))
                 .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
     }
@@ -465,6 +469,34 @@ class TrainingLogControllerTest {
                         .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
                         .imageUrl("https://cdn.test.com/training-log-1.jpg")
                         .build();
+    }
+
+    private TrainingLogEntryResponse detailResponse(Long id) {
+        return TrainingLogEntryResponse.builder()
+                .id(id)
+                .trainingDate(LocalDate.of(2026, 5, 17))
+                .category(TrainingLogCategory.TECHNIQUE)
+                .color(TrainingLogColor.BLUE)
+                .visibility(TrainingLogVisibility.PRIVATE)
+                .trainingIntensity(4)
+                .gymAttendance(true)
+                .condition(3)
+                .trainingMinutes(90)
+                .title("Arm Triangle Details")
+                .content("Finished details for knee angle and arm position.")
+                .checklist(List.of(new TrainingLogChecklistItem("Triangle Review", true, true, "🔥")))
+                .hashtags(List.of("triangle"))
+                .imageUrls(List.of(
+                        "https://cdn.test.com/training-log-1.jpg",
+                        "https://cdn.test.com/training-log-2.jpg"
+                ))
+                .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
+                .imageUrl("https://cdn.test.com/training-log-1.jpg")
+                .likeCount(3L)
+                .commentCount(5L)
+                .likedByMe(false)
+                .commentableByMe(false)
+                .build();
     }
 
     private TrainingLogEntrySummaryResponse summaryResponse(Long id) {

@@ -15,7 +15,10 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -58,6 +61,8 @@ public class TrainingLogService {
     );
 
     private final TrainingLogEntryRepository trainingLogEntryRepository;
+    private final TrainingLogLikeRepository trainingLogLikeRepository;
+    private final TrainingLogCommentRepository trainingLogCommentRepository;
     private final UserRepository userRepository;
     private final Clock clock;
 
@@ -98,7 +103,13 @@ public class TrainingLogService {
     public TrainingLogEntryResponse findEntryDetail(Long userId, Long entryId) {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
-        return toResponse(entry);
+        Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
+        Map<Long, Long> commentCounts = toCountMap(trainingLogCommentRepository.countActiveByEntryIds(List.of(entry.getId())));
+        return toDetailResponse(
+                entry,
+                likeCounts.getOrDefault(entry.getId(), 0L),
+                commentCounts.getOrDefault(entry.getId(), 0L)
+        );
     }
 
     @Transactional(readOnly = true)
@@ -258,6 +269,19 @@ public class TrainingLogService {
     }
 
     private TrainingLogEntryResponse toResponse(TrainingLogEntry entry) {
+        return baseResponseBuilder(entry).build();
+    }
+
+    private TrainingLogEntryResponse toDetailResponse(TrainingLogEntry entry, long likeCount, long commentCount) {
+        return baseResponseBuilder(entry)
+                .likeCount(likeCount)
+                .commentCount(commentCount)
+                .likedByMe(false)
+                .commentableByMe(false)
+                .build();
+    }
+
+    private TrainingLogEntryResponse.TrainingLogEntryResponseBuilder baseResponseBuilder(TrainingLogEntry entry) {
         return TrainingLogEntryResponse.builder()
                 .id(entry.getId())
                 .trainingDate(entry.getTrainingDate())
@@ -276,8 +300,7 @@ public class TrainingLogService {
                 .imageUrl(entry.getImageUrl())
                 .trainingMinutes(entry.getTrainingMinutes())
                 .beltColor(entry.getBeltColor())
-                .stripeCount(entry.getStripeCount())
-                .build();
+                .stripeCount(entry.getStripeCount());
     }
 
     private TrainingLogEntrySummaryResponse toSummaryResponse(TrainingLogEntry entry) {
@@ -648,6 +671,11 @@ public class TrainingLogService {
 
     private TrainingLogVisibility normalizeVisibility(TrainingLogVisibility visibility) {
         return visibility == null ? TrainingLogVisibility.PRIVATE : visibility;
+    }
+
+    private Map<Long, Long> toCountMap(List<TrainingLogCountProjection> counts) {
+        return counts.stream()
+                .collect(Collectors.toMap(TrainingLogCountProjection::getEntryId, TrainingLogCountProjection::getCount));
     }
 
     private int safeToInt(Long value) {
