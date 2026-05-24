@@ -61,6 +61,7 @@
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - `imageUrl`, `imageUrls`, `color`, `visibility`, `trainingIntensity`, `gymAttendance`, `condition`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
+- 친구 소셜 열람 권한은 `visibility`가 아니라 [training-log-social.md](training-log-social.md)의 `shareWithFriends` 설정을 따른다.
 
 ### 2.2 `TrainingLogChecklistItem`
 

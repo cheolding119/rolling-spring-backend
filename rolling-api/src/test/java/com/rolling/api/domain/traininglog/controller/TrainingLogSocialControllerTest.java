@@ -2,8 +2,13 @@ package com.rolling.api.domain.traininglog.controller;
 
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.repository.UserRepository;
@@ -112,6 +117,48 @@ class TrainingLogSocialControllerTest {
     }
 
     @Test
+    @DisplayName("친구 공개 설정 조회는 설정 응답을 반환한다")
+    void getFriendSharing_withToken_returnsSetting() throws Exception {
+        authenticateUser();
+        given(trainingLogSocialService.getFriendSharing(2L)).willReturn(
+                TrainingLogFriendSharingResponse.builder()
+                        .shareWithFriends(true)
+                        .updatedAt(LocalDateTime.of(2026, 5, 24, 12, 0))
+                        .build()
+        );
+
+        mockMvc.perform(get("/api/v1/training-logs/me/friend-sharing")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.shareWithFriends").value(true))
+                .andExpect(jsonPath("$.data.updatedAt").value("2026-05-24T12:00:00"));
+    }
+
+    @Test
+    @DisplayName("친구 공개 설정 변경은 인증 사용자에게 허용된다")
+    void updateFriendSharing_withToken_returnsUpdatedSetting() throws Exception {
+        authenticateUser();
+        given(trainingLogSocialService.updateFriendSharing(eq(2L), any())).willReturn(
+                TrainingLogFriendSharingResponse.builder()
+                        .shareWithFriends(false)
+                        .updatedAt(LocalDateTime.of(2026, 5, 24, 13, 0))
+                        .build()
+        );
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/v1/training-logs/me/friend-sharing")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "shareWithFriends": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.shareWithFriends").value(false))
+                .andExpect(jsonPath("$.data.updatedAt").value("2026-05-24T13:00:00"));
+    }
+
+    @Test
     @DisplayName("친구 피드는 페이징 응답을 반환한다")
     void friendFeed_withToken_returnsPagedEntries() throws Exception {
         authenticateUser();
@@ -141,6 +188,60 @@ class TrainingLogSocialControllerTest {
                 .andExpect(jsonPath("$.data.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.content[0].authorNickname").value("민준"))
                 .andExpect(jsonPath("$.data.content[0].likedByMe").value(true));
+    }
+
+    @Test
+    @DisplayName("친구 월간 캘린더 조회는 기존 캘린더 응답 구조를 반환한다")
+    void friendCalendar_withToken_returnsMonthlyCalendar() throws Exception {
+        authenticateUser();
+        given(trainingLogSocialService.getFriendMonthlyCalendar(2L, 10L, 2026, 5)).willReturn(
+                TrainingLogMonthlyCalendarResponse.builder()
+                        .year(2026)
+                        .month(5)
+                        .dailySummaries(List.of(
+                                new TrainingLogMonthlyCalendarDailySummary(
+                                        LocalDate.of(2026, 5, 22),
+                                        List.of(TrainingLogColor.BLUE),
+                                        List.of(TrainingLogCategory.TECHNIQUE),
+                                        2
+                                )
+                        ))
+                        .build()
+        );
+
+        mockMvc.perform(get("/api/v1/training-logs/friends/10/calendar")
+                        .header("Authorization", "Bearer user-token")
+                        .param("year", "2026")
+                        .param("month", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.year").value(2026))
+                .andExpect(jsonPath("$.data.month").value(5))
+                .andExpect(jsonPath("$.data.dailySummaries[0].date").value("2026-05-22"))
+                .andExpect(jsonPath("$.data.dailySummaries[0].recordCount").value(2));
+    }
+
+    @Test
+    @DisplayName("친구 날짜별 기록 조회는 기존 요약 응답 구조를 반환한다")
+    void friendEntriesByDate_withToken_returnsSummaries() throws Exception {
+        authenticateUser();
+        given(trainingLogSocialService.findFriendEntriesByDate(2L, 10L, LocalDate.of(2026, 5, 22))).willReturn(List.of(
+                TrainingLogEntrySummaryResponse.builder()
+                        .id(1L)
+                        .title("오늘 연습")
+                        .content("암바 디테일")
+                        .category(TrainingLogCategory.TECHNIQUE)
+                        .color(TrainingLogColor.BLUE)
+                        .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
+                        .build()
+        ));
+
+        mockMvc.perform(get("/api/v1/training-logs/friends/10/entries")
+                        .header("Authorization", "Bearer user-token")
+                        .param("date", "2026-05-22"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(1L))
+                .andExpect(jsonPath("$.data[0].title").value("오늘 연습"))
+                .andExpect(jsonPath("$.data[0].color").value("BLUE"));
     }
 
     @Test

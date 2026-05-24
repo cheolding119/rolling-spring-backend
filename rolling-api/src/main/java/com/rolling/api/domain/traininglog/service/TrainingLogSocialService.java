@@ -7,8 +7,13 @@ import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentUpdateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
 import com.rolling.api.domain.traininglog.entity.FriendRequestStatus;
 import com.rolling.api.domain.traininglog.entity.Friendship;
@@ -16,7 +21,8 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLike;
-import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.UserTrainingLogShareSetting;
 import com.rolling.api.domain.traininglog.event.TrainingLogCommentNotificationEvent;
 import com.rolling.api.domain.traininglog.repository.FriendRequestRepository;
 import com.rolling.api.domain.traininglog.repository.FriendshipRepository;
@@ -24,6 +30,7 @@ import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepositor
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
+import com.rolling.api.domain.traininglog.repository.UserTrainingLogShareSettingRepository;
 import com.rolling.api.domain.user.entity.AccountStatus;
 import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserBlockRepository;
@@ -42,6 +49,7 @@ import org.springframework.util.StringUtils;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,6 +77,7 @@ public class TrainingLogSocialService {
     private final TrainingLogEntryRepository trainingLogEntryRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
+    private final UserTrainingLogShareSettingRepository userTrainingLogShareSettingRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final Clock clock;
 
@@ -195,36 +204,68 @@ public class TrainingLogSocialService {
     }
 
     @Transactional(readOnly = true)
+    public TrainingLogFriendSharingResponse getFriendSharing(Long userId) {
+        requireActiveUser(userId);
+        return userTrainingLogShareSettingRepository.findByUser_Id(userId)
+                .map(TrainingLogFriendSharingResponse::from)
+                .orElseGet(TrainingLogFriendSharingResponse::defaultPrivate);
+    }
+
+    @Transactional
+    public TrainingLogFriendSharingResponse updateFriendSharing(Long userId, TrainingLogFriendSharingUpdateRequest request) {
+        User user = getActiveUser(userId);
+        UserTrainingLogShareSetting setting = userTrainingLogShareSettingRepository.findByUser_Id(userId)
+                .orElseGet(() -> userTrainingLogShareSettingRepository.save(UserTrainingLogShareSetting.builder()
+                        .user(user)
+                        .shareWithFriends(false)
+                        .build()));
+        setting.updateShareWithFriends(Boolean.TRUE.equals(request.getShareWithFriends()));
+        return TrainingLogFriendSharingResponse.from(userTrainingLogShareSettingRepository.saveAndFlush(setting));
+    }
+
+    @Transactional(readOnly = true)
     public Page<TrainingLogFriendEntrySummaryResponse> findFriendFeed(Long userId, Pageable pageable) {
         requireActiveUser(userId);
         Page<TrainingLogEntry> entries = trainingLogEntryRepository.findFriendFeedEntries(
                 userId,
-                TrainingLogVisibility.FRIENDS,
                 normalizeFeedPageable(pageable)
         );
         return mapSummaryPage(entries, userId);
     }
 
     @Transactional(readOnly = true)
-    public Page<TrainingLogFriendEntrySummaryResponse> findFriendEntries(
-            Long userId,
-            Long friendUserId,
-            LocalDate dateFrom,
-            LocalDate dateTo,
-            Pageable pageable
-    ) {
+    public TrainingLogMonthlyCalendarResponse getFriendMonthlyCalendar(Long userId, Long friendUserId, int year, int month) {
         requireActiveUser(userId);
-        validateDateRange(dateFrom, dateTo);
+        validateYear(year);
+        validateMonth(month);
         ensureFriendAccessible(userId, friendUserId);
 
-        Page<TrainingLogEntry> entries = trainingLogEntryRepository.findFriendEntriesByAuthorId(
-                friendUserId,
-                TrainingLogVisibility.FRIENDS,
-                dateFrom,
-                dateTo,
-                normalizeFeedPageable(pageable)
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDateExclusive = startDate.plusMonths(1);
+
+        List<TrainingLogMonthlyCalendarDailySummary> dailySummaries = buildMonthlyDailySummaries(
+                trainingLogEntryRepository.findAllByUser_IdAndTrainingDateGreaterThanEqualAndTrainingDateLessThanOrderByTrainingDateAscCreatedAtAsc(
+                        friendUserId,
+                        startDate,
+                        endDateExclusive
+                )
         );
-        return mapSummaryPage(entries, userId);
+
+        return TrainingLogMonthlyCalendarResponse.builder()
+                .year(year)
+                .month(month)
+                .dailySummaries(dailySummaries)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrainingLogEntrySummaryResponse> findFriendEntriesByDate(Long userId, Long friendUserId, LocalDate date) {
+        requireActiveUser(userId);
+        ensureFriendAccessible(userId, friendUserId);
+        return trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAscIdAsc(friendUserId, date).stream()
+                .map(this::toEntrySummaryResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -381,8 +422,11 @@ public class TrainingLogSocialService {
                 .content(entry.getContent())
                 .checklist(TrainingLogJsonCodec.readChecklist(entry.getChecklistJson()))
                 .hashtags(TrainingLogJsonCodec.readStringList(entry.getHashtagsJson()))
+                .imageUrl(entry.getImageUrl())
                 .imageUrls(imageUrls)
                 .externalLinks(TrainingLogJsonCodec.readExternalLinks(entry.getExternalLinksJson()))
+                .beltColor(entry.getBeltColor())
+                .stripeCount(entry.getStripeCount())
                 .likeCount(likeCount)
                 .commentCount(commentCount)
                 .likedByMe(likedByMe)
@@ -505,9 +549,6 @@ public class TrainingLogSocialService {
         if (!isVisibleAuthor(entry.getUser())) {
             throw BusinessException.notFound("훈련 기록을 찾을 수 없습니다");
         }
-        if (entry.getVisibility() != TrainingLogVisibility.FRIENDS) {
-            throw BusinessException.forbidden("친구만 조회할 수 있는 기록입니다");
-        }
         ensureFriendAccessible(viewerUserId, ownerUserId);
         return entry;
     }
@@ -524,6 +565,9 @@ public class TrainingLogSocialService {
         }
         if (!isVisibleAuthor(getRequestableUser(friendUserId))) {
             throw BusinessException.notFound("사용자를 찾을 수 없습니다");
+        }
+        if (!userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(friendUserId)) {
+            throw BusinessException.forbidden("친구 공개가 설정된 기록만 조회할 수 있습니다");
         }
     }
 
@@ -596,12 +640,6 @@ public class TrainingLogSocialService {
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), DEFAULT_FEED_SORT);
     }
 
-    private void validateDateRange(LocalDate dateFrom, LocalDate dateTo) {
-        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
-            throw BusinessException.badRequest("dateFrom은 dateTo보다 늦을 수 없습니다");
-        }
-    }
-
     private User getActiveUser(Long userId) {
         return userRepository.findByIdAndIsWithdrawnFalse(userId)
                 .orElseThrow(() -> BusinessException.notFound("사용자를 찾을 수 없습니다"));
@@ -632,5 +670,67 @@ public class TrainingLogSocialService {
     private TrainingLogComment getComment(Long commentId) {
         return trainingLogCommentRepository.findById(commentId)
                 .orElseThrow(() -> BusinessException.notFound("댓글을 찾을 수 없습니다"));
+    }
+
+    private TrainingLogEntrySummaryResponse toEntrySummaryResponse(TrainingLogEntry entry) {
+        return TrainingLogEntrySummaryResponse.builder()
+                .id(entry.getId())
+                .title(entry.getTitle())
+                .content(entry.getContent())
+                .category(entry.getCategory())
+                .color(entry.getColor())
+                .createdAt(entry.getCreatedAt())
+                .build();
+    }
+
+    private List<TrainingLogMonthlyCalendarDailySummary> buildMonthlyDailySummaries(List<TrainingLogEntry> entries) {
+        if (entries.isEmpty()) {
+            return List.of();
+        }
+
+        Map<LocalDate, List<TrainingLogEntry>> groupedEntries = entries.stream()
+                .collect(Collectors.groupingBy(
+                        TrainingLogEntry::getTrainingDate,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        return groupedEntries.entrySet().stream()
+                .map(entry -> {
+                    List<TrainingLogEntry> dayEntries = entry.getValue();
+                    List<TrainingLogColor> colors = dayEntries.stream()
+                            .map(TrainingLogEntry::getColor)
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.collectingAndThen(
+                                    Collectors.toCollection(LinkedHashSet::new),
+                                    List::copyOf
+                            ));
+                    List<TrainingLogCategory> categories = dayEntries.stream()
+                            .map(TrainingLogEntry::getCategory)
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.collectingAndThen(
+                                    Collectors.toCollection(LinkedHashSet::new),
+                                    List::copyOf
+                            ));
+                    return new TrainingLogMonthlyCalendarDailySummary(
+                            entry.getKey(),
+                            colors,
+                            categories,
+                            dayEntries.size()
+                    );
+                })
+                .toList();
+    }
+
+    private void validateYear(int year) {
+        if (year < 2000 || year > 2100) {
+            throw BusinessException.badRequest("year는 2000 이상 2100 이하이어야 합니다");
+        }
+    }
+
+    private void validateMonth(int month) {
+        if (month < 1 || month > 12) {
+            throw BusinessException.badRequest("month는 1 이상 12 이하이어야 합니다");
+        }
     }
 }
