@@ -3,6 +3,7 @@
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
 - 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10, 훈련 강도/체육관 출석/컨디션 확장, 365일 출석 잔디와 주간/월간 인사이트 조회다.
+- 친구 공개 범위, 친구 열람, 좋아요, 댓글 확장 계약은 [training-log-social.md](training-log-social.md)에서 별도 관리한다.
 
 ## 1. 도메인 개요
 
@@ -44,6 +45,7 @@
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `visibility` | `TrainingLogVisibility` | 기록 공개 범위 |
 | `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
 | `gymAttendance` | `Boolean?` | 체육관 출석 여부 |
 | `condition` | `Integer?` | 컨디션(1~5) |
@@ -57,7 +59,7 @@
 
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
-- `imageUrl`, `imageUrls`, `color`, `trainingIntensity`, `gymAttendance`, `condition`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `imageUrl`, `imageUrls`, `color`, `visibility`, `trainingIntensity`, `gymAttendance`, `condition`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 
 ### 2.2 `TrainingLogChecklistItem`
@@ -165,6 +167,18 @@
 - `TrainingLogColor`는 기록의 독립 색상 필드로 사용한다.
 - 실제 색상 코드 매핑은 프론트 UI 레이어에서 관리한다.
 
+### 3.4 `TrainingLogVisibility`
+
+| Raw value | 설명 |
+| --- | --- |
+| `PRIVATE` | 작성자만 조회 가능 |
+| `FRIENDS` | 친구만 조회 가능 |
+
+구현 메모:
+
+- 생성/수정 request에서 생략하면 `PRIVATE`로 처리한다.
+- 개인 기록 API의 상세 응답에는 항상 포함한다.
+
 ## 4. 공통 정책
 
 ### 4.1 인증과 권한
@@ -265,6 +279,7 @@ Request body:
 | `imageUrls` | `List<String>?` | - | 이미지 목록 |
 | `imageUrl` | `String?` | - | 대표 이미지 URL |
 | `color` | `TrainingLogColor?` | - | 기록 색상 |
+| `visibility` | `TrainingLogVisibility?` | - | 기록 공개 범위. 기본값 `PRIVATE` |
 | `trainingIntensity` | `Integer?` | - | 훈련 강도 |
 | `gymAttendance` | `Boolean?` | - | 체육관 출석 여부 |
 | `condition` | `Integer?` | - | 컨디션(1~5) |
@@ -292,6 +307,7 @@ Request body:
 | `imageUrls` | `List<String>?` | `[]` 또는 `null`이면 비움 |
 | `imageUrl` | `String?` | `null`이면 비움 |
 | `color` | `TrainingLogColor?` | `null`이면 비움 |
+| `visibility` | `TrainingLogVisibility?` | 전달 시 반영, `null`이면 `PRIVATE` |
 | `trainingIntensity` | `Integer?` | `null`이면 비움 |
 | `gymAttendance` | `Boolean?` | `null`이면 비움 |
 | `condition` | `Integer?` | `null`이면 비움 |
@@ -373,7 +389,7 @@ Request body:
 - `checklist`는 `List<TrainingLogChecklistItem>`이다.
 - `hashtags`는 정규화된 `List<String>`이다.
 - `externalLinks`는 `List<TrainingLogExternalLink>`이다.
-- `color`는 기록 색상이다.
+- `color`, `visibility`는 기록 메타데이터다.
 - `trainingIntensity`, `gymAttendance`, `condition`은 훈련 상태 메타데이터로 함께 반환된다.
 - `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`, `trainingMinutes`가 함께 반환된다.
 

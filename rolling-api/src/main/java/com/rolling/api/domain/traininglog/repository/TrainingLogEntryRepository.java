@@ -1,8 +1,11 @@
 package com.rolling.api.domain.traininglog.repository;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,6 +24,9 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
             LocalDate startDate,
             LocalDate endDateExclusive
     );
+
+    @EntityGraph(attributePaths = "user")
+    Optional<TrainingLogEntry> findWithUserById(Long id);
 
     Optional<TrainingLogEntry> findFirstByUser_IdAndCategoryOrderByTrainingDateDescCreatedAtDescIdDesc(
             Long userId,
@@ -74,4 +80,76 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
             order by entry.createdAt desc
             """)
     List<String> findHashtagsJsonByUserId(@Param("userId") Long userId);
+
+    @EntityGraph(attributePaths = "user")
+    @Query(
+            value = """
+                    select entry
+                    from TrainingLogEntry entry
+                    where entry.visibility = :visibility
+                      and entry.user.id in (
+                          select friendship.friendUser.id
+                          from Friendship friendship
+                          where friendship.user.id = :viewerUserId
+                      )
+                      and entry.user.isWithdrawn = false
+                      and entry.user.withdrawalPending = false
+                      and entry.user.accountStatus = com.rolling.api.domain.user.entity.AccountStatus.ACTIVE
+                      and not exists (
+                          select 1 from UserBlock block
+                          where (block.user.id = :viewerUserId and block.blockedUser.id = entry.user.id)
+                             or (block.user.id = entry.user.id and block.blockedUser.id = :viewerUserId)
+                      )
+                    """,
+            countQuery = """
+                    select count(entry)
+                    from TrainingLogEntry entry
+                    where entry.visibility = :visibility
+                      and entry.user.id in (
+                          select friendship.friendUser.id
+                          from Friendship friendship
+                          where friendship.user.id = :viewerUserId
+                      )
+                      and entry.user.isWithdrawn = false
+                      and entry.user.withdrawalPending = false
+                      and entry.user.accountStatus = com.rolling.api.domain.user.entity.AccountStatus.ACTIVE
+                      and not exists (
+                          select 1 from UserBlock block
+                          where (block.user.id = :viewerUserId and block.blockedUser.id = entry.user.id)
+                             or (block.user.id = entry.user.id and block.blockedUser.id = :viewerUserId)
+                      )
+                    """
+    )
+    Page<TrainingLogEntry> findFriendFeedEntries(
+            @Param("viewerUserId") Long viewerUserId,
+            @Param("visibility") TrainingLogVisibility visibility,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = "user")
+    @Query(
+            value = """
+                    select entry
+                    from TrainingLogEntry entry
+                    where entry.user.id = :authorUserId
+                      and entry.visibility = :visibility
+                      and (:dateFrom is null or entry.trainingDate >= :dateFrom)
+                      and (:dateTo is null or entry.trainingDate <= :dateTo)
+                    """,
+            countQuery = """
+                    select count(entry)
+                    from TrainingLogEntry entry
+                    where entry.user.id = :authorUserId
+                      and entry.visibility = :visibility
+                      and (:dateFrom is null or entry.trainingDate >= :dateFrom)
+                      and (:dateTo is null or entry.trainingDate <= :dateTo)
+                    """
+    )
+    Page<TrainingLogEntry> findFriendEntriesByAuthorId(
+            @Param("authorUserId") Long authorUserId,
+            @Param("visibility") TrainingLogVisibility visibility,
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo,
+            Pageable pageable
+    );
 }

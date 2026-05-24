@@ -1,8 +1,5 @@
 package com.rolling.api.domain.traininglog.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
@@ -17,6 +14,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.User;
@@ -54,15 +52,10 @@ public class TrainingLogService {
     private static final int TAG_AUTOCOMPLETE_LIMIT = 20;
     private static final int RECENT_LIMIT = 10;
     private static final Pattern HASHTAG_PATTERN = Pattern.compile("^[0-9a-z가-힣-]+$");
-    private static final TypeReference<List<TrainingLogChecklistItem>> CHECKLIST_TYPE = new TypeReference<>() {};
-    private static final TypeReference<List<String>> HASHTAG_TYPE = new TypeReference<>() {};
-    private static final TypeReference<List<String>> IMAGE_URLS_TYPE = new TypeReference<>() {};
-    private static final TypeReference<List<TrainingLogExternalLink>> EXTERNAL_LINK_TYPE = new TypeReference<>() {};
     private static final Map<TrainingLogLinkType, Set<String>> ALLOWED_EXTERNAL_LINK_HOSTS = Map.of(
             TrainingLogLinkType.INSTAGRAM, Set.of("instagram.com"),
             TrainingLogLinkType.YOUTUBE, Set.of("youtube.com", "youtu.be")
     );
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final TrainingLogEntryRepository trainingLogEntryRepository;
     private final UserRepository userRepository;
@@ -131,6 +124,7 @@ public class TrainingLogService {
         Integer trainingIntensity = validateTrainingIntensity(request.getTrainingIntensity());
         Integer condition = validateCondition(request.getCondition());
         Integer trainingMinutes = request.getTrainingMinutes();
+        TrainingLogVisibility visibility = normalizeVisibility(request.getVisibility());
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
@@ -140,16 +134,17 @@ public class TrainingLogService {
                         .category(category)
                         .title(requireText(request.getTitle(), "기록 제목은 필수입니다"))
                         .content(requireText(request.getContent(), "기록 내용은 필수입니다"))
-                        .checklistJson(writeChecklistJson(checklist))
-                        .hashtagsJson(writeHashtagsJson(hashtags))
-                        .imageUrlsJson(writeImageUrlsJson(imageUrls))
-                        .externalLinksJson(writeExternalLinksJson(externalLinks))
+                        .checklistJson(TrainingLogJsonCodec.writeChecklistJson(checklist))
+                        .hashtagsJson(TrainingLogJsonCodec.writeStringListJson(hashtags))
+                        .imageUrlsJson(TrainingLogJsonCodec.writeStringListJson(imageUrls))
+                        .externalLinksJson(TrainingLogJsonCodec.writeExternalLinksJson(externalLinks))
                         .color(request.getColor())
                         .trainingIntensity(trainingIntensity)
                         .gymAttendance(request.getGymAttendance())
                         .condition(condition)
                         .trainingMinutes(trainingMinutes)
                         .imageUrl(imageUrl)
+                        .visibility(visibility)
                         .beltColor(category == TrainingLogCategory.PROMOTION ? request.getBeltColor() : null)
                         .stripeCount(category == TrainingLogCategory.PROMOTION ? request.getStripeCount() : null)
                         .build()
@@ -176,16 +171,19 @@ public class TrainingLogService {
                 : entry.getContent();
         List<TrainingLogChecklistItem> checklist = request.hasChecklistField()
                 ? normalizeChecklist(request.getChecklist())
-                : readChecklist(entry.getChecklistJson());
+                : TrainingLogJsonCodec.readChecklist(entry.getChecklistJson());
         List<String> hashtags = request.hasHashtagsField()
                 ? normalizeHashtags(request.getHashtags())
-                : readHashtags(entry.getHashtagsJson());
+                : TrainingLogJsonCodec.readStringList(entry.getHashtagsJson());
         List<TrainingLogExternalLink> externalLinks = request.hasExternalLinksField()
                 ? normalizeExternalLinks(request.getExternalLinks())
-                : readExternalLinks(entry.getExternalLinksJson());
+                : TrainingLogJsonCodec.readExternalLinks(entry.getExternalLinksJson());
         List<String> imageUrls = resolveImageUrls(entry, request);
         String imageUrl = firstImageUrl(imageUrls);
         TrainingLogColor color = request.hasColorField() ? request.getColor() : entry.getColor();
+        TrainingLogVisibility visibility = request.hasVisibilityField()
+                ? normalizeVisibility(request.getVisibility())
+                : entry.getVisibility();
         Integer trainingIntensity = request.hasTrainingIntensityField()
                 ? validateTrainingIntensity(request.getTrainingIntensity())
                 : entry.getTrainingIntensity();
@@ -206,16 +204,17 @@ public class TrainingLogService {
                 category,
                 title,
                 content,
-                writeChecklistJson(checklist),
-                writeHashtagsJson(hashtags),
+                TrainingLogJsonCodec.writeChecklistJson(checklist),
+                TrainingLogJsonCodec.writeStringListJson(hashtags),
                 trainingMinutes,
                 trainingIntensity,
                 gymAttendance,
                 condition,
                 imageUrl,
-                writeImageUrlsJson(imageUrls),
-                writeExternalLinksJson(externalLinks),
+                TrainingLogJsonCodec.writeStringListJson(imageUrls),
+                TrainingLogJsonCodec.writeExternalLinksJson(externalLinks),
                 color,
+                visibility,
                 beltColor,
                 stripeCount
         );
@@ -246,7 +245,7 @@ public class TrainingLogService {
 
         LinkedHashSet<String> matched = new LinkedHashSet<>();
         for (String hashtagsJson : trainingLogEntryRepository.findHashtagsJsonByUserId(userId)) {
-            for (String hashtag : readHashtags(hashtagsJson)) {
+            for (String hashtag : TrainingLogJsonCodec.readStringList(hashtagsJson)) {
                 if (hashtag.contains(normalizedQuery)) {
                     matched.add(hashtag);
                     if (matched.size() >= TAG_AUTOCOMPLETE_LIMIT) {
@@ -264,14 +263,15 @@ public class TrainingLogService {
                 .trainingDate(entry.getTrainingDate())
                 .category(entry.getCategory())
                 .color(entry.getColor())
+                .visibility(entry.getVisibility())
                 .trainingIntensity(entry.getTrainingIntensity())
                 .gymAttendance(entry.getGymAttendance())
                 .condition(entry.getCondition())
                 .title(entry.getTitle())
                 .content(entry.getContent())
-                .checklist(readChecklist(entry.getChecklistJson()))
-                .hashtags(readHashtags(entry.getHashtagsJson()))
-                .externalLinks(readExternalLinks(entry.getExternalLinksJson()))
+                .checklist(TrainingLogJsonCodec.readChecklist(entry.getChecklistJson()))
+                .hashtags(TrainingLogJsonCodec.readStringList(entry.getHashtagsJson()))
+                .externalLinks(TrainingLogJsonCodec.readExternalLinks(entry.getExternalLinksJson()))
                 .imageUrls(readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl()))
                 .imageUrl(entry.getImageUrl())
                 .trainingMinutes(entry.getTrainingMinutes())
@@ -582,14 +582,6 @@ public class TrainingLogService {
         );
     }
 
-    private String writeChecklistJson(List<TrainingLogChecklistItem> checklist) {
-        return writeJsonOrNull(checklist);
-    }
-
-    private List<TrainingLogChecklistItem> readChecklist(String checklistJson) {
-        return readJsonList(checklistJson, CHECKLIST_TYPE);
-    }
-
     private List<String> normalizeHashtags(List<String> hashtags) {
         if (hashtags == null) {
             return List.of();
@@ -635,20 +627,8 @@ public class TrainingLogService {
         return normalized;
     }
 
-    private String writeHashtagsJson(List<String> hashtags) {
-        return writeJsonOrNull(hashtags);
-    }
-
-    private List<String> readHashtags(String hashtagsJson) {
-        return readJsonList(hashtagsJson, HASHTAG_TYPE);
-    }
-
-    private String writeImageUrlsJson(List<String> imageUrls) {
-        return writeJsonOrNull(imageUrls);
-    }
-
     private List<String> readImageUrls(String imageUrlsJson, String imageUrl) {
-        List<String> imageUrls = readJsonList(imageUrlsJson, IMAGE_URLS_TYPE);
+        List<String> imageUrls = TrainingLogJsonCodec.readStringList(imageUrlsJson);
         if (!imageUrls.isEmpty()) {
             return imageUrls;
         }
@@ -656,14 +636,6 @@ public class TrainingLogService {
             return List.of(imageUrl);
         }
         return List.of();
-    }
-
-    private String writeExternalLinksJson(List<TrainingLogExternalLink> externalLinks) {
-        return writeJsonOrNull(externalLinks);
-    }
-
-    private List<TrainingLogExternalLink> readExternalLinks(String externalLinksJson) {
-        return readJsonList(externalLinksJson, EXTERNAL_LINK_TYPE);
     }
 
     private void syncUserBeltColor(Long userId) {
@@ -674,27 +646,8 @@ public class TrainingLogService {
                 .ifPresent(user::updateBeltColor);
     }
 
-    private String writeJsonOrNull(Object value) {
-        if (value instanceof List<?> list && list.isEmpty()) {
-            return null;
-        }
-        try {
-            return OBJECT_MAPPER.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("훈련 기록 JSON 직렬화에 실패했습니다", e);
-        }
-    }
-
-    private <T> List<T> readJsonList(String json, TypeReference<List<T>> typeReference) {
-        if (!StringUtils.hasText(json)) {
-            return List.of();
-        }
-        try {
-            List<T> value = OBJECT_MAPPER.readValue(json, typeReference);
-            return value == null ? List.of() : List.copyOf(value);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("훈련 기록 JSON 역직렬화에 실패했습니다", e);
-        }
+    private TrainingLogVisibility normalizeVisibility(TrainingLogVisibility visibility) {
+        return visibility == null ? TrainingLogVisibility.PRIVATE : visibility;
     }
 
     private int safeToInt(Long value) {

@@ -13,6 +13,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
+import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -132,6 +133,7 @@ class TrainingLogServiceTest {
 
         assertThat(response.getId()).isEqualTo(100L);
         assertThat(response.getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(response.getVisibility()).isEqualTo(TrainingLogVisibility.PRIVATE);
         assertThat(response.getTrainingIntensity()).isEqualTo(4);
         assertThat(response.getGymAttendance()).isTrue();
         assertThat(response.getCondition()).isEqualTo(3);
@@ -287,6 +289,22 @@ class TrainingLogServiceTest {
         assertThat(response.getGymAttendance()).isTrue();
         assertThat(response.getCondition()).isEqualTo(2);
         assertThat(response.getTrainingMinutes()).isEqualTo(75);
+    }
+
+    @Test
+    @DisplayName("update can change visibility to friends")
+    void update_setsVisibility() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
+        request.setVisibility(TrainingLogVisibility.FRIENDS);
+
+        TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
+
+        assertThat(entry.getVisibility()).isEqualTo(TrainingLogVisibility.FRIENDS);
+        assertThat(response.getVisibility()).isEqualTo(TrainingLogVisibility.FRIENDS);
     }
 
     @Test
