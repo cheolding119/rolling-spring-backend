@@ -84,6 +84,15 @@ public class TrainingLogSocialController {
         ));
     }
 
+    @PostMapping("/friends/requests/{requestId}/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelFriendRequest(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long requestId
+    ) {
+        trainingLogSocialService.cancelFriendRequest(requireUserId(principal), requestId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @PostMapping("/friends/requests/{requestId}/accept")
     public ResponseEntity<ApiResponse<FriendResponse>> acceptFriendRequest(
             @AuthenticationPrincipal UserPrincipal principal,

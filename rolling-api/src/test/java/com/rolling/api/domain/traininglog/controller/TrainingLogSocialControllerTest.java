@@ -7,6 +7,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryRespo
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
+import com.rolling.api.domain.traininglog.entity.FriendSearchRelationshipStatus;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
@@ -102,6 +103,8 @@ class TrainingLogSocialControllerTest {
                         .nickname("민준")
                         .affiliation("롤링 주짓수")
                         .beltColor(BeltColor.BLUE)
+                        .friendRequestStatus(FriendSearchRelationshipStatus.PENDING_SENT)
+                        .outgoingRequestId(88L)
                         .build()
         ));
 
@@ -113,7 +116,20 @@ class TrainingLogSocialControllerTest {
                 .andExpect(jsonPath("$.data[0].userId").value(10L))
                 .andExpect(jsonPath("$.data[0].nickname").value("민준"))
                 .andExpect(jsonPath("$.data[0].affiliation").value("롤링 주짓수"))
-                .andExpect(jsonPath("$.data[0].beltColor").value("BLUE"));
+                .andExpect(jsonPath("$.data[0].beltColor").value("BLUE"))
+                .andExpect(jsonPath("$.data[0].friendRequestStatus").value("PENDING_SENT"))
+                .andExpect(jsonPath("$.data[0].outgoingRequestId").value(88L));
+    }
+
+    @Test
+    @DisplayName("친구 요청 취소는 인증 사용자에게 허용된다")
+    void cancelFriendRequest_withToken_returnsSuccess() throws Exception {
+        authenticateUser();
+
+        mockMvc.perform(post("/api/v1/friends/requests/88/cancel")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

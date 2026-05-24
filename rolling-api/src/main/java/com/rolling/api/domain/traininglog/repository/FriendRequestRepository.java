@@ -17,6 +17,21 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, Lo
     @EntityGraph(attributePaths = {"sender", "receiver"})
     List<FriendRequest> findAllBySender_IdAndStatusOrderByCreatedAtDesc(Long senderUserId, FriendRequestStatus status);
 
+    @EntityGraph(attributePaths = {"sender", "receiver"})
+    @Query("""
+            select request
+            from FriendRequest request
+            where request.status = com.rolling.api.domain.traininglog.entity.FriendRequestStatus.PENDING
+              and (
+                    (request.sender.id = :userId and request.receiver.id in :candidateIds)
+                 or (request.receiver.id = :userId and request.sender.id in :candidateIds)
+              )
+            """)
+    List<FriendRequest> findPendingRequestsBetweenUserAndCandidates(
+            @Param("userId") Long userId,
+            @Param("candidateIds") List<Long> candidateIds
+    );
+
     @Query("""
             select case when count(request) > 0 then true else false end
             from FriendRequest request
