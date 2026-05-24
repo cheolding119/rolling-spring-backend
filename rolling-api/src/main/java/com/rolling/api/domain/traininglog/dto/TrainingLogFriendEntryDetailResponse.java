@@ -3,6 +3,7 @@ package com.rolling.api.domain.traininglog.dto;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.user.entity.BeltColor;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -29,8 +30,11 @@ public class TrainingLogFriendEntryDetailResponse {
     private String content;
     private List<TrainingLogChecklistItem> checklist;
     private List<String> hashtags;
+    private String imageUrl;
     private List<String> imageUrls;
     private List<TrainingLogExternalLink> externalLinks;
+    private BeltColor beltColor;
+    private Integer stripeCount;
     private long likeCount;
     private long commentCount;
     private boolean likedByMe;

@@ -7,7 +7,11 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
 import com.rolling.api.global.exception.AuthException;
 import com.rolling.api.global.response.ApiResponse;
@@ -108,6 +112,25 @@ public class TrainingLogSocialController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
+    @GetMapping("/training-logs/me/friend-sharing")
+    public ResponseEntity<ApiResponse<TrainingLogFriendSharingResponse>> getFriendSharing(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                trainingLogSocialService.getFriendSharing(requireUserId(principal))
+        ));
+    }
+
+    @PatchMapping("/training-logs/me/friend-sharing")
+    public ResponseEntity<ApiResponse<TrainingLogFriendSharingResponse>> updateFriendSharing(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody TrainingLogFriendSharingUpdateRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                trainingLogSocialService.updateFriendSharing(requireUserId(principal), request)
+        ));
+    }
+
     @GetMapping("/training-logs/friends")
     public ResponseEntity<ApiResponse<Page<TrainingLogFriendEntrySummaryResponse>>> friendFeed(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -118,16 +141,26 @@ public class TrainingLogSocialController {
         ));
     }
 
-    @GetMapping("/training-logs/friends/{friendUserId}/entries")
-    public ResponseEntity<ApiResponse<Page<TrainingLogFriendEntrySummaryResponse>>> friendEntries(
+    @GetMapping("/training-logs/friends/{friendUserId}/calendar")
+    public ResponseEntity<ApiResponse<TrainingLogMonthlyCalendarResponse>> friendCalendar(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long friendUserId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @PageableDefault(size = 20, sort = {"trainingDate", "createdAt", "id"}, direction = Sort.Direction.DESC) Pageable pageable
+            @RequestParam int year,
+            @RequestParam int month
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                trainingLogSocialService.findFriendEntries(requireUserId(principal), friendUserId, dateFrom, dateTo, pageable)
+                trainingLogSocialService.getFriendMonthlyCalendar(requireUserId(principal), friendUserId, year, month)
+        ));
+    }
+
+    @GetMapping(value = "/training-logs/friends/{friendUserId}/entries", params = "date")
+    public ResponseEntity<ApiResponse<List<TrainingLogEntrySummaryResponse>>> friendEntriesByDate(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long friendUserId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                trainingLogSocialService.findFriendEntriesByDate(requireUserId(principal), friendUserId, date)
         ));
     }
 
