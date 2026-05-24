@@ -1,7 +1,6 @@
 package com.rolling.api.domain.traininglog.repository;
 
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
-import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
@@ -86,11 +85,16 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
             value = """
                     select entry
                     from TrainingLogEntry entry
-                    where entry.visibility = :visibility
-                      and entry.user.id in (
+                    where entry.user.id in (
                           select friendship.friendUser.id
                           from Friendship friendship
                           where friendship.user.id = :viewerUserId
+                      )
+                      and exists (
+                          select 1
+                          from UserTrainingLogShareSetting shareSetting
+                          where shareSetting.user.id = entry.user.id
+                            and shareSetting.shareWithFriends = true
                       )
                       and entry.user.isWithdrawn = false
                       and entry.user.withdrawalPending = false
@@ -104,11 +108,16 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
             countQuery = """
                     select count(entry)
                     from TrainingLogEntry entry
-                    where entry.visibility = :visibility
-                      and entry.user.id in (
+                    where entry.user.id in (
                           select friendship.friendUser.id
                           from Friendship friendship
                           where friendship.user.id = :viewerUserId
+                      )
+                      and exists (
+                          select 1
+                          from UserTrainingLogShareSetting shareSetting
+                          where shareSetting.user.id = entry.user.id
+                            and shareSetting.shareWithFriends = true
                       )
                       and entry.user.isWithdrawn = false
                       and entry.user.withdrawalPending = false
@@ -122,34 +131,9 @@ public interface TrainingLogEntryRepository extends JpaRepository<TrainingLogEnt
     )
     Page<TrainingLogEntry> findFriendFeedEntries(
             @Param("viewerUserId") Long viewerUserId,
-            @Param("visibility") TrainingLogVisibility visibility,
             Pageable pageable
     );
 
     @EntityGraph(attributePaths = "user")
-    @Query(
-            value = """
-                    select entry
-                    from TrainingLogEntry entry
-                    where entry.user.id = :authorUserId
-                      and entry.visibility = :visibility
-                      and (:dateFrom is null or entry.trainingDate >= :dateFrom)
-                      and (:dateTo is null or entry.trainingDate <= :dateTo)
-                    """,
-            countQuery = """
-                    select count(entry)
-                    from TrainingLogEntry entry
-                    where entry.user.id = :authorUserId
-                      and entry.visibility = :visibility
-                      and (:dateFrom is null or entry.trainingDate >= :dateFrom)
-                      and (:dateTo is null or entry.trainingDate <= :dateTo)
-                    """
-    )
-    Page<TrainingLogEntry> findFriendEntriesByAuthorId(
-            @Param("authorUserId") Long authorUserId,
-            @Param("visibility") TrainingLogVisibility visibility,
-            @Param("dateFrom") LocalDate dateFrom,
-            @Param("dateTo") LocalDate dateTo,
-            Pageable pageable
-    );
+    List<TrainingLogEntry> findAllByUser_IdAndTrainingDateOrderByCreatedAtAscIdAsc(Long userId, LocalDate trainingDate);
 }

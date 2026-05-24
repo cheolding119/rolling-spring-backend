@@ -5,6 +5,7 @@ import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
 import com.rolling.api.domain.traininglog.entity.FriendRequestStatus;
@@ -21,6 +22,7 @@ import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepositor
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
+import com.rolling.api.domain.traininglog.repository.UserTrainingLogShareSettingRepository;
 import com.rolling.api.domain.user.entity.AccountStatus;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -81,6 +83,9 @@ class TrainingLogSocialServiceTest {
     private TrainingLogCommentRepository trainingLogCommentRepository;
 
     @Mock
+    private UserTrainingLogShareSettingRepository userTrainingLogShareSettingRepository;
+
+    @Mock
     private ApplicationEventPublisher applicationEventPublisher;
 
     private TrainingLogSocialService trainingLogSocialService;
@@ -96,6 +101,7 @@ class TrainingLogSocialServiceTest {
                 trainingLogEntryRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
+                userTrainingLogShareSettingRepository,
                 applicationEventPublisher,
                 clock
         );
@@ -211,12 +217,11 @@ class TrainingLogSocialServiceTest {
     @Test
     @DisplayName("친구 피드는 좋아요 여부와 댓글 수를 함께 매핑한다")
     void findFriendFeed_mapsReactionMetrics() {
-        User viewer = createUser(1L, "viewer");
         User friend = createUser(2L, "friend");
         TrainingLogEntry entry = createEntry(30L, friend, TrainingLogVisibility.FRIENDS);
 
         given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
-        given(trainingLogEntryRepository.findFriendFeedEntries(eq(1L), eq(TrainingLogVisibility.FRIENDS), any()))
+        given(trainingLogEntryRepository.findFriendFeedEntries(eq(1L), any()))
                 .willReturn(new PageImpl<>(List.of(entry), PageRequest.of(0, 20), 1));
         given(trainingLogLikeRepository.countByEntryIds(List.of(30L))).willReturn(List.of(countProjection(30L, 2L)));
         given(trainingLogCommentRepository.countActiveByEntryIds(List.of(30L))).willReturn(List.of(countProjection(30L, 3L)));
@@ -256,6 +261,7 @@ class TrainingLogSocialServiceTest {
         given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
         given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
                 .willReturn(Optional.of(owner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
         given(trainingLogLikeRepository.existsByEntry_IdAndUser_Id(40L, 10L)).willReturn(true);
 
         trainingLogSocialService.likeEntry(10L, 40L);
@@ -294,16 +300,22 @@ class TrainingLogSocialServiceTest {
     }
 
     @Test
-    @DisplayName("FRIENDS가 아닌 PRIVATE 기록은 친구도 상세 조회할 수 없다")
-    void findFriendEntryDetail_whenPrivate_throwsForbidden() {
+    @DisplayName("친구 공개 설정이 꺼져 있으면 친구도 상세 조회할 수 없다")
+    void findFriendEntryDetail_whenFriendSharingOff_throwsForbidden() {
         User owner = createUser(20L, "owner");
         TrainingLogEntry entry = createEntry(40L, owner, TrainingLogVisibility.PRIVATE);
         given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
         given(trainingLogEntryRepository.findWithUserById(40L)).willReturn(Optional.of(entry));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 20L)).willReturn(false);
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(20L, 10L)).willReturn(false);
+        given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
+        given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
+                .willReturn(Optional.of(owner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(false);
 
         assertThatThrownBy(() -> trainingLogSocialService.findFriendEntryDetail(10L, 40L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("친구만 조회할 수 있는 기록입니다");
+                .hasMessage("친구 공개가 설정된 기록만 조회할 수 있습니다");
     }
 
     @Test
@@ -323,6 +335,7 @@ class TrainingLogSocialServiceTest {
         given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
         given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
                 .willReturn(Optional.of(entryOwner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
         given(trainingLogCommentRepository.save(any(TrainingLogComment.class))).willAnswer(invocation -> {
             TrainingLogComment saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 70L);
@@ -366,6 +379,7 @@ class TrainingLogSocialServiceTest {
         given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
         given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
                 .willReturn(Optional.of(entryOwner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
         given(trainingLogCommentRepository.findById(60L)).willReturn(Optional.of(parentComment));
         given(trainingLogCommentRepository.save(any(TrainingLogComment.class))).willAnswer(invocation -> {
             TrainingLogComment saved = invocation.getArgument(0);
@@ -499,6 +513,45 @@ class TrainingLogSocialServiceTest {
         assertThat(response.get(0).getContent()).isNull();
         assertThat(response.get(0).getReplies()).hasSize(1);
         assertThat(response.get(0).getReplies().get(0).getContent()).isEqualTo("reply");
+    }
+
+    @Test
+    @DisplayName("친구 공개 설정 조회는 설정이 없으면 기본 비공개를 반환한다")
+    void getFriendSharing_withoutSetting_returnsDefaultPrivate() {
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(userTrainingLogShareSettingRepository.findByUser_Id(10L)).willReturn(Optional.empty());
+
+        var response = trainingLogSocialService.getFriendSharing(10L);
+
+        assertThat(response.getShareWithFriends()).isFalse();
+        assertThat(response.getUpdatedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("친구 공개 설정 변경은 새 설정 row를 생성한다")
+    void updateFriendSharing_createsSettingWhenMissing() {
+        User owner = createUser(10L, "owner");
+        TrainingLogFriendSharingUpdateRequest request = new TrainingLogFriendSharingUpdateRequest();
+        ReflectionTestUtils.setField(request, "shareWithFriends", true);
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(owner));
+        given(userTrainingLogShareSettingRepository.findByUser_Id(10L)).willReturn(Optional.empty());
+        given(userTrainingLogShareSettingRepository.save(any())).willAnswer(invocation -> {
+            var setting = invocation.getArgument(0, com.rolling.api.domain.traininglog.entity.UserTrainingLogShareSetting.class);
+            ReflectionTestUtils.setField(setting, "id", 1L);
+            ReflectionTestUtils.setField(setting, "createdAt", LocalDateTime.of(2026, 5, 23, 12, 0));
+            ReflectionTestUtils.setField(setting, "updatedAt", LocalDateTime.of(2026, 5, 23, 12, 0));
+            return setting;
+        });
+        given(userTrainingLogShareSettingRepository.saveAndFlush(any())).willAnswer(invocation -> {
+            var setting = invocation.getArgument(0, com.rolling.api.domain.traininglog.entity.UserTrainingLogShareSetting.class);
+            ReflectionTestUtils.setField(setting, "updatedAt", LocalDateTime.of(2026, 5, 23, 12, 5));
+            return setting;
+        });
+
+        var response = trainingLogSocialService.updateFriendSharing(10L, request);
+
+        assertThat(response.getShareWithFriends()).isTrue();
+        assertThat(response.getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 5));
     }
 
     private User createUser(Long id, String nickname) {
