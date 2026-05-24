@@ -9,6 +9,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequ
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
 import com.rolling.api.domain.traininglog.entity.FriendRequestStatus;
+import com.rolling.api.domain.traininglog.entity.FriendSearchRelationshipStatus;
 import com.rolling.api.domain.traininglog.entity.Friendship;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
@@ -108,22 +109,47 @@ class TrainingLogSocialServiceTest {
     }
 
     @Test
-    @DisplayName("친구 검색은 이미 친구, 대기 중, 차단 관계를 제외한다")
-    void searchFriends_filtersExistingRelationships() {
+    @DisplayName("친구 검색은 관계 상태와 보낸 요청 id를 함께 응답한다")
+    void searchFriends_returnsRelationshipStates() {
         given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
+        User friend = createUser(2L, "민준");
+        User pendingSent = createUser(3L, "민석");
+        User pendingReceived = createUser(4L, "민호");
+        User blocked = createUser(5L, "민성");
         given(userRepository.searchFriendCandidates(eq(1L), eq("min"), any())).willReturn(List.of(
-                createUser(2L, "민준"),
-                createUser(3L, "민석"),
-                createUser(4L, "민호"),
-                createUser(5L, "민성")
+                friend,
+                pendingSent,
+                pendingReceived,
+                blocked
         ));
         given(friendshipRepository.findFriendUserIdsByUserId(1L)).willReturn(List.of(2L));
-        given(friendRequestRepository.findPendingRelatedUserIds(1L)).willReturn(List.of(3L));
-        given(userBlockRepository.findBlockedRelationUserIds(1L, List.of(2L, 3L, 4L, 5L))).willReturn(List.of(4L));
+        FriendRequest outgoing = FriendRequest.builder()
+                .sender(createUser(1L, "viewer"))
+                .receiver(pendingSent)
+                .status(FriendRequestStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(outgoing, "id", 88L);
+        FriendRequest incoming = FriendRequest.builder()
+                .sender(pendingReceived)
+                .receiver(createUser(1L, "viewer"))
+                .status(FriendRequestStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(incoming, "id", 89L);
+        given(friendRequestRepository.findPendingRequestsBetweenUserAndCandidates(1L, List.of(2L, 3L, 4L, 5L)))
+                .willReturn(List.of(outgoing, incoming));
+        given(userBlockRepository.findBlockedRelationUserIds(1L, List.of(2L, 3L, 4L, 5L))).willReturn(List.of(5L));
 
         List<FriendSearchResultResponse> response = trainingLogSocialService.searchFriends(1L, "min");
 
-        assertThat(response).extracting(FriendSearchResultResponse::getUserId).containsExactly(5L);
+        assertThat(response).extracting(FriendSearchResultResponse::getUserId).containsExactly(2L, 3L, 4L);
+        assertThat(response).extracting(FriendSearchResultResponse::getFriendRequestStatus)
+                .containsExactly(
+                        FriendSearchRelationshipStatus.FRIEND,
+                        FriendSearchRelationshipStatus.PENDING_SENT,
+                        FriendSearchRelationshipStatus.PENDING_RECEIVED
+                );
+        assertThat(response.get(1).getOutgoingRequestId()).isEqualTo(88L);
+        assertThat(response.get(2).getOutgoingRequestId()).isNull();
     }
 
     @Test
@@ -199,6 +225,27 @@ class TrainingLogSocialServiceTest {
         trainingLogSocialService.rejectFriendRequest(10L, 100L);
 
         assertThat(request.getStatus()).isEqualTo(FriendRequestStatus.REJECTED);
+        assertThat(request.getRespondedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 0));
+    }
+
+    @Test
+    @DisplayName("친구 요청 취소는 본인이 보낸 pending 요청만 canceled로 변경한다")
+    void cancelFriendRequest_updatesStatus() {
+        User sender = createUser(10L, "sender");
+        User receiver = createUser(20L, "receiver");
+        FriendRequest request = FriendRequest.builder()
+                .sender(sender)
+                .receiver(receiver)
+                .status(FriendRequestStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(request, "id", 100L);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(sender));
+        given(friendRequestRepository.findById(100L)).willReturn(Optional.of(request));
+
+        trainingLogSocialService.cancelFriendRequest(10L, 100L);
+
+        assertThat(request.getStatus()).isEqualTo(FriendRequestStatus.CANCELED);
         assertThat(request.getRespondedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 0));
     }
 

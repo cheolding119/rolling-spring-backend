@@ -16,6 +16,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySum
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
 import com.rolling.api.domain.traininglog.entity.FriendRequestStatus;
+import com.rolling.api.domain.traininglog.entity.FriendSearchRelationshipStatus;
 import com.rolling.api.domain.traininglog.entity.Friendship;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
@@ -99,15 +100,27 @@ public class TrainingLogSocialService {
                 .map(User::getId)
                 .toList();
         Set<Long> friendUserIds = new HashSet<>(friendshipRepository.findFriendUserIdsByUserId(userId));
-        Set<Long> pendingUserIds = new HashSet<>(friendRequestRepository.findPendingRelatedUserIds(userId));
+        List<FriendRequest> pendingRequests = friendRequestRepository.findPendingRequestsBetweenUserAndCandidates(userId, candidateIds);
         Set<Long> blockedRelationUserIds = new HashSet<>(userBlockRepository.findBlockedRelationUserIds(userId, candidateIds));
+        Map<Long, Long> outgoingPendingRequestIds = new HashMap<>();
+        Set<Long> incomingPendingUserIds = new HashSet<>();
+
+        for (FriendRequest pendingRequest : pendingRequests) {
+            if (pendingRequest.getSender().getId().equals(userId)) {
+                outgoingPendingRequestIds.put(pendingRequest.getReceiver().getId(), pendingRequest.getId());
+            } else {
+                incomingPendingUserIds.add(pendingRequest.getSender().getId());
+            }
+        }
 
         return candidates.stream()
-                .filter(candidate -> !friendUserIds.contains(candidate.getId()))
-                .filter(candidate -> !pendingUserIds.contains(candidate.getId()))
                 .filter(candidate -> !blockedRelationUserIds.contains(candidate.getId()))
                 .limit(FRIEND_SEARCH_LIMIT)
-                .map(FriendSearchResultResponse::from)
+                .map(candidate -> FriendSearchResultResponse.from(
+                        candidate,
+                        resolveSearchRelationshipStatus(candidate.getId(), friendUserIds, outgoingPendingRequestIds, incomingPendingUserIds),
+                        outgoingPendingRequestIds.get(candidate.getId())
+                ))
                 .toList();
     }
 
@@ -151,6 +164,21 @@ public class TrainingLogSocialService {
                 .status(FriendRequestStatus.PENDING)
                 .build());
         return FriendRequestResponse.from(saved);
+    }
+
+    @Transactional
+    public void cancelFriendRequest(Long userId, Long requestId) {
+        getActiveUser(userId);
+        FriendRequest request = getFriendRequest(requestId);
+
+        if (!request.getSender().getId().equals(userId)) {
+            throw BusinessException.forbidden("본인이 보낸 친구 요청만 취소할 수 있습니다");
+        }
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw BusinessException.badRequest("대기 중인 친구 요청만 취소할 수 있습니다");
+        }
+
+        request.cancel(LocalDateTime.now(clock));
     }
 
     @Transactional
@@ -660,6 +688,24 @@ public class TrainingLogSocialService {
         return !user.getIsWithdrawn()
                 && !user.getWithdrawalPending()
                 && user.getAccountStatus() == AccountStatus.ACTIVE;
+    }
+
+    private FriendSearchRelationshipStatus resolveSearchRelationshipStatus(
+            Long candidateUserId,
+            Set<Long> friendUserIds,
+            Map<Long, Long> outgoingPendingRequestIds,
+            Set<Long> incomingPendingUserIds
+    ) {
+        if (friendUserIds.contains(candidateUserId)) {
+            return FriendSearchRelationshipStatus.FRIEND;
+        }
+        if (outgoingPendingRequestIds.containsKey(candidateUserId)) {
+            return FriendSearchRelationshipStatus.PENDING_SENT;
+        }
+        if (incomingPendingUserIds.contains(candidateUserId)) {
+            return FriendSearchRelationshipStatus.PENDING_RECEIVED;
+        }
+        return FriendSearchRelationshipStatus.NONE;
     }
 
     private FriendRequest getFriendRequest(Long requestId) {

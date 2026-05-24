@@ -59,12 +59,16 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 | `nickname` | `String` | 앱에서 `이름`으로 노출하는 사용자 닉네임 |
 | `affiliation` | `String?` | 소속 |
 | `beltColor` | `BeltColor` | 현재 벨트 |
+| `friendRequestStatus` | `FriendSearchRelationshipStatus` | 현재 검색 사용자와의 관계 상태 |
+| `outgoingRequestId` | `Long?` | 내가 보낸 `PENDING` 요청 ID. 취소 가능할 때만 값 존재 |
 
 구현 메모:
 
 - 친구 검색 결과는 `nickname`, `affiliation`, `beltColor`를 함께 노출한다.
+- 친구 검색 결과는 `friendRequestStatus`, `outgoingRequestId`를 함께 노출한다.
 - 현재 백엔드 사용자 엔티티의 source field는 `User.nickname`, `User.affiliation`, `User.beltColor`다.
 - 소속이 없으면 `affiliation = null`로 반환하고, 화면 문구는 클라이언트가 결정한다.
+- 검색 결과에서는 차단 관계만 제외하고, 친구/보낸 요청/받은 요청 대상은 상태 필드로 구분해 반환한다.
 
 ### 2.3 `FriendRequestResponse`
 
@@ -220,7 +224,16 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 | `REJECTED` | 거절됨 |
 | `CANCELED` | 발신자가 취소함 |
 
-### 3.2 `PushNotificationType`
+### 3.2 `FriendSearchRelationshipStatus`
+
+| Raw value | 설명 |
+| --- | --- |
+| `NONE` | 요청 가능한 상태 |
+| `PENDING_SENT` | 내가 보낸 친구 요청 대기 중 |
+| `PENDING_RECEIVED` | 내가 받은 친구 요청 대기 중 |
+| `FRIEND` | 이미 친구 관계 |
+
+### 3.3 `PushNotificationType`
 
 훈련일지 소셜에서 추가되는 알림 raw value:
 
@@ -240,6 +253,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 친구는 `양방향 승인형` 관계다.
 - 친구 검색은 `User.nickname` 기준으로 수행한다.
 - 친구 검색 결과에는 `nickname`, `affiliation`, `beltColor`를 함께 노출한다.
+- 친구 검색 결과에는 `friendRequestStatus`, `outgoingRequestId`를 함께 노출한다.
 - 친구 검색은 최소 2자 이상 키워드부터 허용하고 최대 20건까지 반환한다.
 - 자기 자신에게 친구 요청을 보낼 수 없다.
 - 이미 친구인 사용자에게 재요청할 수 없다.
@@ -247,6 +261,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 차단한 사용자 또는 차단당한 사용자와는 친구 요청, 수락, 열람이 모두 불가하다.
 - 탈퇴, 탈퇴 예약, 비활성 상태 사용자는 검색 결과와 요청 대상에서 제외한다.
 - 친구 삭제는 양방향 관계를 제거한다.
+- 발신자는 본인이 보낸 `PENDING` 친구 요청을 취소할 수 있다.
 
 ### 4.3 친구 훈련일지 공개 정책
 
@@ -305,6 +320,18 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - Response data: `List<FriendResponse>`
 - 기존 API 재사용
 
+### 5.1.1 친구 검색 조회
+
+`GET /api/v1/friends/search?q={keyword}`
+
+- 인증: 필요
+- Response data: `List<FriendSearchResultResponse>`
+
+구현 메모:
+
+- 검색 결과에서 `PENDING` 관계 사용자를 제거하지 않는다.
+- `friendRequestStatus`와 `outgoingRequestId`로 프론트가 `요청`, `요청됨`, `받은 요청`, `친구` 상태를 그릴 수 있어야 한다.
+
 ### 5.2 내 친구 훈련일지 공개 설정 조회
 
 `GET /api/v1/training-logs/me/friend-sharing`
@@ -331,6 +358,25 @@ Request body:
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `shareWithFriends` | `Boolean` | O | 친구 공개 여부 |
+
+### 5.3.1 친구 요청 취소
+
+`POST /api/v1/friends/requests/{requestId}/cancel`
+
+- 인증: 필요
+- Response data: `null`
+
+정책:
+
+- 로그인 사용자가 직접 보낸 `PENDING` 요청만 취소할 수 있다.
+- `ACCEPTED`, `REJECTED`, `CANCELED` 상태 요청은 취소할 수 없다.
+- 성공 시 상태는 `CANCELED`로 변경하고 `respondedAt`을 갱신한다.
+
+에러:
+
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `VALIDATION_ERROR`
 
 ### 5.4 친구 월간 캘린더 요약 조회
 
