@@ -260,6 +260,12 @@
 - 인증: 필요
 - Response data: `TrainingLogEntryResponse`
 
+구현 메모:
+
+- 본인 상세 조회 응답에는 소셜 메타 필드 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 함께 포함한다.
+- 현재 정책 기준 본인 기록은 좋아요 대상이 아니므로 `likedByMe = false`로 반환한다.
+- 현재 정책 기준 본인 기록에는 댓글 작성 진입을 열지 않으므로 `commentableByMe = false`로 반환한다.
+
 ### 5.3 특정 날짜 훈련 기록 생성
 
 `POST /api/v1/training-logs/me/entries/{date}`
@@ -393,6 +399,8 @@ Request body:
 - `color`, `visibility`는 기록 메타데이터다.
 - `trainingIntensity`, `gymAttendance`, `condition`은 훈련 상태 메타데이터로 함께 반환된다.
 - `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`, `trainingMinutes`가 함께 반환된다.
+- 본인 상세 조회에서는 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 함께 반환한다.
+- 생성/수정/최근 목록 응답에서는 소셜 메타 필드가 생략될 수 있다.
 
 ### 6.2 `TrainingLogEntrySummaryResponse`
 
