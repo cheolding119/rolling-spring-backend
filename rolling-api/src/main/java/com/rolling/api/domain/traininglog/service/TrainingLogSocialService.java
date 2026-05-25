@@ -1,10 +1,15 @@
 package com.rolling.api.domain.traininglog.service;
 
 import com.rolling.api.domain.notification.model.PushNotificationType;
+import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
 import com.rolling.api.domain.traininglog.dto.FriendResponse;
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
@@ -20,14 +25,17 @@ import com.rolling.api.domain.traininglog.entity.FriendSearchRelationshipStatus;
 import com.rolling.api.domain.traininglog.entity.Friendship;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
+import com.rolling.api.domain.traininglog.entity.TrainingLogCommentReport;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLike;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.UserTrainingLogShareSetting;
+import com.rolling.api.domain.traininglog.event.FriendRequestNotificationEvent;
 import com.rolling.api.domain.traininglog.event.TrainingLogCommentNotificationEvent;
 import com.rolling.api.domain.traininglog.repository.FriendRequestRepository;
 import com.rolling.api.domain.traininglog.repository.FriendshipRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
@@ -37,7 +45,9 @@ import com.rolling.api.domain.user.entity.User;
 import com.rolling.api.domain.user.repository.UserBlockRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
+import com.rolling.api.global.page.PageableUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,6 +77,9 @@ public class TrainingLogSocialService {
 
     private static final int FRIEND_SEARCH_LIMIT = 20;
     private static final int FRIEND_SEARCH_FETCH_SIZE = 100;
+    private static final long COMMENT_REPORT_BLOCK_THRESHOLD = 3L;
+    private static final Sort DEFAULT_ADMIN_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
+    private static final Set<String> COMMENT_REPORT_ADMIN_ALLOWED_SORTS = Set.of("createdAt", "updatedAt", "status", "processedAt");
     private static final Sort DEFAULT_FEED_SORT = Sort.by("trainingDate").descending()
             .and(Sort.by("createdAt").descending())
             .and(Sort.by("id").descending());
@@ -78,6 +91,7 @@ public class TrainingLogSocialService {
     private final TrainingLogEntryRepository trainingLogEntryRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
+    private final TrainingLogCommentReportRepository trainingLogCommentReportRepository;
     private final UserTrainingLogShareSettingRepository userTrainingLogShareSettingRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final Clock clock;
@@ -163,6 +177,13 @@ public class TrainingLogSocialService {
                 .receiver(receiver)
                 .status(FriendRequestStatus.PENDING)
                 .build());
+        applicationEventPublisher.publishEvent(new FriendRequestNotificationEvent(
+                saved.getId(),
+                sender.getId(),
+                sender.getNickname(),
+                receiver.getId(),
+                PushNotificationType.FRIEND_REQUEST_RECEIVED
+        ));
         return FriendRequestResponse.from(saved);
     }
 
@@ -301,7 +322,7 @@ public class TrainingLogSocialService {
         requireActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
-        Map<Long, Long> commentCounts = toCountMap(trainingLogCommentRepository.countActiveByEntryIds(List.of(entry.getId())));
+        Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId, false);
         boolean likedByMe = trainingLogLikeRepository.existsByEntry_IdAndUser_Id(entry.getId(), userId);
 
         return toFriendDetailResponse(
@@ -356,6 +377,7 @@ public class TrainingLogSocialService {
         if (request.getParentCommentId() != null) {
             parentComment = getComment(request.getParentCommentId());
             validateReplyParent(entryId, parentComment);
+            ensureNotBlocked(userId, parentComment.getAuthor().getId());
         }
 
         TrainingLogComment saved = trainingLogCommentRepository.save(TrainingLogComment.builder()
@@ -379,9 +401,45 @@ public class TrainingLogSocialService {
         if (comment.isDeleted()) {
             throw BusinessException.badRequest("삭제된 댓글은 수정할 수 없습니다");
         }
+        if (!comment.getEntry().getUser().getId().equals(userId)) {
+            ensureNotBlocked(userId, comment.getEntry().getUser().getId());
+        }
+        if (comment.isReply() && !comment.getParentComment().getAuthor().getId().equals(userId)) {
+            ensureNotBlocked(userId, comment.getParentComment().getAuthor().getId());
+        }
 
         comment.updateContent(normalizeCommentContent(request.getContent()));
         return toCommentResponse(comment, userId, false, comment.getEntry().getUser().getId(), List.of());
+    }
+
+    @Transactional
+    public void reportComment(Long userId, Long commentId, TrainingLogCommentReportRequest request) {
+        User reporter = getActiveUser(userId);
+        TrainingLogComment comment = getCommentForReport(commentId);
+        loadAccessibleEntry(userId, comment.getEntry().getId());
+        ensureCommentVisibleToViewer(userId, comment);
+
+        if (comment.getAuthor().getId().equals(userId)) {
+            throw new BusinessException("SELF_REPORT_NOT_ALLOWED", "자신의 댓글은 신고할 수 없습니다", HttpStatus.BAD_REQUEST);
+        }
+        validateReportRequest(request);
+        if (trainingLogCommentReportRepository.existsByComment_IdAndReporter_Id(commentId, userId)) {
+            throw alreadyReported();
+        }
+
+        TrainingLogCommentReport report = TrainingLogCommentReport.builder()
+                .comment(comment)
+                .reporter(reporter)
+                .reason(request.getReason())
+                .customReason(normalizeCustomReason(request.getReason(), request.getCustomReason()))
+                .status(ReportStatus.RECEIVED)
+                .build();
+        trainingLogCommentReportRepository.save(report);
+
+        comment.incrementReportCount();
+        if (comment.getReportCount() >= COMMENT_REPORT_BLOCK_THRESHOLD) {
+            softDeleteReportedComment(comment);
+        }
     }
 
     @Transactional
@@ -400,12 +458,39 @@ public class TrainingLogSocialService {
         comment.softDelete(LocalDateTime.now(clock));
     }
 
+    @Transactional(readOnly = true)
+    public Page<TrainingLogCommentReportAdminResponse> findCommentReportsForAdmin(ReportStatus status, Pageable pageable) {
+        Pageable resolvedPageable = normalizeAdminPageable(pageable, DEFAULT_ADMIN_SORT, COMMENT_REPORT_ADMIN_ALLOWED_SORTS);
+        Page<TrainingLogCommentReport> reports = status == null
+                ? trainingLogCommentReportRepository.findAll(resolvedPageable)
+                : trainingLogCommentReportRepository.findAllByStatus(status, resolvedPageable);
+        return reports.map(TrainingLogCommentReportAdminResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingLogCommentReportAdminResponse findCommentReportForAdmin(Long reportId) {
+        return TrainingLogCommentReportAdminResponse.from(loadCommentReportForAdmin(reportId));
+    }
+
+    @Transactional
+    public TrainingLogCommentReportAdminResponse updateCommentReportStatus(Long adminUserId, Long reportId, ReportStatusUpdateRequest request) {
+        TrainingLogCommentReport report = loadCommentReportForAdmin(reportId);
+        report.updateStatus(
+                requireStatus(request.getStatus()),
+                adminUserId,
+                LocalDateTime.now(clock),
+                normalizeFreeText(request.getProcessingMemo()),
+                normalizeFreeText(request.getFinalAction())
+        );
+        return TrainingLogCommentReportAdminResponse.from(report);
+    }
+
     private Page<TrainingLogFriendEntrySummaryResponse> mapSummaryPage(Page<TrainingLogEntry> entries, Long viewerUserId) {
         List<Long> entryIds = entries.getContent().stream()
                 .map(TrainingLogEntry::getId)
                 .toList();
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(entryIds));
-        Map<Long, Long> commentCounts = toCountMap(trainingLogCommentRepository.countActiveByEntryIds(entryIds));
+        Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(entryIds, viewerUserId, false);
         Set<Long> likedEntryIds = new HashSet<>(entryIds.isEmpty()
                 ? List.<Long>of()
                 : trainingLogLikeRepository.findLikedEntryIdsByUserIdAndEntryIds(viewerUserId, entryIds));
@@ -470,8 +555,10 @@ public class TrainingLogSocialService {
             boolean isAdmin,
             Long entryOwnerId
     ) {
+        Set<Long> blockedRelationUserIds = isAdmin ? Set.of() : findBlockedRelationUserIds(viewerUserId, comments);
         Map<Long, List<TrainingLogComment>> repliesByParentId = comments.stream()
                 .filter(TrainingLogComment::isReply)
+                .filter(comment -> isCommentVisible(comment, blockedRelationUserIds))
                 .collect(Collectors.groupingBy(
                         comment -> comment.getParentComment().getId(),
                         LinkedHashMap::new,
@@ -480,6 +567,7 @@ public class TrainingLogSocialService {
 
         return comments.stream()
                 .filter(comment -> !comment.isReply())
+                .filter(comment -> isCommentVisible(comment, blockedRelationUserIds))
                 .map(comment -> toCommentResponse(
                         comment,
                         viewerUserId,
@@ -532,6 +620,9 @@ public class TrainingLogSocialService {
         if (recipientUserId.equals(author.getId())) {
             return;
         }
+        if (isBlockedBetween(recipientUserId, author.getId())) {
+            return;
+        }
 
         PushNotificationType type = parentComment == null
                 ? PushNotificationType.TRAINING_LOG_COMMENT_CREATED
@@ -563,6 +654,23 @@ public class TrainingLogSocialService {
         Map<Long, Long> result = new HashMap<>();
         for (TrainingLogCountProjection count : counts) {
             result.put(count.getEntryId(), count.getCount());
+        }
+        return result;
+    }
+
+    private Map<Long, Long> resolveVisibleCommentCountMap(Collection<Long> entryIds, Long viewerUserId, boolean isAdmin) {
+        if (entryIds == null || entryIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<TrainingLogComment> comments = trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(entryIds);
+        Set<Long> blockedRelationUserIds = isAdmin ? Set.of() : findBlockedRelationUserIds(viewerUserId, comments);
+        Map<Long, Long> result = new HashMap<>();
+        for (TrainingLogComment comment : comments) {
+            if (comment.isDeleted() || !isCommentVisible(comment, blockedRelationUserIds)) {
+                continue;
+            }
+            result.merge(comment.getEntry().getId(), 1L, Long::sum);
         }
         return result;
     }
@@ -668,6 +776,10 @@ public class TrainingLogSocialService {
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), DEFAULT_FEED_SORT);
     }
 
+    private Pageable normalizeAdminPageable(Pageable pageable, Sort defaultSort, Set<String> allowedSorts) {
+        return PageableUtils.normalize(pageable, defaultSort, allowedSorts, 20, 100);
+    }
+
     private User getActiveUser(Long userId) {
         return userRepository.findByIdAndIsWithdrawnFalse(userId)
                 .orElseThrow(() -> BusinessException.notFound("사용자를 찾을 수 없습니다"));
@@ -713,9 +825,106 @@ public class TrainingLogSocialService {
                 .orElseThrow(() -> BusinessException.notFound("친구 요청을 찾을 수 없습니다"));
     }
 
+    private TrainingLogComment getCommentForReport(Long commentId) {
+        TrainingLogComment comment = trainingLogCommentRepository.findByIdForUpdate(commentId)
+                .orElseThrow(() -> BusinessException.notFound("댓글을 찾을 수 없습니다"));
+        if (comment.isDeleted()) {
+            throw BusinessException.notFound("댓글을 찾을 수 없습니다");
+        }
+        return comment;
+    }
+
     private TrainingLogComment getComment(Long commentId) {
         return trainingLogCommentRepository.findById(commentId)
                 .orElseThrow(() -> BusinessException.notFound("댓글을 찾을 수 없습니다"));
+    }
+
+    private TrainingLogCommentReport loadCommentReportForAdmin(Long reportId) {
+        return trainingLogCommentReportRepository.findById(reportId)
+                .orElseThrow(() -> BusinessException.notFound("신고를 찾을 수 없습니다"));
+    }
+
+    private void softDeleteReportedComment(TrainingLogComment comment) {
+        LocalDateTime deletedAt = LocalDateTime.now(clock);
+        comment.softDelete(deletedAt);
+        if (comment.isReply()) {
+            return;
+        }
+
+        for (TrainingLogComment reply : trainingLogCommentRepository.findAllByParentComment_Id(comment.getId())) {
+            if (!reply.isDeleted()) {
+                reply.softDelete(deletedAt);
+            }
+        }
+    }
+
+    private Set<Long> findBlockedRelationUserIds(Long viewerUserId, List<TrainingLogComment> comments) {
+        if (viewerUserId == null || comments.isEmpty()) {
+            return Set.of();
+        }
+
+        List<Long> candidateIds = comments.stream()
+                .flatMap(comment -> comment.isReply()
+                        ? java.util.stream.Stream.of(comment.getAuthor().getId(), comment.getParentComment().getAuthor().getId())
+                        : java.util.stream.Stream.of(comment.getAuthor().getId()))
+                .distinct()
+                .toList();
+        if (candidateIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(userBlockRepository.findBlockedRelationUserIds(viewerUserId, candidateIds));
+    }
+
+    private boolean isCommentVisible(TrainingLogComment comment, Set<Long> blockedRelationUserIds) {
+        if (blockedRelationUserIds.contains(comment.getAuthor().getId())) {
+            return false;
+        }
+        return !comment.isReply() || !blockedRelationUserIds.contains(comment.getParentComment().getAuthor().getId());
+    }
+
+    private void ensureCommentVisibleToViewer(Long viewerUserId, TrainingLogComment comment) {
+        if (!isCommentVisible(comment, findBlockedRelationUserIds(viewerUserId, List.of(comment)))) {
+            throw BusinessException.forbidden("차단 관계에서는 친구 기능을 사용할 수 없습니다");
+        }
+    }
+
+    private void validateReportRequest(TrainingLogCommentReportRequest request) {
+        if (request == null || request.getReason() == null) {
+            throw BusinessException.badRequest("신고 사유는 필수입니다");
+        }
+    }
+
+    private String normalizeCustomReason(ReportReason reason, String customReason) {
+        if (reason != ReportReason.OTHER) {
+            return null;
+        }
+
+        if (!StringUtils.hasText(customReason)) {
+            throw BusinessException.badRequest("기타 신고 사유를 입력해주세요");
+        }
+        String normalized = customReason.trim();
+        if (normalized.isEmpty() || normalized.length() > 500) {
+            throw BusinessException.badRequest("기타 신고 사유를 입력해주세요");
+        }
+        return normalized;
+    }
+
+    private ReportStatus requireStatus(ReportStatus status) {
+        if (status == null) {
+            throw BusinessException.badRequest("신고 상태는 필수입니다");
+        }
+        return status;
+    }
+
+    private String normalizeFreeText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private BusinessException alreadyReported() {
+        return new BusinessException("ALREADY_REPORTED", "이미 신고한 대상입니다", HttpStatus.BAD_REQUEST);
     }
 
     private TrainingLogEntrySummaryResponse toEntrySummaryResponse(TrainingLogEntry entry) {

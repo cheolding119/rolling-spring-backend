@@ -294,6 +294,37 @@ class TrainingLogSocialControllerTest {
                 .andExpect(jsonPath("$.data.editableByMe").value(true));
     }
 
+    @Test
+    @DisplayName("댓글 신고는 인증이 필요하다")
+    void reportComment_withoutToken_returnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/training-logs/comments/100/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reason": "SPAM"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("댓글 신고는 인증 사용자에게 허용된다")
+    void reportComment_withToken_returnsSuccess() throws Exception {
+        authenticateUser();
+
+        mockMvc.perform(post("/api/v1/training-logs/comments/100/report")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reason": "SPAM"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
     private void authenticateUser() {
         given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
         given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
