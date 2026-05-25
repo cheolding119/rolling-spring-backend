@@ -1,9 +1,12 @@
 package com.rolling.api.domain.traininglog.service;
 
 import com.rolling.api.domain.notification.model.PushNotificationType;
+import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
@@ -13,17 +16,22 @@ import com.rolling.api.domain.traininglog.entity.FriendSearchRelationshipStatus;
 import com.rolling.api.domain.traininglog.entity.Friendship;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
+import com.rolling.api.domain.traininglog.entity.TrainingLogCommentReport;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLike;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.event.FriendRequestNotificationEvent;
 import com.rolling.api.domain.traininglog.event.TrainingLogCommentNotificationEvent;
 import com.rolling.api.domain.traininglog.repository.FriendRequestRepository;
 import com.rolling.api.domain.traininglog.repository.FriendshipRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.traininglog.repository.UserTrainingLogShareSettingRepository;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.user.entity.AccountStatus;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -41,6 +49,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -84,6 +93,9 @@ class TrainingLogSocialServiceTest {
     private TrainingLogCommentRepository trainingLogCommentRepository;
 
     @Mock
+    private TrainingLogCommentReportRepository trainingLogCommentReportRepository;
+
+    @Mock
     private UserTrainingLogShareSettingRepository userTrainingLogShareSettingRepository;
 
     @Mock
@@ -102,6 +114,7 @@ class TrainingLogSocialServiceTest {
                 trainingLogEntryRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
+                trainingLogCommentReportRepository,
                 userTrainingLogShareSettingRepository,
                 applicationEventPublisher,
                 clock
@@ -205,6 +218,14 @@ class TrainingLogSocialServiceTest {
         assertThat(response.getSenderUserId()).isEqualTo(10L);
         assertThat(response.getReceiverUserId()).isEqualTo(20L);
         assertThat(response.getStatus()).isEqualTo(FriendRequestStatus.PENDING);
+
+        ArgumentCaptor<FriendRequestNotificationEvent> eventCaptor = ArgumentCaptor.forClass(FriendRequestNotificationEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().requestId()).isEqualTo(99L);
+        assertThat(eventCaptor.getValue().recipientUserId()).isEqualTo(20L);
+        assertThat(eventCaptor.getValue().senderUserId()).isEqualTo(10L);
+        assertThat(eventCaptor.getValue().senderNickname()).isEqualTo("sender");
+        assertThat(eventCaptor.getValue().type()).isEqualTo(PushNotificationType.FRIEND_REQUEST_RECEIVED);
     }
 
     @Test
@@ -266,19 +287,27 @@ class TrainingLogSocialServiceTest {
     void findFriendFeed_mapsReactionMetrics() {
         User friend = createUser(2L, "friend");
         TrainingLogEntry entry = createEntry(30L, friend, TrainingLogVisibility.FRIENDS);
+        TrainingLogComment visibleComment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(friend)
+                .content("visible")
+                .build();
+        ReflectionTestUtils.setField(visibleComment, "id", 301L);
 
         given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
         given(trainingLogEntryRepository.findFriendFeedEntries(eq(1L), any()))
                 .willReturn(new PageImpl<>(List.of(entry), PageRequest.of(0, 20), 1));
         given(trainingLogLikeRepository.countByEntryIds(List.of(30L))).willReturn(List.of(countProjection(30L, 2L)));
-        given(trainingLogCommentRepository.countActiveByEntryIds(List.of(30L))).willReturn(List.of(countProjection(30L, 3L)));
+        given(trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(List.of(30L)))
+                .willReturn(List.of(visibleComment));
+        given(userBlockRepository.findBlockedRelationUserIds(1L, List.of(2L))).willReturn(List.of());
         given(trainingLogLikeRepository.findLikedEntryIdsByUserIdAndEntryIds(1L, List.of(30L))).willReturn(List.of(30L));
 
         List<TrainingLogFriendEntrySummaryResponse> content = trainingLogSocialService.findFriendFeed(1L, PageRequest.of(0, 20)).getContent();
 
         assertThat(content).hasSize(1);
         assertThat(content.get(0).getLikeCount()).isEqualTo(2L);
-        assertThat(content.get(0).getCommentCount()).isEqualTo(3L);
+        assertThat(content.get(0).getCommentCount()).isEqualTo(1L);
         assertThat(content.get(0).isLikedByMe()).isTrue();
     }
 
@@ -446,6 +475,40 @@ class TrainingLogSocialServiceTest {
     }
 
     @Test
+    @DisplayName("차단 관계의 상위 댓글에는 대댓글을 작성할 수 없다")
+    void createComment_whenBlockedWithParentAuthor_throwsForbidden() {
+        User replier = createUser(10L, "reply-user");
+        User entryOwner = createUser(20L, "entry-owner");
+        User parentAuthor = createUser(30L, "parent-author");
+        TrainingLogEntry entry = createEntry(50L, entryOwner, TrainingLogVisibility.FRIENDS);
+        TrainingLogComment parentComment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(parentAuthor)
+                .content("parent")
+                .build();
+        ReflectionTestUtils.setField(parentComment, "id", 60L);
+
+        TrainingLogCommentCreateRequest request = new TrainingLogCommentCreateRequest();
+        ReflectionTestUtils.setField(request, "content", "reply");
+        ReflectionTestUtils.setField(request, "parentCommentId", 60L);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(replier));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 20L)).willReturn(false);
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(20L, 10L)).willReturn(false);
+        given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
+        given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
+                .willReturn(Optional.of(entryOwner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
+        given(trainingLogCommentRepository.findById(60L)).willReturn(Optional.of(parentComment));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 30L)).willReturn(true);
+
+        assertThatThrownBy(() -> trainingLogSocialService.createComment(10L, 50L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("차단 관계에서는 친구 기능을 사용할 수 없습니다");
+    }
+
+    @Test
     @DisplayName("댓글 수정은 본인 댓글 본문을 변경한다")
     void updateComment_updatesOwnComment() {
         User author = createUser(10L, "author");
@@ -560,6 +623,247 @@ class TrainingLogSocialServiceTest {
         assertThat(response.get(0).getContent()).isNull();
         assertThat(response.get(0).getReplies()).hasSize(1);
         assertThat(response.get(0).getReplies().get(0).getContent()).isEqualTo("reply");
+    }
+
+    @Test
+    @DisplayName("차단된 원댓글은 하위 대댓글과 함께 목록에서 숨긴다")
+    void findComments_hidesBlockedParentThread() {
+        User viewer = createUser(10L, "viewer");
+        User blockedAuthor = createUser(20L, "blocked");
+        User replyAuthor = createUser(30L, "reply");
+        User visibleAuthor = createUser(40L, "visible");
+        TrainingLogEntry entry = createEntry(50L, viewer, TrainingLogVisibility.PRIVATE);
+
+        TrainingLogComment blockedParent = TrainingLogComment.builder()
+                .entry(entry)
+                .author(blockedAuthor)
+                .content("blocked parent")
+                .build();
+        ReflectionTestUtils.setField(blockedParent, "id", 60L);
+
+        TrainingLogComment blockedReply = TrainingLogComment.builder()
+                .entry(entry)
+                .parentComment(blockedParent)
+                .author(replyAuthor)
+                .content("blocked reply")
+                .build();
+        ReflectionTestUtils.setField(blockedReply, "id", 61L);
+
+        TrainingLogComment visibleParent = TrainingLogComment.builder()
+                .entry(entry)
+                .author(visibleAuthor)
+                .content("visible parent")
+                .build();
+        ReflectionTestUtils.setField(visibleParent, "id", 62L);
+
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(trainingLogCommentRepository.findAllByEntry_IdOrderByCreatedAtAscIdAsc(50L))
+                .willReturn(List.of(blockedParent, blockedReply, visibleParent));
+        given(userBlockRepository.findBlockedRelationUserIds(10L, List.of(20L, 30L, 40L))).willReturn(List.of(20L));
+
+        List<TrainingLogCommentResponse> response = trainingLogSocialService.findComments(10L, 50L, false);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getId()).isEqualTo(62L);
+    }
+
+    @Test
+    @DisplayName("댓글 신고는 자기 댓글에 허용되지 않는다")
+    void reportComment_whenSelfReport_throwsBadRequest() {
+        User author = createUser(10L, "author");
+        TrainingLogEntry entry = createEntry(50L, author, TrainingLogVisibility.PRIVATE);
+        TrainingLogComment comment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(author)
+                .content("mine")
+                .build();
+        ReflectionTestUtils.setField(comment, "id", 60L);
+
+        TrainingLogCommentReportRequest request = new TrainingLogCommentReportRequest();
+        ReflectionTestUtils.setField(request, "reason", ReportReason.SPAM);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(author));
+        given(trainingLogCommentRepository.findByIdForUpdate(60L)).willReturn(Optional.of(comment));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+
+        assertThatThrownBy(() -> trainingLogSocialService.reportComment(10L, 60L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code")
+                .isEqualTo("SELF_REPORT_NOT_ALLOWED");
+    }
+
+    @Test
+    @DisplayName("댓글 신고는 중복 신고를 막는다")
+    void reportComment_whenAlreadyReported_throwsBadRequest() {
+        User reporter = createUser(10L, "reporter");
+        User author = createUser(20L, "author");
+        TrainingLogEntry entry = createEntry(50L, reporter, TrainingLogVisibility.PRIVATE);
+        TrainingLogComment comment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(author)
+                .content("target")
+                .build();
+        ReflectionTestUtils.setField(comment, "id", 60L);
+
+        TrainingLogCommentReportRequest request = new TrainingLogCommentReportRequest();
+        ReflectionTestUtils.setField(request, "reason", ReportReason.SPAM);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(reporter));
+        given(trainingLogCommentRepository.findByIdForUpdate(60L)).willReturn(Optional.of(comment));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(trainingLogCommentReportRepository.existsByComment_IdAndReporter_Id(60L, 10L)).willReturn(true);
+
+        assertThatThrownBy(() -> trainingLogSocialService.reportComment(10L, 60L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code")
+                .isEqualTo("ALREADY_REPORTED");
+    }
+
+    @Test
+    @DisplayName("OTHER 댓글 신고는 customReason이 필요하다")
+    void reportComment_whenOtherWithoutCustomReason_throwsBadRequest() {
+        User reporter = createUser(10L, "reporter");
+        User author = createUser(20L, "author");
+        TrainingLogEntry entry = createEntry(50L, reporter, TrainingLogVisibility.PRIVATE);
+        TrainingLogComment comment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(author)
+                .content("target")
+                .build();
+        ReflectionTestUtils.setField(comment, "id", 60L);
+
+        TrainingLogCommentReportRequest request = new TrainingLogCommentReportRequest();
+        ReflectionTestUtils.setField(request, "reason", ReportReason.OTHER);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(reporter));
+        given(trainingLogCommentRepository.findByIdForUpdate(60L)).willReturn(Optional.of(comment));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(trainingLogCommentReportRepository.existsByComment_IdAndReporter_Id(60L, 10L)).willReturn(false);
+
+        assertThatThrownBy(() -> trainingLogSocialService.reportComment(10L, 60L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("기타 신고 사유를 입력해주세요");
+    }
+
+    @Test
+    @DisplayName("댓글 신고가 3회 누적되면 원댓글과 대댓글을 함께 soft delete 한다")
+    void reportComment_whenThresholdReached_softDeletesParentAndReplies() {
+        User reporter = createUser(10L, "reporter");
+        User author = createUser(20L, "author");
+        User replyAuthor = createUser(30L, "reply");
+        TrainingLogEntry entry = createEntry(50L, reporter, TrainingLogVisibility.PRIVATE);
+        TrainingLogComment parent = TrainingLogComment.builder()
+                .entry(entry)
+                .author(author)
+                .content("target")
+                .reportCount(2L)
+                .build();
+        ReflectionTestUtils.setField(parent, "id", 60L);
+
+        TrainingLogComment reply = TrainingLogComment.builder()
+                .entry(entry)
+                .parentComment(parent)
+                .author(replyAuthor)
+                .content("reply")
+                .build();
+        ReflectionTestUtils.setField(reply, "id", 61L);
+
+        TrainingLogCommentReportRequest request = new TrainingLogCommentReportRequest();
+        ReflectionTestUtils.setField(request, "reason", ReportReason.SPAM);
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(reporter));
+        given(trainingLogCommentRepository.findByIdForUpdate(60L)).willReturn(Optional.of(parent));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(trainingLogCommentReportRepository.existsByComment_IdAndReporter_Id(60L, 10L)).willReturn(false);
+        given(trainingLogCommentRepository.findAllByParentComment_Id(60L)).willReturn(List.of(reply));
+
+        trainingLogSocialService.reportComment(10L, 60L, request);
+
+        assertThat(parent.getReportCount()).isEqualTo(3L);
+        assertThat(parent.isDeleted()).isTrue();
+        assertThat(reply.isDeleted()).isTrue();
+        assertThat(parent.getDeletedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 0));
+        assertThat(reply.getDeletedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 0));
+        ArgumentCaptor<TrainingLogCommentReport> reportCaptor = ArgumentCaptor.forClass(TrainingLogCommentReport.class);
+        verify(trainingLogCommentReportRepository).save(reportCaptor.capture());
+        assertThat(reportCaptor.getValue().getStatus()).isEqualTo(ReportStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("관리자 댓글 신고 목록 조회는 훈련일지 작성자와 신고자 정보를 함께 반환한다")
+    void findCommentReportsForAdmin_returnsAdminResponses() {
+        User entryOwner = createUser(20L, "entry-owner");
+        User commentAuthor = createUser(21L, "commenter");
+        User reporter = createUser(22L, "reporter");
+        TrainingLogEntry entry = createEntry(50L, entryOwner, TrainingLogVisibility.FRIENDS);
+        TrainingLogComment comment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(commentAuthor)
+                .content("신고 대상")
+                .build();
+        ReflectionTestUtils.setField(comment, "id", 60L);
+        TrainingLogCommentReport report = TrainingLogCommentReport.builder()
+                .comment(comment)
+                .reporter(reporter)
+                .reason(ReportReason.SPAM)
+                .status(ReportStatus.RECEIVED)
+                .build();
+        ReflectionTestUtils.setField(report, "id", 70L);
+        ReflectionTestUtils.setField(report, "createdAt", LocalDateTime.of(2026, 5, 23, 12, 0));
+        ReflectionTestUtils.setField(report, "updatedAt", LocalDateTime.of(2026, 5, 23, 12, 0));
+
+        given(trainingLogCommentReportRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(report), PageRequest.of(0, 20), 1));
+
+        var response = trainingLogSocialService.findCommentReportsForAdmin(
+                null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt", "id"))
+        );
+
+        assertThat(response.getContent()).hasSize(1);
+        TrainingLogCommentReportAdminResponse item = response.getContent().get(0);
+        assertThat(item.getEntryId()).isEqualTo(50L);
+        assertThat(item.getEntryAuthorNickname()).isEqualTo("entry-owner");
+        assertThat(item.getCommentAuthorNickname()).isEqualTo("commenter");
+        assertThat(item.getReporterNickname()).isEqualTo("reporter");
+    }
+
+    @Test
+    @DisplayName("관리자 댓글 신고 상태 변경은 처리자와 메모를 기록한다")
+    void updateCommentReportStatus_updatesMetadata() {
+        User entryOwner = createUser(20L, "entry-owner");
+        User commentAuthor = createUser(21L, "commenter");
+        User reporter = createUser(22L, "reporter");
+        TrainingLogEntry entry = createEntry(50L, entryOwner, TrainingLogVisibility.FRIENDS);
+        TrainingLogComment comment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(commentAuthor)
+                .content("신고 대상")
+                .build();
+        ReflectionTestUtils.setField(comment, "id", 60L);
+        TrainingLogCommentReport report = TrainingLogCommentReport.builder()
+                .comment(comment)
+                .reporter(reporter)
+                .reason(ReportReason.SPAM)
+                .status(ReportStatus.RECEIVED)
+                .build();
+        ReflectionTestUtils.setField(report, "id", 70L);
+
+        ReportStatusUpdateRequest request = new ReportStatusUpdateRequest();
+        ReflectionTestUtils.setField(request, "status", ReportStatus.RESOLVED);
+        ReflectionTestUtils.setField(request, "processingMemo", "  조치 완료  ");
+        ReflectionTestUtils.setField(request, "finalAction", "  CONTENT_HIDDEN  ");
+
+        given(trainingLogCommentReportRepository.findById(70L)).willReturn(Optional.of(report));
+
+        TrainingLogCommentReportAdminResponse response = trainingLogSocialService.updateCommentReportStatus(1L, 70L, request);
+
+        assertThat(response.getStatus()).isEqualTo(ReportStatus.RESOLVED);
+        assertThat(response.getProcessedByUserId()).isEqualTo(1L);
+        assertThat(response.getProcessingMemo()).isEqualTo("조치 완료");
+        assertThat(response.getFinalAction()).isEqualTo("CONTENT_HIDDEN");
+        assertThat(response.getProcessedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 12, 0));
     }
 
     @Test

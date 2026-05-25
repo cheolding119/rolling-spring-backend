@@ -11,6 +11,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySum
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
@@ -21,6 +22,7 @@ import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.repository.UserBlockRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +65,9 @@ class TrainingLogServiceTest {
     private TrainingLogCommentRepository trainingLogCommentRepository;
 
     @Mock
+    private UserBlockRepository userBlockRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     private TrainingLogService trainingLogService;
@@ -74,6 +79,7 @@ class TrainingLogServiceTest {
                 trainingLogEntryRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
+                userBlockRepository,
                 userRepository,
                 fixedClock
         );
@@ -526,6 +532,12 @@ class TrainingLogServiceTest {
     void findEntryDetail_returnsFullResponse() {
         User user = createUser(10L);
         TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        TrainingLogComment visibleComment = TrainingLogComment.builder()
+                .entry(entry)
+                .author(createUser(20L))
+                .content("visible")
+                .build();
+        ReflectionTestUtils.setField(visibleComment, "id", 11L);
         entry.update(
                 TrainingLogCategory.TECHNIQUE,
                 "Original Title",
@@ -541,7 +553,9 @@ class TrainingLogServiceTest {
         );
         given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
         given(trainingLogLikeRepository.countByEntryIds(List.of(1L))).willReturn(List.of(countProjection(1L, 3L)));
-        given(trainingLogCommentRepository.countActiveByEntryIds(List.of(1L))).willReturn(List.of(countProjection(1L, 5L)));
+        given(trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(List.of(1L)))
+                .willReturn(List.of(visibleComment));
+        given(userBlockRepository.findBlockedRelationUserIds(10L, List.of(20L))).willReturn(List.of());
 
         TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
 
@@ -551,7 +565,7 @@ class TrainingLogServiceTest {
         assertThat(response.getChecklist().get(0).favorite()).isTrue();
         assertThat(response.getImageUrls()).containsExactly("https://cdn.test.com/original.jpg");
         assertThat(response.getLikeCount()).isEqualTo(3L);
-        assertThat(response.getCommentCount()).isEqualTo(5L);
+        assertThat(response.getCommentCount()).isEqualTo(1L);
         assertThat(response.getLikedByMe()).isFalse();
         assertThat(response.getCommentableByMe()).isTrue();
     }

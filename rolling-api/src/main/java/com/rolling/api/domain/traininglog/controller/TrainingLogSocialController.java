@@ -4,6 +4,7 @@ import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
 import com.rolling.api.domain.traininglog.dto.FriendResponse;
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailResponse;
@@ -232,6 +233,16 @@ public class TrainingLogSocialController {
         return ResponseEntity.ok(ApiResponse.success(
                 trainingLogSocialService.updateComment(requireUserId(principal), commentId, request)
         ));
+    }
+
+    @PostMapping("/training-logs/comments/{commentId}/report")
+    public ResponseEntity<ApiResponse<Void>> reportComment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long commentId,
+            @Valid @RequestBody TrainingLogCommentReportRequest request
+    ) {
+        trainingLogSocialService.reportComment(requireUserId(principal), commentId, request);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @DeleteMapping("/training-logs/comments/{commentId}")

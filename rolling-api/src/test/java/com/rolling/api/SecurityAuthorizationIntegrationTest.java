@@ -22,6 +22,9 @@ import com.rolling.api.domain.report.entity.ReportStatus;
 import com.rolling.api.domain.community.service.CommunityService;
 import com.rolling.api.domain.map.controller.MapController;
 import com.rolling.api.domain.map.service.KakaoGeocodeService;
+import com.rolling.api.domain.traininglog.controller.TrainingLogAdminController;
+import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminResponse;
+import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
@@ -99,6 +102,7 @@ class SecurityAuthorizationIntegrationTest {
     private SeminarService seminarService;
     private NoticeService noticeService;
     private CommunityService communityService;
+    private TrainingLogSocialService trainingLogSocialService;
     private TournamentService tournamentService;
     private TournamentManagerService tournamentManagerService;
     private KakaoGeocodeService kakaoGeocodeService;
@@ -122,6 +126,7 @@ class SecurityAuthorizationIntegrationTest {
         seminarService = context.getBean(SeminarService.class);
         noticeService = context.getBean(NoticeService.class);
         communityService = context.getBean(CommunityService.class);
+        trainingLogSocialService = context.getBean(TrainingLogSocialService.class);
         tournamentService = context.getBean(TournamentService.class);
         tournamentManagerService = context.getBean(TournamentManagerService.class);
         kakaoGeocodeService = context.getBean(KakaoGeocodeService.class);
@@ -429,6 +434,10 @@ class SecurityAuthorizationIntegrationTest {
         mockMvc.perform(patch("/api/v1/admin/community/posts/11/hide")
                         .header("Authorization", bearerToken(2L)))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/admin/training-logs/comments/reports")
+                        .header("Authorization", bearerToken(2L)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -524,6 +533,24 @@ class SecurityAuthorizationIntegrationTest {
                 .id(3L)
                 .status(ReportStatus.RESOLVED)
                 .build());
+        given(trainingLogSocialService.findCommentReportsForAdmin(isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        TrainingLogCommentReportAdminResponse.builder()
+                                .id(7L)
+                                .commentId(11L)
+                                .entryId(21L)
+                                .entryTitle("훈련일지")
+                                .commentAuthorNickname("commenter")
+                                .reporterNickname("reporter")
+                                .status(ReportStatus.RECEIVED)
+                                .build()
+                ), PageRequest.of(0, 20), 1));
+        given(trainingLogSocialService.updateCommentReportStatus(eq(1L), eq(7L), any()))
+                .willReturn(TrainingLogCommentReportAdminResponse.builder()
+                        .id(7L)
+                        .status(ReportStatus.RESOLVED)
+                        .finalAction("CONTENT_HIDDEN")
+                        .build());
 
         mockMvc.perform(get("/api/v1/admin/community/posts")
                         .header("Authorization", bearerToken(1L)))
@@ -551,6 +578,24 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.data.content[0].id").value(4));
 
         mockMvc.perform(patch("/api/v1/admin/community/posts/reports/3/status")
+                        .header("Authorization", bearerToken(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"status\": \"RESOLVED\",
+                                  \"processingMemo\": \"검토 완료\",
+                                  \"finalAction\": \"CONTENT_HIDDEN\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"));
+
+        mockMvc.perform(get("/api/v1/admin/training-logs/comments/reports")
+                        .header("Authorization", bearerToken(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(7));
+
+        mockMvc.perform(patch("/api/v1/admin/training-logs/comments/reports/7/status")
                         .header("Authorization", bearerToken(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -786,6 +831,7 @@ class SecurityAuthorizationIntegrationTest {
             NoticeAdminController.class,
             CommunityController.class,
             CommunityAdminController.class,
+            TrainingLogAdminController.class,
             MapController.class,
             TournamentCrawlerController.class,
             TestActuatorController.class
@@ -810,6 +856,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         CommunityService communityService() {
             return mock(CommunityService.class);
+        }
+
+        @Bean
+        TrainingLogSocialService trainingLogSocialService() {
+            return mock(TrainingLogSocialService.class);
         }
 
         @Bean

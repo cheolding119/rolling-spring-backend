@@ -11,8 +11,9 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
-import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
+import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
+import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
@@ -21,6 +22,7 @@ import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.User;
+import com.rolling.api.domain.user.repository.UserBlockRepository;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import org.springframework.data.domain.PageRequest;
@@ -63,6 +65,7 @@ public class TrainingLogService {
     private final TrainingLogEntryRepository trainingLogEntryRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
+    private final UserBlockRepository userBlockRepository;
     private final UserRepository userRepository;
     private final Clock clock;
 
@@ -104,7 +107,7 @@ public class TrainingLogService {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
-        Map<Long, Long> commentCounts = toCountMap(trainingLogCommentRepository.countActiveByEntryIds(List.of(entry.getId())));
+        Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId);
         return toDetailResponse(
                 entry,
                 likeCounts.getOrDefault(entry.getId(), 0L),
@@ -312,6 +315,39 @@ public class TrainingLogService {
                 .color(entry.getColor())
                 .createdAt(entry.getCreatedAt())
                 .build();
+    }
+
+    private Map<Long, Long> resolveVisibleCommentCountMap(List<Long> entryIds, Long viewerUserId) {
+        if (entryIds == null || entryIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<TrainingLogComment> comments =
+                trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(entryIds);
+        List<Long> candidateIds = comments.stream()
+                .flatMap(comment -> comment.isReply()
+                        ? java.util.stream.Stream.of(comment.getAuthor().getId(), comment.getParentComment().getAuthor().getId())
+                        : java.util.stream.Stream.of(comment.getAuthor().getId()))
+                .distinct()
+                .toList();
+        Set<Long> blockedRelationUserIds = candidateIds.isEmpty()
+                ? Set.of()
+                : new LinkedHashSet<>(userBlockRepository.findBlockedRelationUserIds(viewerUserId, candidateIds));
+
+        Map<Long, Long> result = new LinkedHashMap<>();
+        for (TrainingLogComment comment : comments) {
+            if (comment.isDeleted()) {
+                continue;
+            }
+            if (blockedRelationUserIds.contains(comment.getAuthor().getId())) {
+                continue;
+            }
+            if (comment.isReply() && blockedRelationUserIds.contains(comment.getParentComment().getAuthor().getId())) {
+                continue;
+            }
+            result.merge(comment.getEntry().getId(), 1L, Long::sum);
+        }
+        return result;
     }
 
     private List<TrainingLogMonthlyCalendarDailySummary> buildMonthlyDailySummaries(List<TrainingLogEntry> entries) {
