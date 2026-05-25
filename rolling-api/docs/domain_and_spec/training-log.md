@@ -264,7 +264,7 @@
 
 - 본인 상세 조회 응답에는 소셜 메타 필드 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 함께 포함한다.
 - 현재 정책 기준 본인 기록은 좋아요 대상이 아니므로 `likedByMe = false`로 반환한다.
-- 현재 정책 기준 본인 기록에는 댓글 작성 진입을 열지 않으므로 `commentableByMe = false`로 반환한다.
+- 현재 정책 기준 본인 기록에도 댓글 작성이 가능하므로 `commentableByMe = true`로 반환한다.
 
 ### 5.3 특정 날짜 훈련 기록 생성
 

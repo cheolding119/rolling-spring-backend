@@ -323,7 +323,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.likeCount").value(3))
                 .andExpect(jsonPath("$.data.commentCount").value(5))
                 .andExpect(jsonPath("$.data.likedByMe").value(false))
-                .andExpect(jsonPath("$.data.commentableByMe").value(false))
+                .andExpect(jsonPath("$.data.commentableByMe").value(true))
                 .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
     }
@@ -495,7 +495,7 @@ class TrainingLogControllerTest {
                 .likeCount(3L)
                 .commentCount(5L)
                 .likedByMe(false)
-                .commentableByMe(false)
+                .commentableByMe(true)
                 .build();
     }
 
