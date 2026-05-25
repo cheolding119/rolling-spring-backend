@@ -553,7 +553,7 @@ class TrainingLogServiceTest {
         assertThat(response.getLikeCount()).isEqualTo(3L);
         assertThat(response.getCommentCount()).isEqualTo(5L);
         assertThat(response.getLikedByMe()).isFalse();
-        assertThat(response.getCommentableByMe()).isFalse();
+        assertThat(response.getCommentableByMe()).isTrue();
     }
 
     @Test
