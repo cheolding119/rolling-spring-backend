@@ -24,6 +24,7 @@ class NotificationSchemaConfigTest {
         assertThat(sql).contains("SEMINAR_CANCELED");
         assertThat(sql).contains("INQUIRY_ANSWERED");
         assertThat(sql).contains("COMMUNITY_COMMENT_CREATED");
+        assertThat(sql).contains("FRIEND_REQUEST_RECEIVED");
         assertThat(sql).contains("TRAINING_LOG_COMMENT_CREATED");
         assertThat(sql).contains("TRAINING_LOG_COMMENT_REPLY_CREATED");
         assertThat(sql).contains("notifications_type_check");
@@ -32,7 +33,7 @@ class NotificationSchemaConfigTest {
     @Test
     @DisplayName("현재 constraint 정의에 enum 값이 모두 있으면 동기화가 필요 없다고 판단한다")
     void containsAllAllowedTypes_whenDefinitionContainsAllValues_returnsTrue() {
-        String definition = "CHECK (((type)::text = ANY ((ARRAY['OPEN_MAT_UPDATED'::character varying, 'OPEN_MAT_DELETED'::character varying, 'SEMINAR_APPLIED'::character varying, 'SEMINAR_APPLICATION_CANCELED'::character varying, 'SEMINAR_APPLICATION_CANCELED_BY_HOST'::character varying, 'SEMINAR_UPDATED'::character varying, 'SEMINAR_DELETED'::character varying, 'SEMINAR_CANCELED'::character varying, 'INQUIRY_ANSWERED'::character varying, 'COMMUNITY_COMMENT_CREATED'::character varying, 'TRAINING_LOG_COMMENT_CREATED'::character varying, 'TRAINING_LOG_COMMENT_REPLY_CREATED'::character varying])::text[])))";
+        String definition = "CHECK (((type)::text = ANY ((ARRAY['OPEN_MAT_UPDATED'::character varying, 'OPEN_MAT_DELETED'::character varying, 'SEMINAR_APPLIED'::character varying, 'SEMINAR_APPLICATION_CANCELED'::character varying, 'SEMINAR_APPLICATION_CANCELED_BY_HOST'::character varying, 'SEMINAR_UPDATED'::character varying, 'SEMINAR_DELETED'::character varying, 'SEMINAR_CANCELED'::character varying, 'INQUIRY_ANSWERED'::character varying, 'COMMUNITY_COMMENT_CREATED'::character varying, 'FRIEND_REQUEST_RECEIVED'::character varying, 'TRAINING_LOG_COMMENT_CREATED'::character varying, 'TRAINING_LOG_COMMENT_REPLY_CREATED'::character varying])::text[])))";
 
         assertThat(config.containsAllAllowedTypes(definition)).isTrue();
     }

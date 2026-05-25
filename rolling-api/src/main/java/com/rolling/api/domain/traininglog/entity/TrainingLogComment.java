@@ -49,6 +49,9 @@ public class TrainingLogComment extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(nullable = false)
+    private Long reportCount = 0L;
+
     @Builder
     public TrainingLogComment(
             TrainingLogEntry entry,
@@ -56,7 +59,8 @@ public class TrainingLogComment extends BaseTimeEntity {
             User author,
             String content,
             boolean deleted,
-            LocalDateTime deletedAt
+            LocalDateTime deletedAt,
+            Long reportCount
     ) {
         this.entry = entry;
         this.parentComment = parentComment;
@@ -64,6 +68,9 @@ public class TrainingLogComment extends BaseTimeEntity {
         this.content = content;
         this.deleted = deleted;
         this.deletedAt = deletedAt;
+        if (reportCount != null) {
+            this.reportCount = reportCount;
+        }
     }
 
     public boolean isReply() {
@@ -72,6 +79,10 @@ public class TrainingLogComment extends BaseTimeEntity {
 
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    public void incrementReportCount() {
+        this.reportCount = this.reportCount == null ? 1L : this.reportCount + 1L;
     }
 
     public void softDelete(LocalDateTime deletedAt) {

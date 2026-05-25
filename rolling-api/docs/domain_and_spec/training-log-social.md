@@ -14,6 +14,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 
 - 친구 검색(`이름`으로 노출되는 `User.nickname` 기준)
 - 친구 요청 전송, 수락, 거절, 삭제
+- 친구 요청 전송 시 수신자 알림함 저장과 푸시 발송 시도
 - 친구 설정에서 제어하는 `훈련일지 친구 공개 on/off`
 - 친구 월간 캘린더 조회
 - 친구 특정 날짜 기록 목록 조회
@@ -202,6 +203,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 | `parentCommentId` | `Long?` | 상위 댓글 ID. 원댓글이면 null |
 | `authorUserId` | `Long` | 작성자 ID |
 | `content` | `String` | 댓글 본문 |
+| `reportCount` | `Long` | 누적 신고 수 |
 | `deleted` | `Boolean` | soft delete 여부 |
 | `deletedAt` | `LocalDateTime?` | 삭제 시각 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
@@ -212,6 +214,29 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 테이블명은 `training_log_comments`를 기준으로 설계한다.
 - `parent_comment_id = null`이면 원댓글, 값이 있으면 대댓글이다.
 - depth 제한은 row 구조가 아니라 서비스 검증으로 강제한다.
+
+### 2.11 `TrainingLogCommentReport` 저장 모델 설계
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | PK |
+| `commentId` | `Long` | 신고 대상 댓글 ID |
+| `reporterId` | `Long` | 신고 사용자 ID |
+| `reason` | `ReportReason` | 신고 사유 |
+| `customReason` | `String?` | 기타 신고 사유 |
+| `status` | `ReportStatus` | 신고 처리 상태 |
+| `processedByUserId` | `Long?` | 처리 관리자 ID |
+| `processedAt` | `LocalDateTime?` | 처리 시각 |
+| `processingMemo` | `String?` | 처리 메모 |
+| `finalAction` | `String?` | 최종 조치 메모 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+
+구현 메모:
+
+- 테이블명은 `training_log_comment_reports`를 기준으로 설계한다.
+- `(comment_id, reporter_id)` unique 제약으로 동일 사용자의 중복 신고를 막는다.
+- 신고 처리 상태는 커뮤니티 댓글 신고와 동일하게 `ReportStatus` 공용 enum을 사용한다.
 
 ## 3. Enum
 
@@ -237,6 +262,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 
 훈련일지 소셜에서 추가되는 알림 raw value:
 
+- `FRIEND_REQUEST_RECEIVED`
 - `TRAINING_LOG_COMMENT_CREATED`
 - `TRAINING_LOG_COMMENT_REPLY_CREATED`
 
@@ -258,6 +284,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 자기 자신에게 친구 요청을 보낼 수 없다.
 - 이미 친구인 사용자에게 재요청할 수 없다.
 - 이미 `PENDING`인 요청이 있으면 중복 요청할 수 없다.
+- 친구 요청 전송이 성공하면 수신자에게 `FRIEND_REQUEST_RECEIVED` 알림함 저장과 푸시 발송을 시도한다.
 - 차단한 사용자 또는 차단당한 사용자와는 친구 요청, 수락, 열람이 모두 불가하다.
 - 탈퇴, 탈퇴 예약, 비활성 상태 사용자는 검색 결과와 요청 대상에서 제외한다.
 - 친구 삭제는 양방향 관계를 제거한다.
@@ -300,12 +327,28 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 댓글 삭제는 댓글 작성자, 기록 작성자, 관리자만 가능하다.
 - 삭제된 원댓글에 대댓글이 남아 있으면 원댓글은 placeholder 형태로 유지한다.
 - 댓글과 대댓글 작성 진입점은 친구 훈련일지 상세 페이지다.
+- 조회자와 댓글 작성자 사이에 차단 관계가 있으면 댓글 목록에서 숨긴다.
+- 차단된 원댓글이 숨겨지면 그 하위 대댓글도 함께 숨긴다.
+- 차단 관계가 있는 기록 작성자에게는 새 댓글을 작성할 수 없다.
+- 차단 관계가 있는 상위 댓글 작성자에게는 대댓글을 작성할 수 없다.
+- 댓글 수는 조회자에게 실제로 노출되는 댓글 기준으로 계산한다.
+
+### 4.6.1 댓글 신고 정책
+
+- 댓글 신고는 `POST /api/v1/training-logs/comments/{commentId}/report`로 처리한다.
+- 자기 댓글은 신고할 수 없다.
+- 동일 사용자의 동일 댓글 중복 신고는 허용하지 않는다.
+- `ReportReason.OTHER`일 때 `customReason`은 필수다.
+- 이미 삭제된 댓글은 새 신고를 받을 수 없다.
+- 댓글 또는 대댓글 신고가 3회 이상 누적되면 해당 댓글은 자동 soft delete 된다.
+- 원댓글이 신고 누적으로 자동 삭제되면 하위 대댓글도 함께 soft delete 된다.
 
 ### 4.7 알림 정책
 
 - 친구가 내 기록에 댓글을 달면 기록 작성자에게 `TRAINING_LOG_COMMENT_CREATED` 알림을 저장하고 푸시 발송을 시도한다.
 - 내 댓글에 대댓글이 달리면 상위 댓글 작성자에게 `TRAINING_LOG_COMMENT_REPLY_CREATED` 알림을 저장하고 푸시 발송을 시도한다.
 - 자기 자신의 댓글/대댓글 액션에는 자기 알림을 만들지 않는다.
+- 차단 관계가 생긴 사용자 간에는 새 댓글/대댓글 알림을 발행하지 않는다.
 - 좋아요 알림은 MVP 범위에 포함하지 않는다.
 - 알림 route는 `"/training-logs/friends/entries/{entryId}"` 형식의 API path를 payload에 저장한다.
 - 앱 라우트로의 변환은 프론트가 `targetId` 또는 `route`를 해석해서 처리한다.
@@ -331,6 +374,19 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 
 - 검색 결과에서 `PENDING` 관계 사용자를 제거하지 않는다.
 - `friendRequestStatus`와 `outgoingRequestId`로 프론트가 `요청`, `요청됨`, `받은 요청`, `친구` 상태를 그릴 수 있어야 한다.
+
+### 5.1.2 친구 요청 전송
+
+`POST /api/v1/friends/requests/{targetUserId}`
+
+- 인증: 필요
+- Response data: `FriendRequestResponse`
+
+구현 메모:
+
+- 친구 요청 저장 성공 후 수신자에게 `FRIEND_REQUEST_RECEIVED` 알림함 저장과 푸시 발송을 시도한다.
+- 알림 `targetId`는 생성된 `friendRequest.id`를 사용한다.
+- 알림 `route`는 `/friends/requests/received`를 사용한다.
 
 ### 5.2 내 친구 훈련일지 공개 설정 조회
 
@@ -425,6 +481,7 @@ Query parameters:
 
 - 일반 훈련일지 상세 화면을 read-only로 재사용할 수 있어야 한다.
 - 좋아요, 댓글 영역이 필요하면 additive field를 포함한다.
+- `commentCount`는 조회자에게 노출되는 댓글 기준으로 계산한다.
 
 에러:
 
@@ -443,6 +500,7 @@ Query parameters:
 - 본인 상세 조회도 친구 상세와 동일한 읽기 메타 필드 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 포함한다.
 - 댓글 목록 조회, 댓글 작성/수정/삭제, 좋아요/좋아요 취소 API는 아래 소셜 액션 API를 그대로 재사용한다.
 - 현재 정책 기준 본인 기록 상세에서는 `likedByMe = false`, `commentableByMe = true`로 반환한다.
+- `commentCount`는 본인에게 실제로 노출되는 댓글 기준으로 계산한다.
 
 ### 5.7 호환용 친구 피드 조회
 
@@ -456,6 +514,7 @@ Query parameters:
 - 기존 프론트 호환을 위해 유지하는 API다.
 - `shareWithFriends = true`인 친구의 기록만 반환한다.
 - `TrainingLogEntry.visibility` 값과 무관하게 해당 친구의 모든 기록이 반환된다.
+- `commentCount`는 조회자에게 노출되는 댓글 기준으로 계산한다.
 
 ### 5.8 좋아요
 
@@ -473,6 +532,11 @@ Query parameters:
 - 인증: 필요
 - Response data: `List<TrainingLogCommentResponse>`
 
+구현 메모:
+
+- 조회자와 차단 관계인 댓글 작성자의 댓글은 응답에서 제외한다.
+- 차단된 원댓글이 제외되면 해당 스레드의 대댓글도 함께 제외한다.
+
 ### 5.10 댓글 작성
 
 `POST /api/v1/training-logs/entries/{entryId}/comments`
@@ -487,6 +551,11 @@ Request body:
 | `content` | `String` | O | 댓글 본문 |
 | `parentCommentId` | `Long?` | - | 대댓글이면 상위 댓글 ID |
 
+구현 메모:
+
+- 기록 작성자와 차단 관계면 댓글 작성이 불가하다.
+- 대댓글 작성 시 상위 댓글 작성자와 차단 관계면 작성이 불가하다.
+
 ### 5.11 댓글 수정
 
 `PATCH /api/v1/training-logs/comments/{commentId}`
@@ -500,6 +569,83 @@ Request body:
 
 - 인증: 필요
 - Response data: `null`
+
+### 5.12.1 댓글 신고
+
+`POST /api/v1/training-logs/comments/{commentId}/report`
+
+- 인증: 필요
+- Response data: `null`
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `reason` | `ReportReason` | O | 신고 사유 |
+| `customReason` | `String?` | - | 기타 신고 사유 |
+
+에러:
+
+- `NOT_FOUND`
+- `SELF_REPORT_NOT_ALLOWED`
+- `ALREADY_REPORTED`
+- `VALIDATION_ERROR`
+- `FORBIDDEN`
+
+### 5.12.2 관리자 댓글 신고 목록 조회
+
+`GET /api/v1/admin/training-logs/comments/reports`
+
+- 인증: 필요
+- 권한: `ADMIN`
+- Response data: `Page<TrainingLogCommentReportAdminResponse>`
+
+Query parameters:
+
+| 파라미터 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `status` | `ReportStatus?` | - | 처리 상태 필터 |
+
+구현 메모:
+
+- 기본 정렬은 `createdAt desc, id desc`다.
+- 허용 정렬 필드는 `createdAt`, `updatedAt`, `status`, `processedAt`다.
+- 응답에는 댓글 작성자, 훈련일지 작성자, 신고자 식별 정보와 처리 상태가 함께 포함된다.
+
+### 5.12.3 관리자 댓글 신고 상세 조회
+
+`GET /api/v1/admin/training-logs/comments/reports/{id}`
+
+- 인증: 필요
+- 권한: `ADMIN`
+- Response data: `TrainingLogCommentReportAdminResponse`
+
+구현 메모:
+
+- 목록 응답 필드에 더해 `parentCommentId`, `commentDeleted`, `processingMemo`, `finalAction`을 함께 확인할 수 있다.
+- 삭제된 댓글도 신고 이력을 유지한 채 운영자가 조회할 수 있다.
+
+### 5.12.4 관리자 댓글 신고 상태 변경
+
+`PATCH /api/v1/admin/training-logs/comments/reports/{id}/status`
+
+- 인증: 필요
+- 권한: `ADMIN`
+- Response data: `TrainingLogCommentReportAdminResponse`
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `status` | `ReportStatus` | O | 처리 상태 |
+| `processingMemo` | `String?` | - | 처리 메모 |
+| `finalAction` | `String?` | - | 최종 조치 메모 |
+
+구현 메모:
+
+- 상태 변경 시 `processedByUserId`, `processedAt`을 함께 기록한다.
+- `finalAction`은 `CONTENT_HIDDEN`, `WARNING`, `TEMP_SUSPENSION` 같은 운영 메모 raw value를 저장하는 용도로 사용한다.
+- 사용자 제재가 필요하면 기존 `user_sanctions` 관리자 흐름에서 후속 조치를 수행한다. 현재 훈련일지 댓글 신고 상태 변경이 자동으로 제재 row를 생성하지는 않는다.
 
 ### 5.13 알림 API 재사용
 
@@ -517,4 +663,8 @@ Request body:
 - `TrainingLogEntry.visibility`는 개인 훈련일지 메타데이터로 유지하되, 친구 열람 권한 결정에는 사용하지 않는다.
 - 차단 정책은 친구 공개 설정보다 우선한다.
 - 커뮤니티의 좋아요/댓글/알림 패턴을 최대한 재사용하는 것이 맞다.
+- 댓글 신고는 공용 `ReportTargetType` 확장 대신 전용 `TrainingLogCommentReport` 모델로 저장한다.
+- 신고 누적 삭제 기준은 `training_log_comments.reportCount >= 3`이다.
+- 관리자 댓글 신고 조회/처리는 `/api/v1/admin/training-logs/comments/reports*` 경로로 운영하고, 일반 사용자 댓글 삭제와 별도로 운영 메모를 남긴다.
+- 댓글 삭제 책임은 현재 공용 댓글 삭제 API에서 분기한다. 댓글 작성자, 기록 작성자, 관리자는 `DELETE /api/v1/training-logs/comments/{commentId}`로 삭제할 수 있고, 관리자 신고 상태 변경 API는 삭제를 자동 수행하지 않는다.
 - 댓글 알림은 `@TransactionalEventListener(AFTER_COMMIT)`에서 알림함 저장 후 푸시 발송을 시도한다.
