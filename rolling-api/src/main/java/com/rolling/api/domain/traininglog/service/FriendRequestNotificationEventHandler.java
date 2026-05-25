@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FriendRequestNotificationEventHandler {
 
-    private static final String FRIEND_REQUEST_ROUTE = "/friends/requests/received";
+    private static final String FRIEND_REQUEST_ROUTE = "/training-log/social/friends";
 
     private final NotificationService notificationService;
     private final PushNotificationService pushNotificationService;
