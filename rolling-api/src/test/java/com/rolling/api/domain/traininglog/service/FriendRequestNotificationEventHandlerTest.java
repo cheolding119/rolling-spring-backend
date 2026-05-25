@@ -51,7 +51,7 @@ class FriendRequestNotificationEventHandlerTest {
         PushNotificationCommand command = captor.getValue();
         assertThat(command.type()).isEqualTo(PushNotificationType.FRIEND_REQUEST_RECEIVED);
         assertThat(command.targetId()).isEqualTo(88L);
-        assertThat(command.data()).containsEntry("route", "/friends/requests/received");
+        assertThat(command.data()).containsEntry("route", "/training-log/social/friends");
         assertThat(command.title()).contains("친구 요청");
         assertThat(command.body()).contains("민준");
     }
