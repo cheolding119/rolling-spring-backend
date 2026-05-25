@@ -277,7 +277,7 @@ public class TrainingLogService {
                 .likeCount(likeCount)
                 .commentCount(commentCount)
                 .likedByMe(false)
-                .commentableByMe(false)
+                .commentableByMe(true)
                 .build();
     }
 
