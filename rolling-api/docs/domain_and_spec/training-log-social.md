@@ -386,7 +386,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 
 - 친구 요청 저장 성공 후 수신자에게 `FRIEND_REQUEST_RECEIVED` 알림함 저장과 푸시 발송을 시도한다.
 - 알림 `targetId`는 생성된 `friendRequest.id`를 사용한다.
-- 알림 `route`는 `/friends/requests/received`를 사용한다.
+- 알림 `route`는 `/training-log/social/friends`를 사용한다.
 
 ### 5.2 내 친구 훈련일지 공개 설정 조회
 
