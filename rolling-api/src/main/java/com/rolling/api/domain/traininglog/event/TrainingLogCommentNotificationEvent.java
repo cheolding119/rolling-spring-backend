@@ -4,6 +4,7 @@ import com.rolling.api.domain.notification.model.PushNotificationType;
 
 public record TrainingLogCommentNotificationEvent(
         Long entryId,
+        Long entryOwnerUserId,
         Long recipientUserId,
         Long actorUserId,
         String actorNickname,

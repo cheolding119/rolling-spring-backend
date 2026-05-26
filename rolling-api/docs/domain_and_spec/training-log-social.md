@@ -120,6 +120,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
   - `commentableByMe`
   - `createdAt`
   - `updatedAt`
+- 작성자가 `settings.showOwnReactions = false`를 설정한 기록은 친구 화면에서도 `likeCount = 0`, `commentCount = 0`, `likedByMe = false`, `commentableByMe = false`로 숨긴다.
 
 ### 2.6 `TrainingLogCommentResponse`
 
@@ -350,7 +351,9 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 자기 자신의 댓글/대댓글 액션에는 자기 알림을 만들지 않는다.
 - 차단 관계가 생긴 사용자 간에는 새 댓글/대댓글 알림을 발행하지 않는다.
 - 좋아요 알림은 MVP 범위에 포함하지 않는다.
-- 알림 route는 `"/training-logs/friends/entries/{entryId}"` 형식의 API path를 payload에 저장한다.
+- 알림 route는 수신자 관점으로 저장한다.
+- 기록 작성자가 받는 댓글/답글 알림은 `"/training-logs/me/entries/{entryId}"`를 사용한다.
+- 친구 사용자가 받는 답글 알림은 `"/training-logs/friends/entries/{entryId}"`를 사용한다.
 - 앱 라우트로의 변환은 프론트가 `targetId` 또는 `route`를 해석해서 처리한다.
 
 ## 5. API
@@ -463,6 +466,7 @@ Query parameters:
 
 - 일반 훈련일지 날짜별 카드 목록 화면을 read-only로 재사용할 수 있게 기존 요약 응답 구조를 재사용한다.
 - 친구 관계와 `shareWithFriends = true`를 모두 만족할 때만 조회 가능하다.
+- 작성자가 `settings.showOwnReactions = false`면 해당 카드의 `likeCount`, `commentCount`는 0으로 내려간다.
 
 ### 5.6 친구 기록 상세 조회
 
@@ -482,6 +486,7 @@ Query parameters:
 - 일반 훈련일지 상세 화면을 read-only로 재사용할 수 있어야 한다.
 - 좋아요, 댓글 영역이 필요하면 additive field를 포함한다.
 - `commentCount`는 조회자에게 노출되는 댓글 기준으로 계산한다.
+- 작성자가 `settings.showOwnReactions = false`면 상세 본문은 조회 가능하지만 좋아요/댓글 메타는 숨기고 `commentableByMe = false`로 반환한다.
 
 에러:
 
@@ -501,6 +506,7 @@ Query parameters:
 - 댓글 목록 조회, 댓글 작성/수정/삭제, 좋아요/좋아요 취소 API는 아래 소셜 액션 API를 그대로 재사용한다.
 - 현재 정책 기준 본인 기록 상세에서는 `likedByMe = false`, `commentableByMe = true`로 반환한다.
 - `commentCount`는 본인에게 실제로 노출되는 댓글 기준으로 계산한다.
+- 단, `settings.showOwnReactions = false`면 본인 상세도 `likeCount = 0`, `commentCount = 0`, `likedByMe = false`, `commentableByMe = false`로 반환한다.
 
 ### 5.7 호환용 친구 피드 조회
 
@@ -515,6 +521,7 @@ Query parameters:
 - `shareWithFriends = true`인 친구의 기록만 반환한다.
 - `TrainingLogEntry.visibility` 값과 무관하게 해당 친구의 모든 기록이 반환된다.
 - `commentCount`는 조회자에게 노출되는 댓글 기준으로 계산한다.
+- 작성자가 `settings.showOwnReactions = false`면 피드 카드의 `likeCount`, `commentCount`, `likedByMe`도 숨긴다.
 
 ### 5.8 좋아요
 
@@ -524,6 +531,10 @@ Query parameters:
 
 - 인증: 필요
 - Response data: `null`
+
+구현 메모:
+
+- 작성자가 `settings.showOwnReactions = false`인 기록에는 좋아요/좋아요 취소를 허용하지 않는다.
 
 ### 5.9 댓글 목록 조회
 
@@ -536,6 +547,7 @@ Query parameters:
 
 - 조회자와 차단 관계인 댓글 작성자의 댓글은 응답에서 제외한다.
 - 차단된 원댓글이 제외되면 해당 스레드의 대댓글도 함께 제외한다.
+- 작성자가 `settings.showOwnReactions = false`인 기록은 일반 사용자에게 빈 배열을 반환한다.
 
 ### 5.10 댓글 작성
 
@@ -545,6 +557,10 @@ Query parameters:
 - Response data: `TrainingLogCommentResponse`
 
 Request body:
+
+구현 메모:
+
+- 작성자가 `settings.showOwnReactions = false`인 기록에는 댓글 작성을 허용하지 않는다.
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |

@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -512,19 +513,45 @@ class TrainingLogServiceTest {
     @DisplayName("date summary returns summary cards for the selected day")
     void findEntrySummaries_returnsSummaryCardsForDate() {
         given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        User owner = createUser(10L);
+        TrainingLogEntry firstEntry = createEntryWithColor(2L, owner, LocalDate.of(2026, 5, 17), TrainingLogColor.RED, 30);
+        TrainingLogEntry secondEntry = createEntryWithColor(1L, owner, LocalDate.of(2026, 5, 17), TrainingLogColor.BLUE, 60);
+        TrainingLogComment firstComment = TrainingLogComment.builder()
+                .entry(firstEntry)
+                .author(createUser(20L))
+                .content("first")
+                .build();
+        ReflectionTestUtils.setField(firstComment, "id", 201L);
+        TrainingLogComment secondComment = TrainingLogComment.builder()
+                .entry(secondEntry)
+                .author(createUser(30L))
+                .content("second")
+                .build();
+        ReflectionTestUtils.setField(secondComment, "id", 202L);
         given(trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(10L, LocalDate.of(2026, 5, 17)))
                 .willReturn(List.of(
-                        createEntryWithColor(2L, createUser(10L), LocalDate.of(2026, 5, 17), TrainingLogColor.RED, 30),
-                        createEntryWithColor(1L, createUser(10L), LocalDate.of(2026, 5, 17), TrainingLogColor.BLUE, 60)
+                        firstEntry,
+                        secondEntry
                 ));
+        given(trainingLogLikeRepository.countByEntryIds(List.of(2L, 1L))).willReturn(List.of(
+                countProjection(2L, 1L),
+                countProjection(1L, 3L)
+        ));
+        given(trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(List.of(2L, 1L)))
+                .willReturn(List.of(secondComment, firstComment));
+        given(userBlockRepository.findBlockedRelationUserIds(10L, List.of(30L, 20L))).willReturn(List.of());
 
         List<TrainingLogEntrySummaryResponse> response = trainingLogService.findEntrySummaries(10L, LocalDate.of(2026, 5, 17));
 
         assertThat(response).extracting(TrainingLogEntrySummaryResponse::getId).containsExactly(2L, 1L);
         assertThat(response.get(0).getCategory()).isEqualTo(TrainingLogCategory.TECHNIQUE);
         assertThat(response.get(0).getColor()).isEqualTo(TrainingLogColor.RED);
+        assertThat(response.get(0).getLikeCount()).isEqualTo(1L);
+        assertThat(response.get(0).getCommentCount()).isEqualTo(1L);
         assertThat(response.get(1).getCategory()).isEqualTo(TrainingLogCategory.TECHNIQUE);
         assertThat(response.get(1).getColor()).isEqualTo(TrainingLogColor.BLUE);
+        assertThat(response.get(1).getLikeCount()).isEqualTo(3L);
+        assertThat(response.get(1).getCommentCount()).isEqualTo(1L);
     }
 
     @Test
@@ -568,6 +595,24 @@ class TrainingLogServiceTest {
         assertThat(response.getCommentCount()).isEqualTo(1L);
         assertThat(response.getLikedByMe()).isFalse();
         assertThat(response.getCommentableByMe()).isTrue();
+    }
+
+    @Test
+    @DisplayName("상세 반응 숨김이 꺼져 있으면 본인 상세는 좋아요/댓글 메타를 숨긴다")
+    void findEntryDetail_whenOwnReactionsHidden_returnsHiddenSocialMetadata() {
+        User user = createUser(10L);
+        user.updateShowOwnReactions(false);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+
+        TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
+
+        assertThat(response.getLikeCount()).isZero();
+        assertThat(response.getCommentCount()).isZero();
+        assertThat(response.getLikedByMe()).isFalse();
+        assertThat(response.getCommentableByMe()).isFalse();
+        verify(trainingLogLikeRepository, never()).countByEntryIds(any());
+        verify(trainingLogCommentRepository, never()).findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(any());
     }
 
     @Test

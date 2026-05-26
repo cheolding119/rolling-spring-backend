@@ -19,7 +19,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TrainingLogCommentNotificationEventHandler {
 
-    private static final String TRAINING_LOG_DETAIL_ROUTE = "/training-logs/friends/entries/";
+    private static final String MY_TRAINING_LOG_DETAIL_ROUTE = "/training-logs/me/entries/";
+    private static final String FRIEND_TRAINING_LOG_DETAIL_ROUTE = "/training-logs/friends/entries/";
 
     private final NotificationService notificationService;
     private final PushNotificationService pushNotificationService;
@@ -31,7 +32,7 @@ public class TrainingLogCommentNotificationEventHandler {
                 titleFor(event.type()),
                 bodyFor(event),
                 event.entryId(),
-                Map.of("route", TRAINING_LOG_DETAIL_ROUTE + event.entryId())
+                Map.of("route", resolveRoute(event))
         );
 
         try {
@@ -64,5 +65,12 @@ public class TrainingLogCommentNotificationEventHandler {
                     event.actorNickname() + "님이 \"" + event.entryTitle() + "\" 기록 댓글에 답글을 남겼습니다.";
             default -> event.actorNickname() + "님이 훈련일지에 반응했습니다.";
         };
+    }
+
+    private String resolveRoute(TrainingLogCommentNotificationEvent event) {
+        String baseRoute = event.recipientUserId().equals(event.entryOwnerUserId())
+                ? MY_TRAINING_LOG_DETAIL_ROUTE
+                : FRIEND_TRAINING_LOG_DETAIL_ROUTE;
+        return baseRoute + event.entryId();
     }
 }

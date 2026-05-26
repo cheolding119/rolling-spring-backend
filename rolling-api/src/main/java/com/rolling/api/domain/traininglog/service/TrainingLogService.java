@@ -72,8 +72,22 @@ public class TrainingLogService {
     @Transactional(readOnly = true)
     public List<TrainingLogEntrySummaryResponse> findEntrySummaries(Long userId, LocalDate trainingDate) {
         requireActiveUserExists(userId);
-        return trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(userId, trainingDate).stream()
-                .map(this::toSummaryResponse)
+        List<TrainingLogEntry> entries =
+                trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAsc(userId, trainingDate);
+        if (entries.isEmpty()) {
+            return List.of();
+        }
+        List<Long> entryIds = entries.stream()
+                .map(TrainingLogEntry::getId)
+                .toList();
+        Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(entryIds));
+        Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(entryIds, userId);
+        return entries.stream()
+                .map(entry -> toSummaryResponse(
+                        entry,
+                        likeCounts.getOrDefault(entry.getId(), 0L),
+                        commentCounts.getOrDefault(entry.getId(), 0L)
+                ))
                 .toList();
     }
 
@@ -106,12 +120,16 @@ public class TrainingLogService {
     public TrainingLogEntryResponse findEntryDetail(Long userId, Long entryId) {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
+        if (!isReactionVisible(entry)) {
+            return toDetailResponse(entry, 0L, 0L, false);
+        }
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
         Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId);
         return toDetailResponse(
                 entry,
                 likeCounts.getOrDefault(entry.getId(), 0L),
-                commentCounts.getOrDefault(entry.getId(), 0L)
+                commentCounts.getOrDefault(entry.getId(), 0L),
+                true
         );
     }
 
@@ -275,12 +293,17 @@ public class TrainingLogService {
         return baseResponseBuilder(entry).build();
     }
 
-    private TrainingLogEntryResponse toDetailResponse(TrainingLogEntry entry, long likeCount, long commentCount) {
+    private TrainingLogEntryResponse toDetailResponse(
+            TrainingLogEntry entry,
+            long likeCount,
+            long commentCount,
+            boolean commentableByMe
+    ) {
         return baseResponseBuilder(entry)
                 .likeCount(likeCount)
                 .commentCount(commentCount)
                 .likedByMe(false)
-                .commentableByMe(true)
+                .commentableByMe(commentableByMe)
                 .build();
     }
 
@@ -306,15 +329,21 @@ public class TrainingLogService {
                 .stripeCount(entry.getStripeCount());
     }
 
-    private TrainingLogEntrySummaryResponse toSummaryResponse(TrainingLogEntry entry) {
+    private TrainingLogEntrySummaryResponse toSummaryResponse(TrainingLogEntry entry, long likeCount, long commentCount) {
         return TrainingLogEntrySummaryResponse.builder()
                 .id(entry.getId())
                 .title(entry.getTitle())
                 .content(entry.getContent())
                 .category(entry.getCategory())
                 .color(entry.getColor())
+                .likeCount(likeCount)
+                .commentCount(commentCount)
                 .createdAt(entry.getCreatedAt())
                 .build();
+    }
+
+    private boolean isReactionVisible(TrainingLogEntry entry) {
+        return !Boolean.FALSE.equals(entry.getUser().getShowOwnReactions());
     }
 
     private Map<Long, Long> resolveVisibleCommentCountMap(List<Long> entryIds, Long viewerUserId) {

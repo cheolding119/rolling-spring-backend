@@ -177,11 +177,12 @@ Response data:
 | `isAdmin` | `Boolean` |
 | `settings` | `Object` |
 | `settings.pushNotificationEnabled` | `Boolean` |
+| `settings.showOwnReactions` | `Boolean` |
 
 현재 구현 메모:
 
 - `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
-- `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`와 소속 `affiliation`이 포함된다.
+- `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`, `settings.showOwnReactions`와 소속 `affiliation`이 포함된다.
 - `/users/me` 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
 - 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
 - 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
@@ -219,20 +220,24 @@ Request body:
 
 | 필드 | 타입 | 필수 |
 | --- | --- | --- |
-| `pushNotificationEnabled` | `Boolean` | O |
+| `pushNotificationEnabled` | `Boolean` | - |
+| `showOwnReactions` | `Boolean` | - |
 
 Response data:
 
 | 필드 | 타입 |
 | --- | --- |
 | `pushNotificationEnabled` | `Boolean` |
+| `showOwnReactions` | `Boolean` |
 
 현재 구현 메모:
 
 - 이 설정은 사용자 전역 푸시 수신 설정이다.
 - `false`면 해당 사용자는 모든 디바이스에서 FCM 발송 대상에서 제외된다.
 - `Notification` 알림함 저장 자체는 계속 유지된다.
+- `showOwnReactions = false`면 내 훈련일지 상세에서 좋아요/댓글 메타와 댓글 목록을 숨기고, 친구에게도 해당 기록의 좋아요/댓글 정보를 노출하지 않는다.
 - 앱은 마이페이지 진입 시 `GET /api/v1/users/me`의 `settings.pushNotificationEnabled`를 source of truth로 사용한다.
+- 푸시 설정과 훈련일지 반응 노출 설정은 각각 단독으로 patch할 수 있다.
 - 앱에서 스위치를 변경하면 `PATCH /api/v1/users/me/settings`를 호출한다.
 - 푸시를 꺼도 `GET /api/v1/notifications` 알림함 데이터는 계속 조회 가능해야 한다.
 

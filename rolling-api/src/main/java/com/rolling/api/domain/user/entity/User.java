@@ -63,6 +63,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private Boolean pushNotificationEnabled = true;
 
+    @Column(nullable = false)
+    private Boolean showOwnReactions = true;
+
     @OneToMany(mappedBy = "user")
     private List<UserDevice> devices = new ArrayList<>();
 
@@ -88,7 +91,8 @@ public class User extends BaseTimeEntity {
                 String affiliation,
                 BeltColor beltColor,
                 String fcmToken,
-                Boolean pushNotificationEnabled) {
+                Boolean pushNotificationEnabled,
+                Boolean showOwnReactions) {
         this.socialId = socialId;
         this.socialProvider = socialProvider;
         this.nickname = nickname;
@@ -98,6 +102,7 @@ public class User extends BaseTimeEntity {
         this.beltColor = beltColor == null ? BeltColor.WHITE : beltColor;
         this.accountStatus = AccountStatus.ACTIVE;
         this.pushNotificationEnabled = pushNotificationEnabled == null ? true : pushNotificationEnabled;
+        this.showOwnReactions = showOwnReactions == null ? true : showOwnReactions;
         if (fcmToken != null && !fcmToken.isBlank()) {
             new UserDevice(this, fcmToken.trim(), null, null, null);
         }
@@ -139,6 +144,10 @@ public class User extends BaseTimeEntity {
 
     public void updatePushNotificationEnabled(boolean enabled) {
         this.pushNotificationEnabled = enabled;
+    }
+
+    public void updateShowOwnReactions(boolean showOwnReactions) {
+        this.showOwnReactions = showOwnReactions;
     }
 
     public AccountStatus getEffectiveAccountStatus(LocalDateTime now) {
