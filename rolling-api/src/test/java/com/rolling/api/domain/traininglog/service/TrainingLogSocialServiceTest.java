@@ -8,6 +8,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminRespo
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
@@ -63,6 +64,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -395,6 +397,31 @@ class TrainingLogSocialServiceTest {
     }
 
     @Test
+    @DisplayName("친구가 상세 반응 숨김을 설정하면 친구 상세에서 좋아요/댓글 메타를 숨긴다")
+    void findFriendEntryDetail_whenOwnerHidesReactions_returnsHiddenSocialMetadata() {
+        User owner = createUser(20L, "owner");
+        owner.updateShowOwnReactions(false);
+        TrainingLogEntry entry = createEntry(40L, owner, TrainingLogVisibility.FRIENDS);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findWithUserById(40L)).willReturn(Optional.of(entry));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 20L)).willReturn(false);
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(20L, 10L)).willReturn(false);
+        given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
+        given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
+                .willReturn(Optional.of(owner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
+
+        TrainingLogFriendEntryDetailResponse response = trainingLogSocialService.findFriendEntryDetail(10L, 40L);
+
+        assertThat(response.getLikeCount()).isZero();
+        assertThat(response.getCommentCount()).isZero();
+        assertThat(response.isLikedByMe()).isFalse();
+        assertThat(response.isCommentableByMe()).isFalse();
+        verify(trainingLogLikeRepository, never()).countByEntryIds(any());
+        verify(trainingLogCommentRepository, never()).findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(any());
+    }
+
+    @Test
     @DisplayName("댓글 작성은 기록 작성자에게 댓글 알림 이벤트를 발행한다")
     void createComment_commentPublishesNotificationEvent() {
         User commenter = createUser(10L, "commenter");
@@ -424,8 +451,34 @@ class TrainingLogSocialServiceTest {
 
         ArgumentCaptor<TrainingLogCommentNotificationEvent> eventCaptor = ArgumentCaptor.forClass(TrainingLogCommentNotificationEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().entryOwnerUserId()).isEqualTo(20L);
         assertThat(eventCaptor.getValue().recipientUserId()).isEqualTo(20L);
         assertThat(eventCaptor.getValue().type()).isEqualTo(PushNotificationType.TRAINING_LOG_COMMENT_CREATED);
+    }
+
+    @Test
+    @DisplayName("상세 반응 숨김이 설정된 기록에는 댓글을 작성할 수 없다")
+    void createComment_whenOwnerHidesReactions_throwsBadRequest() {
+        User commenter = createUser(10L, "commenter");
+        User entryOwner = createUser(20L, "entry-owner");
+        entryOwner.updateShowOwnReactions(false);
+        TrainingLogEntry entry = createEntry(50L, entryOwner, TrainingLogVisibility.FRIENDS);
+
+        TrainingLogCommentCreateRequest request = new TrainingLogCommentCreateRequest();
+        ReflectionTestUtils.setField(request, "content", "nice work");
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(commenter));
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 20L)).willReturn(false);
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(20L, 10L)).willReturn(false);
+        given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
+        given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
+                .willReturn(Optional.of(entryOwner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
+
+        assertThatThrownBy(() -> trainingLogSocialService.createComment(10L, 50L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("좋아요와 댓글이 숨김 처리된 기록입니다");
     }
 
     @Test
@@ -470,6 +523,7 @@ class TrainingLogSocialServiceTest {
         ArgumentCaptor<TrainingLogCommentNotificationEvent> eventCaptor = ArgumentCaptor.forClass(TrainingLogCommentNotificationEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
         assertThat(response.getParentCommentId()).isEqualTo(60L);
+        assertThat(eventCaptor.getValue().entryOwnerUserId()).isEqualTo(20L);
         assertThat(eventCaptor.getValue().recipientUserId()).isEqualTo(30L);
         assertThat(eventCaptor.getValue().type()).isEqualTo(PushNotificationType.TRAINING_LOG_COMMENT_REPLY_CREATED);
     }
@@ -623,6 +677,29 @@ class TrainingLogSocialServiceTest {
         assertThat(response.get(0).getContent()).isNull();
         assertThat(response.get(0).getReplies()).hasSize(1);
         assertThat(response.get(0).getReplies().get(0).getContent()).isEqualTo("reply");
+    }
+
+    @Test
+    @DisplayName("상세 반응 숨김이 설정된 기록의 댓글 목록은 일반 사용자에게 비어 있다")
+    void findComments_whenOwnerHidesReactions_returnsEmptyList() {
+        User viewer = createUser(10L, "viewer");
+        User owner = createUser(20L, "owner");
+        owner.updateShowOwnReactions(false);
+        TrainingLogEntry entry = createEntry(50L, owner, TrainingLogVisibility.FRIENDS);
+
+        given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
+        given(trainingLogEntryRepository.findWithUserById(50L)).willReturn(Optional.of(entry));
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(10L, 20L)).willReturn(false);
+        given(userBlockRepository.existsByUser_IdAndBlockedUser_Id(20L, 10L)).willReturn(false);
+        given(friendshipRepository.existsByUser_IdAndFriendUser_Id(10L, 20L)).willReturn(true);
+        given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
+                .willReturn(Optional.of(owner));
+        given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
+
+        List<TrainingLogCommentResponse> response = trainingLogSocialService.findComments(10L, 50L, false);
+
+        assertThat(response).isEmpty();
+        verify(trainingLogCommentRepository, never()).findAllByEntry_IdOrderByCreatedAtAscIdAsc(anyLong());
     }
 
     @Test

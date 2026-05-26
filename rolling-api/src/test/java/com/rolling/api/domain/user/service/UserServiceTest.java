@@ -258,6 +258,33 @@ class UserServiceTest {
 
         assertThat(user.getPushNotificationEnabled()).isFalse();
         assertThat(response.getPushNotificationEnabled()).isFalse();
+        assertThat(response.getShowOwnReactions()).isTrue();
+    }
+
+    @Test
+    @DisplayName("사용자 설정 수정 시 showOwnReactions만 단독으로 반영할 수 있다")
+    void updateSettings_updatesShowOwnReactionsOnly() {
+        User user = User.builder()
+                .socialId("social-settings")
+                .socialProvider(SocialProvider.GOOGLE)
+                .nickname("settings-user")
+                .email("settings@test.com")
+                .affiliation("settings-gym")
+                .beltColor(BeltColor.WHITE)
+                .build();
+        ReflectionTestUtils.setField(user, "id", 31L);
+
+        UserSettingsUpdateRequest request = new UserSettingsUpdateRequest();
+        ReflectionTestUtils.setField(request, "showOwnReactions", false);
+
+        when(userRepository.findByIdAndIsWithdrawnFalse(31L)).thenReturn(Optional.of(user));
+
+        UserSettingsResponse response = userService.updateSettings(31L, request);
+
+        assertThat(user.getPushNotificationEnabled()).isTrue();
+        assertThat(user.getShowOwnReactions()).isFalse();
+        assertThat(response.getPushNotificationEnabled()).isTrue();
+        assertThat(response.getShowOwnReactions()).isFalse();
     }
 
     @Test

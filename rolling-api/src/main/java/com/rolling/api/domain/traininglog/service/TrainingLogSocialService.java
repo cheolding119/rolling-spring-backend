@@ -312,8 +312,17 @@ public class TrainingLogSocialService {
     public List<TrainingLogEntrySummaryResponse> findFriendEntriesByDate(Long userId, Long friendUserId, LocalDate date) {
         requireActiveUser(userId);
         ensureFriendAccessible(userId, friendUserId);
-        return trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAscIdAsc(friendUserId, date).stream()
-                .map(this::toEntrySummaryResponse)
+        List<TrainingLogEntry> entries =
+                trainingLogEntryRepository.findAllByUser_IdAndTrainingDateOrderByCreatedAtAscIdAsc(friendUserId, date);
+        Map<Long, Long> likeCounts = loadReactionCounts(entries);
+        Map<Long, Long> commentCounts = loadVisibleCommentCounts(entries, userId, false);
+
+        return entries.stream()
+                .map(entry -> toEntrySummaryResponse(
+                        entry,
+                        likeCounts.getOrDefault(entry.getId(), 0L),
+                        commentCounts.getOrDefault(entry.getId(), 0L)
+                ))
                 .toList();
     }
 
@@ -321,6 +330,9 @@ public class TrainingLogSocialService {
     public TrainingLogFriendEntryDetailResponse findFriendEntryDetail(Long userId, Long entryId) {
         requireActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
+        if (!isReactionVisible(entry)) {
+            return toFriendDetailResponse(entry, 0L, 0L, false, false);
+        }
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
         Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId, false);
         boolean likedByMe = trainingLogLikeRepository.existsByEntry_IdAndUser_Id(entry.getId(), userId);
@@ -338,6 +350,7 @@ public class TrainingLogSocialService {
     public void likeEntry(Long userId, Long entryId) {
         User user = getActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
+        ensureReactionInteractionAllowed(entry);
         if (entry.getUser().getId().equals(userId)) {
             throw BusinessException.badRequest("본인 기록에는 좋아요를 누를 수 없습니다");
         }
@@ -354,6 +367,7 @@ public class TrainingLogSocialService {
     @Transactional
     public void unlikeEntry(Long userId, Long entryId) {
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
+        ensureReactionInteractionAllowed(entry);
         if (entry.getUser().getId().equals(userId)) {
             throw BusinessException.badRequest("본인 기록에는 좋아요를 누를 수 없습니다");
         }
@@ -366,6 +380,9 @@ public class TrainingLogSocialService {
     public List<TrainingLogCommentResponse> findComments(Long userId, Long entryId, boolean isAdmin) {
         requireActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
+        if (!isAdmin && !isReactionVisible(entry)) {
+            return List.of();
+        }
         return buildCommentTree(trainingLogCommentRepository.findAllByEntry_IdOrderByCreatedAtAscIdAsc(entryId), userId, isAdmin, entry.getUser().getId());
     }
 
@@ -373,6 +390,7 @@ public class TrainingLogSocialService {
     public TrainingLogCommentResponse createComment(Long userId, Long entryId, TrainingLogCommentCreateRequest request) {
         User author = getActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
+        ensureReactionInteractionAllowed(entry);
         TrainingLogComment parentComment = null;
         if (request.getParentCommentId() != null) {
             parentComment = getComment(request.getParentCommentId());
@@ -486,14 +504,12 @@ public class TrainingLogSocialService {
     }
 
     private Page<TrainingLogFriendEntrySummaryResponse> mapSummaryPage(Page<TrainingLogEntry> entries, Long viewerUserId) {
-        List<Long> entryIds = entries.getContent().stream()
-                .map(TrainingLogEntry::getId)
-                .toList();
-        Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(entryIds));
-        Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(entryIds, viewerUserId, false);
-        Set<Long> likedEntryIds = new HashSet<>(entryIds.isEmpty()
+        Map<Long, Long> likeCounts = loadReactionCounts(entries.getContent());
+        Map<Long, Long> commentCounts = loadVisibleCommentCounts(entries.getContent(), viewerUserId, false);
+        List<Long> visibleReactionEntryIds = visibleReactionEntryIds(entries.getContent());
+        Set<Long> likedEntryIds = new HashSet<>(visibleReactionEntryIds.isEmpty()
                 ? List.<Long>of()
-                : trainingLogLikeRepository.findLikedEntryIdsByUserIdAndEntryIds(viewerUserId, entryIds));
+                : trainingLogLikeRepository.findLikedEntryIdsByUserIdAndEntryIds(viewerUserId, visibleReactionEntryIds));
 
         return entries.map(entry -> TrainingLogFriendEntrySummaryResponse.builder()
                 .id(entry.getId())
@@ -506,7 +522,7 @@ public class TrainingLogSocialService {
                 .content(entry.getContent())
                 .likeCount(likeCounts.getOrDefault(entry.getId(), 0L))
                 .commentCount(commentCounts.getOrDefault(entry.getId(), 0L))
-                .likedByMe(likedEntryIds.contains(entry.getId()))
+                .likedByMe(isReactionVisible(entry) && likedEntryIds.contains(entry.getId()))
                 .createdAt(entry.getCreatedAt())
                 .build());
     }
@@ -630,6 +646,7 @@ public class TrainingLogSocialService {
 
         applicationEventPublisher.publishEvent(new TrainingLogCommentNotificationEvent(
                 entry.getId(),
+                entry.getUser().getId(),
                 recipientUserId,
                 author.getId(),
                 author.getNickname(),
@@ -927,15 +944,54 @@ public class TrainingLogSocialService {
         return new BusinessException("ALREADY_REPORTED", "이미 신고한 대상입니다", HttpStatus.BAD_REQUEST);
     }
 
-    private TrainingLogEntrySummaryResponse toEntrySummaryResponse(TrainingLogEntry entry) {
+    private TrainingLogEntrySummaryResponse toEntrySummaryResponse(
+            TrainingLogEntry entry,
+            long likeCount,
+            long commentCount
+    ) {
         return TrainingLogEntrySummaryResponse.builder()
                 .id(entry.getId())
                 .title(entry.getTitle())
                 .content(entry.getContent())
                 .category(entry.getCategory())
                 .color(entry.getColor())
+                .likeCount(likeCount)
+                .commentCount(commentCount)
                 .createdAt(entry.getCreatedAt())
                 .build();
+    }
+
+    private Map<Long, Long> loadReactionCounts(List<TrainingLogEntry> entries) {
+        List<Long> visibleEntryIds = visibleReactionEntryIds(entries);
+        if (visibleEntryIds.isEmpty()) {
+            return Map.of();
+        }
+        return toCountMap(trainingLogLikeRepository.countByEntryIds(visibleEntryIds));
+    }
+
+    private Map<Long, Long> loadVisibleCommentCounts(List<TrainingLogEntry> entries, Long viewerUserId, boolean isAdmin) {
+        List<Long> visibleEntryIds = visibleReactionEntryIds(entries);
+        if (visibleEntryIds.isEmpty()) {
+            return Map.of();
+        }
+        return resolveVisibleCommentCountMap(visibleEntryIds, viewerUserId, isAdmin);
+    }
+
+    private List<Long> visibleReactionEntryIds(List<TrainingLogEntry> entries) {
+        return entries.stream()
+                .filter(this::isReactionVisible)
+                .map(TrainingLogEntry::getId)
+                .toList();
+    }
+
+    private void ensureReactionInteractionAllowed(TrainingLogEntry entry) {
+        if (!isReactionVisible(entry)) {
+            throw BusinessException.badRequest("좋아요와 댓글이 숨김 처리된 기록입니다");
+        }
+    }
+
+    private boolean isReactionVisible(TrainingLogEntry entry) {
+        return !Boolean.FALSE.equals(entry.getUser().getShowOwnReactions());
     }
 
     private List<TrainingLogMonthlyCalendarDailySummary> buildMonthlyDailySummaries(List<TrainingLogEntry> entries) {
