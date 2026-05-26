@@ -170,6 +170,7 @@ class UserControllerTest {
         given(userService.updateSettings(eq(2L), any())).willReturn(
                 UserSettingsResponse.builder()
                         .pushNotificationEnabled(false)
+                        .showOwnReactions(true)
                         .build()
         );
 
@@ -183,7 +184,36 @@ class UserControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.pushNotificationEnabled").value(false));
+                .andExpect(jsonPath("$.data.pushNotificationEnabled").value(false))
+                .andExpect(jsonPath("$.data.showOwnReactions").value(true));
+    }
+
+    @Test
+    @DisplayName("사용자 설정 수정은 showOwnReactions만 보내도 성공한다")
+    void updateSettings_withShowOwnReactionsOnly_returnsUpdatedValue() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.updateSettings(eq(2L), any())).willReturn(
+                UserSettingsResponse.builder()
+                        .pushNotificationEnabled(true)
+                        .showOwnReactions(false)
+                        .build()
+        );
+
+        mockMvc.perform(patch("/api/v1/users/me/settings")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"showOwnReactions\": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.pushNotificationEnabled").value(true))
+                .andExpect(jsonPath("$.data.showOwnReactions").value(false));
     }
 
     @Test
@@ -250,6 +280,7 @@ class UserControllerTest {
                 .isAdmin(false)
                 .settings(UserSettingsResponse.builder()
                         .pushNotificationEnabled(pushNotificationEnabled)
+                        .showOwnReactions(true)
                         .build())
                 .build();
     }

@@ -36,6 +36,7 @@ class TrainingLogCommentNotificationEventHandlerTest {
         );
         TrainingLogCommentNotificationEvent event = new TrainingLogCommentNotificationEvent(
                 10L,
+                99L,
                 20L,
                 30L,
                 "reply-user",
@@ -66,6 +67,7 @@ class TrainingLogCommentNotificationEventHandlerTest {
         TrainingLogCommentNotificationEvent event = new TrainingLogCommentNotificationEvent(
                 11L,
                 21L,
+                21L,
                 31L,
                 "comment-user",
                 "오늘 드릴 기록",
@@ -80,7 +82,7 @@ class TrainingLogCommentNotificationEventHandlerTest {
 
         PushNotificationCommand command = captor.getValue();
         assertThat(command.type()).isEqualTo(PushNotificationType.TRAINING_LOG_COMMENT_CREATED);
-        assertThat(command.data()).containsEntry("route", "/training-logs/friends/entries/11");
+        assertThat(command.data()).containsEntry("route", "/training-logs/me/entries/11");
         assertThat(command.title()).contains("댓글");
         assertThat(command.body()).contains("comment-user");
     }

@@ -67,7 +67,12 @@ public class UserService {
     @Transactional
     public UserSettingsResponse updateSettings(Long userId, UserSettingsUpdateRequest request) {
         User user = getActiveUser(userId);
-        user.updatePushNotificationEnabled(request.getPushNotificationEnabled());
+        if (request.getPushNotificationEnabled() != null) {
+            user.updatePushNotificationEnabled(request.getPushNotificationEnabled());
+        }
+        if (request.getShowOwnReactions() != null) {
+            user.updateShowOwnReactions(request.getShowOwnReactions());
+        }
         return UserSettingsResponse.from(user);
     }
 

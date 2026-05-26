@@ -88,6 +88,8 @@
 | `content` | `String` | 기록 본문 |
 | `category` | `TrainingLogCategory` | 기록 카테고리 |
 | `color` | `TrainingLogColor?` | 기록 색상 |
+| `likeCount` | `Long` | 좋아요 수 |
+| `commentCount` | `Long` | 댓글 수 |
 | `createdAt` | `LocalDateTime` | 생성 시각 |
 
 ### 2.5 `TrainingLogMonthlyCalendarDailySummary`
@@ -264,7 +266,7 @@
 
 - 본인 상세 조회 응답에는 소셜 메타 필드 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 함께 포함한다.
 - 현재 정책 기준 본인 기록은 좋아요 대상이 아니므로 `likedByMe = false`로 반환한다.
-- 현재 정책 기준 본인 기록에도 댓글 작성이 가능하므로 `commentableByMe = true`로 반환한다.
+- `settings.showOwnReactions = false`면 본문 데이터만 반환하고 `likeCount = 0`, `commentCount = 0`, `likedByMe = false`, `commentableByMe = false`로 반환한다.
 
 ### 5.3 특정 날짜 훈련 기록 생성
 
@@ -406,6 +408,7 @@ Request body:
 
 - 날짜 선택 후 아래 카드 목록에 사용하는 요약 응답이다.
 - `trainingDate`는 별도 컨텍스트에서 이미 선택되어 있으므로 포함하지 않는다.
+- 현재 구현은 선택 날짜 카드에서도 `likeCount`, `commentCount`를 함께 반환한다.
 
 ### 6.3 `TrainingLogMonthlyCalendarResponse`
 

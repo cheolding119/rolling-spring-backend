@@ -247,6 +247,8 @@ class TrainingLogSocialControllerTest {
                         .content("암바 디테일")
                         .category(TrainingLogCategory.TECHNIQUE)
                         .color(TrainingLogColor.BLUE)
+                        .likeCount(2L)
+                        .commentCount(1L)
                         .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
                         .build()
         ));
@@ -257,7 +259,9 @@ class TrainingLogSocialControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(1L))
                 .andExpect(jsonPath("$.data[0].title").value("오늘 연습"))
-                .andExpect(jsonPath("$.data[0].color").value("BLUE"));
+                .andExpect(jsonPath("$.data[0].color").value("BLUE"))
+                .andExpect(jsonPath("$.data[0].likeCount").value(2))
+                .andExpect(jsonPath("$.data[0].commentCount").value(1));
     }
 
     @Test

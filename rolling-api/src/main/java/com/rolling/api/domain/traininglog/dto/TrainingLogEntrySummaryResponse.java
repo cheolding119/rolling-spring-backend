@@ -28,6 +28,12 @@ public class TrainingLogEntrySummaryResponse {
     @Schema(description = "기록 색상", example = "BLUE")
     private TrainingLogColor color;
 
+    @Schema(description = "좋아요 수", example = "3")
+    private Long likeCount;
+
+    @Schema(description = "댓글 수", example = "5")
+    private Long commentCount;
+
     @Schema(description = "생성 시각")
     private LocalDateTime createdAt;
 }

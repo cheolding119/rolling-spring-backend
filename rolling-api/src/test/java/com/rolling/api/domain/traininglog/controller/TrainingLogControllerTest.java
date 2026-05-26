@@ -301,6 +301,8 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data[0].title").value("Arm Triangle Details"))
                 .andExpect(jsonPath("$.data[0].category").value("TECHNIQUE"))
                 .andExpect(jsonPath("$.data[0].color").value("BLUE"))
+                .andExpect(jsonPath("$.data[0].likeCount").value(2))
+                .andExpect(jsonPath("$.data[0].commentCount").value(4))
                 .andExpect(jsonPath("$.data[1].id").value(1));
     }
 
@@ -506,6 +508,8 @@ class TrainingLogControllerTest {
                 .content("Finished details for knee angle and arm position.")
                 .category(TrainingLogCategory.TECHNIQUE)
                 .color(TrainingLogColor.BLUE)
+                .likeCount(2L)
+                .commentCount(4L)
                 .createdAt(LocalDateTime.of(2026, 5, 17, 12, 0))
                 .build();
     }
