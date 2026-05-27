@@ -6,8 +6,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 
 public interface TrainingLogCommentReportRepository extends JpaRepository<TrainingLogCommentReport, Long> {
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    void deleteAllByComment_Entry_Id(Long entryId);
 
     boolean existsByComment_IdAndReporter_Id(Long commentId, Long reporterId);
 

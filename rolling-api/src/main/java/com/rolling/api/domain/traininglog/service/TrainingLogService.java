@@ -17,6 +17,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
@@ -65,6 +66,7 @@ public class TrainingLogService {
     private final TrainingLogEntryRepository trainingLogEntryRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
+    private final TrainingLogCommentReportRepository trainingLogCommentReportRepository;
     private final UserBlockRepository userBlockRepository;
     private final UserRepository userRepository;
     private final Clock clock;
@@ -261,6 +263,9 @@ public class TrainingLogService {
     public void delete(Long userId, Long entryId) {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
+        trainingLogLikeRepository.deleteAllByEntry_Id(entryId);
+        trainingLogCommentReportRepository.deleteAllByComment_Entry_Id(entryId);
+        trainingLogCommentRepository.deleteAllByEntry_Id(entryId);
         trainingLogEntryRepository.delete(entry);
         if (entry.getCategory() == TrainingLogCategory.PROMOTION) {
             syncUserBeltColor(userId);
