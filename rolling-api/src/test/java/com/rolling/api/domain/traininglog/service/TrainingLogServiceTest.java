@@ -16,6 +16,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
@@ -66,6 +67,9 @@ class TrainingLogServiceTest {
     private TrainingLogCommentRepository trainingLogCommentRepository;
 
     @Mock
+    private TrainingLogCommentReportRepository trainingLogCommentReportRepository;
+
+    @Mock
     private UserBlockRepository userBlockRepository;
 
     @Mock
@@ -80,6 +84,7 @@ class TrainingLogServiceTest {
                 trainingLogEntryRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
+                trainingLogCommentReportRepository,
                 userBlockRepository,
                 userRepository,
                 fixedClock
@@ -657,6 +662,9 @@ class TrainingLogServiceTest {
 
         trainingLogService.delete(10L, 1L);
 
+        verify(trainingLogLikeRepository).deleteAllByEntry_Id(1L);
+        verify(trainingLogCommentReportRepository).deleteAllByComment_Entry_Id(1L);
+        verify(trainingLogCommentRepository).deleteAllByEntry_Id(1L);
         verify(trainingLogEntryRepository).delete(entry);
     }
 
