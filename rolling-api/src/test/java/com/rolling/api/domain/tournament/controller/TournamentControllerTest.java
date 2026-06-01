@@ -1,8 +1,10 @@
 package com.rolling.api.domain.tournament.controller;
 
-import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.tournament.dto.TournamentFavoriteResponse;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
+import com.rolling.api.domain.tournament.service.TournamentFavoriteService;
 import com.rolling.api.domain.tournament.service.TournamentService;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.config.SecurityConfig;
@@ -31,15 +33,18 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +53,7 @@ class TournamentControllerTest {
 
     private MockMvc mockMvc;
     private TournamentService tournamentService;
+    private TournamentFavoriteService tournamentFavoriteService;
     private JwtTokenProvider jwtTokenProvider;
     private UserRepository userRepository;
     private AdminAccessConfig adminAccessConfig;
@@ -66,6 +72,7 @@ class TournamentControllerTest {
         context.refresh();
 
         tournamentService = context.getBean(TournamentService.class);
+        tournamentFavoriteService = context.getBean(TournamentFavoriteService.class);
         jwtTokenProvider = context.getBean(JwtTokenProvider.class);
         userRepository = context.getBean(UserRepository.class);
         adminAccessConfig = context.getBean(AdminAccessConfig.class);
@@ -91,7 +98,8 @@ class TournamentControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(10))
                 .andExpect(jsonPath("$.data.posterUrl").value("https://cdn.rolling.com/posters/10.jpg"))
-                .andExpect(jsonPath("$.data.title").value("제5회 롤링컵"));
+                .andExpect(jsonPath("$.data.title").value("제5회 롤링컵"))
+                .andExpect(jsonPath("$.data.region").value("SEOUL"));
 
         given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
         given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
@@ -109,16 +117,108 @@ class TournamentControllerTest {
     }
 
     @Test
-    @DisplayName("대회 목록 조회는 인증 사용자의 viewer id를 서비스에 전달한다")
-    void list_withUserToken_passesViewerId() {
-        TournamentController controller = new TournamentController(tournamentService);
+    @DisplayName("대회 목록 조회는 인증 사용자의 viewer id와 region을 서비스에 전달한다")
+    void list_withUserToken_passesViewerIdAndRegion() {
+        TournamentController controller = new TournamentController(tournamentService, tournamentFavoriteService);
         PageRequest pageable = PageRequest.of(0, 20);
-        given(tournamentService.findAll(pageable, TournamentSource.MANUAL, 2L))
-                .willReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(response(10L))));
+        given(tournamentService.findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, 2L))
+                .willReturn(new PageImpl<>(List.of(response(10L))));
 
-        controller.list(new UserPrincipal(2L), TournamentSource.MANUAL, pageable);
+        controller.list(new UserPrincipal(2L), TournamentSource.MANUAL, Region.SEOUL, pageable);
 
-        verify(tournamentService).findAll(pageable, TournamentSource.MANUAL, 2L);
+        verify(tournamentService).findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, 2L);
+    }
+
+    @Test
+    @DisplayName("찜한 대회 목록 조회는 accessToken이 없으면 401을 반환한다")
+    void favorites_withoutAccessToken_returnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/tournaments/favorites"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("찜한 대회 목록 조회는 인증 사용자가 접근할 수 있다")
+    void favorites_withUserToken_returnsOk() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(tournamentFavoriteService.findFavorites(eq(2L), any()))
+                .willReturn(new PageImpl<>(List.of(favoriteResponse(10L)), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/v1/tournaments/favorites")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].tournamentId").value(10))
+                .andExpect(jsonPath("$.data.content[0].notificationEnabled").value(true));
+    }
+
+    @Test
+    @DisplayName("대회 찜 추가는 인증 사용자가 성공적으로 요청할 수 있다")
+    void favorite_withUserToken_returnsOk() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(tournamentFavoriteService.addFavorite(2L, 10L)).willReturn(favoriteResponse(10L));
+
+        mockMvc.perform(post("/api/v1/tournaments/10/favorite")
+                        .header("Authorization", "Bearer user-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.tournamentId").value(10));
+    }
+
+    @Test
+    @DisplayName("리마인드 설정은 인증 사용자가 성공적으로 요청할 수 있다")
+    void updateReminder_withUserToken_returnsOk() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(tournamentFavoriteService.updateReminder(eq(2L), eq(10L), any())).willReturn(favoriteResponse(10L));
+
+        mockMvc.perform(patch("/api/v1/tournaments/10/favorite-reminder")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "notificationEnabled": true,
+                                  "remindDate": "2026-04-01",
+                                  "remindTime": "09:00"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.notificationEnabled").value(true))
+                .andExpect(jsonPath("$.data.remindDate").value("2026-04-01"))
+                .andExpect(jsonPath("$.data.remindTime").value("09:00:00"));
+    }
+
+    @Test
+    @DisplayName("리마인드 설정은 validation error를 반환할 수 있다")
+    void updateReminder_validationError_returnsBadRequest() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        doThrow(new BusinessException("VALIDATION_ERROR", "알림 날짜와 시간은 필수입니다", org.springframework.http.HttpStatus.BAD_REQUEST))
+                .when(tournamentFavoriteService).updateReminder(eq(2L), eq(10L), any());
+
+        mockMvc.perform(patch("/api/v1/tournaments/10/favorite-reminder")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "notificationEnabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -140,75 +240,6 @@ class TournamentControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
-
-        verify(tournamentService).report(
-                eq(2L),
-                eq(10L),
-                any(com.rolling.api.domain.report.dto.ReportCreateRequest.class)
-        );
-    }
-
-    @Test
-    @DisplayName("대회 신고는 이미 신고한 대상이면 ALREADY_REPORTED를 반환한다")
-    void report_duplicate_returnsBadRequest() throws Exception {
-        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
-        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
-        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
-        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
-        doThrow(new BusinessException("ALREADY_REPORTED", "이미 신고한 대상입니다", org.springframework.http.HttpStatus.BAD_REQUEST))
-                .when(tournamentService).report(eq(2L), eq(10L), any());
-
-        mockMvc.perform(post("/api/v1/tournaments/10/report")
-                        .header("Authorization", "Bearer user-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "reason": "SPAM"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("ALREADY_REPORTED"))
-                .andExpect(jsonPath("$.error.message").value("이미 신고한 대상입니다"));
-    }
-
-    @Test
-    @DisplayName("대회 신고는 자기 작성 대상이면 SELF_REPORT_NOT_ALLOWED를 반환한다")
-    void report_self_returnsBadRequest() throws Exception {
-        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
-        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
-        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
-        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
-        doThrow(new BusinessException("SELF_REPORT_NOT_ALLOWED", "자신이 작성한 게시글은 신고할 수 없습니다", org.springframework.http.HttpStatus.BAD_REQUEST))
-                .when(tournamentService).report(eq(2L), eq(10L), any());
-
-        mockMvc.perform(post("/api/v1/tournaments/10/report")
-                        .header("Authorization", "Bearer user-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "reason": "SPAM"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("SELF_REPORT_NOT_ALLOWED"))
-                .andExpect(jsonPath("$.error.message").value("자신이 작성한 게시글은 신고할 수 없습니다"));
-    }
-
-    @Test
-    @DisplayName("대회 신고는 accessToken이 없으면 401을 반환한다")
-    void report_withoutAccessToken_returnsUnauthorized() throws Exception {
-        mockMvc.perform(post("/api/v1/tournaments/10/report")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "reason": "SPAM"
-                                }
-                                """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private TournamentResponse response(Long id) {
@@ -221,20 +252,47 @@ class TournamentControllerTest {
                 .competitionDate(LocalDate.of(2026, 4, 15))
                 .registrationDeadline(LocalDate.of(2026, 4, 1))
                 .location("서울 올림픽공원 체조경기장")
+                .region(Region.SEOUL)
                 .applyLink("https://forms.google.com/rolling")
                 .registrationClosed(false)
                 .createdAt(LocalDateTime.of(2026, 4, 1, 12, 0))
                 .build();
     }
 
+    private TournamentFavoriteResponse favoriteResponse(Long tournamentId) {
+        return TournamentFavoriteResponse.builder()
+                .tournamentId(tournamentId)
+                .source(TournamentSource.MANUAL)
+                .title("제5회 롤링컵")
+                .organizer("롤링 주짓수")
+                .posterUrl("https://cdn.rolling.com/posters/10.jpg")
+                .competitionDate(LocalDate.of(2026, 4, 15))
+                .registrationDeadline(LocalDate.of(2026, 4, 1))
+                .location("서울 올림픽공원 체조경기장")
+                .region(Region.SEOUL)
+                .applyLink("https://forms.google.com/rolling")
+                .registrationClosed(false)
+                .notificationEnabled(true)
+                .remindDate(LocalDate.of(2026, 4, 1))
+                .remindTime(LocalTime.of(9, 0))
+                .favoritedAt(LocalDateTime.of(2026, 3, 20, 10, 0))
+                .build();
+    }
+
     @Configuration
     @EnableWebMvc
+    @EnableSpringDataWebSupport
     @Import({TournamentController.class, GlobalExceptionHandler.class, SecurityConfig.class})
     static class TestConfig {
 
         @Bean
         TournamentService tournamentService() {
             return mock(TournamentService.class);
+        }
+
+        @Bean
+        TournamentFavoriteService tournamentFavoriteService() {
+            return mock(TournamentFavoriteService.class);
         }
 
         @Bean

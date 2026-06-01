@@ -22,6 +22,9 @@ class SchedulerHealthIndicatorTest {
                 true,
                 "0 0 2 * * *",
                 "Asia/Seoul",
+                true,
+                "0 * * * * *",
+                "Asia/Seoul",
                 "0 * * * * *",
                 "Asia/Seoul"
         );
@@ -44,6 +47,9 @@ class SchedulerHealthIndicatorTest {
                 true,
                 "0 0 2 * * *",
                 "Asia/Seoul",
+                true,
+                "0 * * * * *",
+                "Asia/Seoul",
                 "0 * * * * *",
                 "Asia/Seoul"
         );
@@ -56,7 +62,12 @@ class SchedulerHealthIndicatorTest {
         tracker.recordSuccess(MonitoringTaskNames.WITHDRAWAL_PROCESSOR, "processed=0");
 
         assertThat(indicator.health().getStatus()).isEqualTo(Status.UP);
-        assertThat(indicator.health().getDetails()).containsKeys("openMatStatusSync", "tournamentCrawler", "withdrawalProcessor");
+        assertThat(indicator.health().getDetails()).containsKeys(
+                "openMatStatusSync",
+                "tournamentCrawler",
+                "tournamentFavoriteReminder",
+                "withdrawalProcessor"
+        );
     }
 
     @Test

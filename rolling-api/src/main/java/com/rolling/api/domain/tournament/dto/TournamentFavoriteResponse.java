@@ -2,23 +2,23 @@ package com.rolling.api.domain.tournament.dto;
 
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentFavorite;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
+import com.rolling.api.domain.tournament.util.TournamentOrdering;
 import lombok.Builder;
 import lombok.Getter;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.LocalTime;
 
 @Getter
 @Builder
-public class TournamentResponse {
+public class TournamentFavoriteResponse {
 
-    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
-
-    private Long id;
+    private Long tournamentId;
     private TournamentSource source;
     private String title;
     private String organizer;
@@ -29,30 +29,30 @@ public class TournamentResponse {
     private Region region;
     private String applyLink;
     private boolean registrationClosed;
-    private LocalDateTime createdAt;
+    private boolean notificationEnabled;
+    private LocalDate remindDate;
+    private LocalTime remindTime;
+    private LocalDateTime favoritedAt;
 
-    public static TournamentResponse from(Tournament tournament) {
-        return from(tournament, tournament.getPosterUrl());
-    }
+    public static TournamentFavoriteResponse from(TournamentFavorite favorite, String posterUrl) {
+        Tournament tournament = favorite.getTournament();
 
-    public static TournamentResponse from(Tournament tournament, String posterUrl) {
-        LocalDate competitionDate = TournamentDateUtils.parse(tournament.getCompetitionDate());
-        LocalDate registrationDeadline = TournamentDateUtils.parse(tournament.getRegistrationDeadline());
-        boolean registrationClosed = registrationDeadline != null && LocalDate.now(SEOUL_ZONE).isAfter(registrationDeadline);
-
-        return TournamentResponse.builder()
-                .id(tournament.getId())
+        return TournamentFavoriteResponse.builder()
+                .tournamentId(tournament.getId())
                 .source(resolveSource(tournament.getSource()))
                 .title(tournament.getTitle())
                 .organizer(tournament.getOrganizer())
                 .posterUrl(StringUtils.hasText(posterUrl) ? posterUrl : tournament.getPosterUrl())
-                .competitionDate(competitionDate)
-                .registrationDeadline(registrationDeadline)
+                .competitionDate(TournamentDateUtils.parse(tournament.getCompetitionDate()))
+                .registrationDeadline(TournamentDateUtils.parse(tournament.getRegistrationDeadline()))
                 .location(tournament.getLocation())
                 .region(tournament.getRegion())
                 .applyLink(tournament.getApplyLink())
-                .registrationClosed(registrationClosed)
-                .createdAt(tournament.getCreatedAt())
+                .registrationClosed(TournamentOrdering.isRegistrationClosed(tournament))
+                .notificationEnabled(Boolean.TRUE.equals(favorite.getNotificationEnabled()))
+                .remindDate(favorite.getRemindDate())
+                .remindTime(favorite.getRemindTime())
+                .favoritedAt(favorite.getCreatedAt())
                 .build();
     }
 

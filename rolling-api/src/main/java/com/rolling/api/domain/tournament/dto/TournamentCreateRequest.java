@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.dto;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +32,9 @@ public class TournamentCreateRequest {
 
     @Schema(description = "개최 장소", example = "서울 올림픽공원 체조경기장")
     private String location;
+
+    @Schema(description = "지역", example = "SEOUL", nullable = true)
+    private Region region;
 
     @NotBlank(message = "외부 접수 링크는 필수입니다")
     @Schema(description = "외부 접수 링크", example = "https://forms.google.com/...")
