@@ -1,14 +1,16 @@
 package com.rolling.api.domain.tournament.service;
 
+import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.report.dto.ReportCreateRequest;
+import com.rolling.api.domain.report.entity.ReportReason;
+import com.rolling.api.domain.report.entity.ReportTargetType;
+import com.rolling.api.domain.report.service.ReportService;
 import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
-import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlRequest;
-import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlResponse;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.dto.TournamentUpdateRequest;
 import com.rolling.api.domain.tournament.entity.Tournament;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
-import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.domain.user.repository.UserRepository;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.global.security.AdminAccessConfig;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,10 +45,13 @@ class TournamentServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private com.rolling.api.domain.report.service.ReportService reportService;
+    private ReportService reportService;
 
     @Mock
     private TournamentPosterService tournamentPosterService;
+
+    @Mock
+    private TournamentFavoriteService tournamentFavoriteService;
 
     private final AdminAccessConfig adminAccessConfig = new AdminAccessConfig("1");
 
@@ -57,14 +63,7 @@ class TournamentServiceTest {
         Tournament openEarly = tournament(3L, 10L, TournamentSource.KOREA_JIU, "open-early", "2026-04-10", "2999-04-01", "https://apply/open-early");
         when(tournamentRepository.findAll()).thenReturn(List.of(closed, openLater, openEarly));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10));
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10));
 
         assertThat(page.getContent()).hasSize(3);
         assertThat(page.getContent().get(0).getId()).isEqualTo(3L);
@@ -81,17 +80,25 @@ class TournamentServiceTest {
         Tournament legacyManual = tournament(3L, 10L, null, "legacy-manual", "2026-06-10", "2999-06-01", "https://apply/legacy-manual");
         when(tournamentRepository.findAll()).thenReturn(List.of(street, legacyManual, manual));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10), TournamentSource.MANUAL);
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10), TournamentSource.MANUAL);
 
         assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(1L, 3L);
         assertThat(page.getContent()).extracting(TournamentResponse::getSource).containsOnly(TournamentSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("대회 목록 조회 시 region 필터를 적용한다")
+    void findAll_filtersByRegion() {
+        Tournament seoul = tournament(1L, 10L, TournamentSource.MANUAL, "seoul", "2026-04-10", "2999-04-01", "https://apply/seoul");
+        Tournament busan = tournament(2L, 10L, TournamentSource.MANUAL, "busan", "2026-05-10", "2999-05-01", "https://apply/busan");
+        ReflectionTestUtils.setField(seoul, "region", Region.SEOUL);
+        ReflectionTestUtils.setField(busan, "region", Region.BUSAN);
+        when(tournamentRepository.findAll()).thenReturn(List.of(seoul, busan));
+
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10), null, Region.SEOUL, null);
+
+        assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(1L);
+        assertThat(page.getContent()).extracting(TournamentResponse::getRegion).containsOnly(Region.SEOUL);
     }
 
     @Test
@@ -102,14 +109,7 @@ class TournamentServiceTest {
         when(tournamentRepository.findAll()).thenReturn(List.of(blocked, visible));
         when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(10L));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10), null, 99L);
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10), null, 99L);
 
         assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(2L);
     }
@@ -119,18 +119,13 @@ class TournamentServiceTest {
     void findAll_mapsManualAndCrawlerWithSameResponseShape() {
         Tournament manual = tournament(1L, 10L, TournamentSource.MANUAL, "manual", "2026-04-10", "2999-04-01", "https://apply/manual");
         Tournament crawled = tournament(2L, null, TournamentSource.KOREA_JIU, "crawled", "2026-05-10", "2999-05-01", "https://apply/crawled");
+        ReflectionTestUtils.setField(manual, "region", Region.SEOUL);
+        ReflectionTestUtils.setField(crawled, "region", Region.BUSAN);
         when(tournamentRepository.findAll()).thenReturn(List.of(manual, crawled));
         when(tournamentPosterService.resolveDisplayUrl(manual)).thenReturn("https://cdn.rolling.com/manual.jpg");
         when(tournamentPosterService.resolveDisplayUrl(crawled)).thenReturn("https://cdn.rolling.com/crawled.jpg");
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        Page<TournamentResponse> page = tournamentService.findAll(PageRequest.of(0, 10));
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10));
 
         assertThat(page.getContent()).hasSize(2);
         assertThat(page.getContent()).allSatisfy(response -> {
@@ -159,19 +154,13 @@ class TournamentServiceTest {
             return tournament;
         });
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        TournamentResponse response = tournamentService.create(11L, request);
+        TournamentResponse response = service().create(11L, request);
 
         assertThat(response.getId()).isEqualTo(99L);
         assertThat(response.getSource()).isEqualTo(TournamentSource.MANUAL);
         assertThat(response.getTitle()).isEqualTo("제5회 롤링컵");
         assertThat(response.getCompetitionDate()).isEqualTo(LocalDate.of(2026, 4, 15));
+        assertThat(response.getRegion()).isEqualTo(Region.SEOUL);
         verify(tournamentRepository).save(any(Tournament.class));
     }
 
@@ -187,14 +176,7 @@ class TournamentServiceTest {
             return tournament;
         });
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        TournamentResponse response = tournamentService.create(11L, request);
+        TournamentResponse response = service().create(11L, request);
 
         ArgumentCaptor<Tournament> captor = ArgumentCaptor.forClass(Tournament.class);
         verify(tournamentRepository).save(captor.capture());
@@ -212,14 +194,7 @@ class TournamentServiceTest {
         when(tournamentPosterService.resolveDisplayUrl(tournament))
                 .thenReturn("https://cdn.rolling.com/posters/poster.jpg");
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        TournamentResponse response = tournamentService.findById(77L);
+        TournamentResponse response = service().findById(77L);
 
         assertThat(response.getPosterUrl()).isEqualTo("https://cdn.rolling.com/posters/poster.jpg");
     }
@@ -231,14 +206,7 @@ class TournamentServiceTest {
         when(tournamentRepository.findById(78L)).thenReturn(Optional.of(tournament));
         when(userRepository.findBlockedUserIdsByUserId(99L)).thenReturn(List.of(3L));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        assertThatThrownBy(() -> tournamentService.findById(78L, 99L))
+        assertThatThrownBy(() -> service().findById(78L, 99L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("대회를 찾을 수 없습니다");
     }
@@ -249,16 +217,7 @@ class TournamentServiceTest {
         Tournament tournament = tournament(10L, 3L, TournamentSource.MANUAL, "sample", "2026-04-15", "2026-04-01", "https://apply/sample");
         when(tournamentRepository.findById(10L)).thenReturn(Optional.of(tournament));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        TournamentUpdateRequest request = new TournamentUpdateRequest();
-
-        assertThatThrownBy(() -> tournamentService.update(2L, 10L, request))
+        assertThatThrownBy(() -> service().update(2L, 10L, new TournamentUpdateRequest()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("작성자 또는 관리자만 수정할 수 있습니다");
     }
@@ -269,20 +228,15 @@ class TournamentServiceTest {
         Tournament tournament = tournament(11L, 3L, TournamentSource.MANUAL, "old-title", "2026-04-15", "2026-04-01", "https://apply/sample");
         when(tournamentRepository.findById(11L)).thenReturn(Optional.of(tournament));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
         TournamentUpdateRequest request = new TournamentUpdateRequest();
         ReflectionTestUtils.setField(request, "title", "새 제목");
+        ReflectionTestUtils.setField(request, "region", Region.DAEGU);
 
-        TournamentResponse response = tournamentService.update(1L, 11L, request);
+        TournamentResponse response = service().update(1L, 11L, request);
 
         assertThat(response.getTitle()).isEqualTo("새 제목");
-        verify(tournamentRepository).findById(11L);
+        assertThat(response.getRegion()).isEqualTo(Region.DAEGU);
+        verify(tournamentFavoriteService).disableInvalidRemindersForTournament(11L);
     }
 
     @Test
@@ -291,15 +245,9 @@ class TournamentServiceTest {
         Tournament tournament = tournament(20L, 7L, TournamentSource.MANUAL, "sample", "2026-04-15", "2026-04-01", "https://apply/sample");
         when(tournamentRepository.findById(20L)).thenReturn(Optional.of(tournament));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
+        service().delete(7L, 20L);
 
-        tournamentService.delete(7L, 20L);
-
+        verify(tournamentFavoriteService).removeFavoritesByTournament(20L);
         verify(tournamentRepository).delete(tournament);
     }
 
@@ -313,14 +261,7 @@ class TournamentServiceTest {
         ReflectionTestUtils.setField(request, "competitionDate", LocalDate.of(2026, 4, 15));
         ReflectionTestUtils.setField(request, "registrationDeadline", LocalDate.of(2026, 4, 20));
 
-        TournamentService tournamentService = new TournamentService(
-                tournamentRepository,
-                userRepository,
-                reportService,
-                tournamentPosterService,
-                adminAccessConfig);
-
-        assertThatThrownBy(() -> tournamentService.update(3L, 30L, request))
+        assertThatThrownBy(() -> service().update(3L, 30L, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("접수 마감일은 대회일보다 이후일 수 없습니다");
     }
@@ -331,25 +272,29 @@ class TournamentServiceTest {
         Tournament tournament = tournament(40L, 8L, TournamentSource.MANUAL, "report-target", "2026-04-15", "2026-04-01", "https://apply/report-target");
         when(tournamentRepository.findById(40L)).thenReturn(Optional.of(tournament));
 
-        TournamentService tournamentService = new TournamentService(
+        ReportCreateRequest request = new ReportCreateRequest();
+        ReflectionTestUtils.setField(request, "reason", ReportReason.SPAM);
+
+        service().report(9L, 40L, request);
+
+        verify(reportService).createReport(
+                9L,
+                ReportTargetType.TOURNAMENT,
+                40L,
+                8L,
+                ReportReason.SPAM,
+                null
+        );
+    }
+
+    private TournamentService service() {
+        return new TournamentService(
                 tournamentRepository,
                 userRepository,
                 reportService,
                 tournamentPosterService,
-                adminAccessConfig);
-
-        ReportCreateRequest request = new ReportCreateRequest();
-        ReflectionTestUtils.setField(request, "reason", com.rolling.api.domain.report.entity.ReportReason.SPAM);
-
-        tournamentService.report(9L, 40L, request);
-
-        org.mockito.Mockito.verify(reportService).createReport(
-                9L,
-                com.rolling.api.domain.report.entity.ReportTargetType.TOURNAMENT,
-                40L,
-                8L,
-                com.rolling.api.domain.report.entity.ReportReason.SPAM,
-                null
+                adminAccessConfig,
+                tournamentFavoriteService
         );
     }
 
@@ -361,6 +306,7 @@ class TournamentServiceTest {
         ReflectionTestUtils.setField(request, "competitionDate", LocalDate.of(2026, 4, 15));
         ReflectionTestUtils.setField(request, "registrationDeadline", LocalDate.of(2026, 4, 1));
         ReflectionTestUtils.setField(request, "location", "서울 올림픽공원 체조경기장");
+        ReflectionTestUtils.setField(request, "region", Region.SEOUL);
         ReflectionTestUtils.setField(request, "applyLink", "https://forms.google.com/...");
         return request;
     }
@@ -382,6 +328,7 @@ class TournamentServiceTest {
                 .competitionDate(competitionDate)
                 .registrationDeadline(registrationDeadline)
                 .location("서울")
+                .region(Region.SEOUL)
                 .applyLink(applyLink)
                 .build();
         ReflectionTestUtils.setField(tournament, "id", id);

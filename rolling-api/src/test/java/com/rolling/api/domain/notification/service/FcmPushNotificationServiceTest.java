@@ -276,6 +276,27 @@ class FcmPushNotificationServiceTest {
         verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
     }
 
+    @Test
+    @DisplayName("전역 푸시 OFF 등으로 발송 대상 디바이스가 없으면 FCM을 호출하지 않는다")
+    void sendToUsers_whenNoEligibleDevices_doesNotCallFcm() throws Exception {
+        when(userDeviceRepository.findPushTargetDevicesByUserIds(List.of(5L)))
+                .thenReturn(List.of());
+
+        fcmPushNotificationService.sendToUsers(
+                List.of(5L),
+                new PushNotificationCommand(
+                        PushNotificationType.TOURNAMENT_FAVORITE_REMINDER,
+                        "대회 접수 마감 알림",
+                        "테스트 알림입니다.",
+                        202L,
+                        Map.of("route", "/tournament/detail")
+                )
+        );
+
+        verify(firebaseMessaging, never()).sendEachForMulticast(any(MulticastMessage.class));
+        verify(userDeviceRepository, never()).deleteAllByFcmTokenIn(any());
+    }
+
     private User createUser(Long id, String socialId) {
         User user = User.builder()
                 .socialId(socialId)

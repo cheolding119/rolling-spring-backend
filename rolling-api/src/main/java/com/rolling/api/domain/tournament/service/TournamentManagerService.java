@@ -3,8 +3,10 @@ package com.rolling.api.domain.tournament.service;
 import com.rolling.api.domain.tournament.crawler.TournamentCrawler;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.entity.Tournament;
+import com.rolling.api.domain.tournament.entity.TournamentFavorite;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
+import com.rolling.api.domain.tournament.repository.TournamentFavoriteRepository;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
 import com.rolling.api.global.exception.BusinessException;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +35,7 @@ public class TournamentManagerService {
 
     private final List<TournamentCrawler> crawlers;
     private final TournamentRepository tournamentRepository;
+    private final TournamentFavoriteRepository tournamentFavoriteRepository;
     private final S3Uploader s3Uploader;
     private MeterRegistry meterRegistry;
 
@@ -178,6 +182,7 @@ public class TournamentManagerService {
             return 0;
         }
 
+        tournamentFavoriteRepository.deleteAllByTournament_IdIn(deleteIds);
         tournamentRepository.deleteAllByIdInBatch(deleteIds);
         log.info("Deleted expired tournaments by registration deadline. today={}, deletedCount={}", today, deleteIds.size());
         return deleteIds.size();
@@ -287,8 +292,30 @@ public class TournamentManagerService {
                 normalizedTournament.applyLink()
         );
         tournamentRepository.save(tournament);
+        if (!isNew) {
+            disableInvalidReminders(tournament);
+        }
 
         return isNew ? UpsertResult.CREATED : UpsertResult.UPDATED;
+    }
+
+    private void disableInvalidReminders(Tournament tournament) {
+        if (tournament == null || tournament.getId() == null) {
+            return;
+        }
+
+        LocalDate registrationDeadline = TournamentDateUtils.parse(tournament.getRegistrationDeadline());
+        if (registrationDeadline == null) {
+            tournamentFavoriteRepository.findAllByTournament_IdAndNotificationEnabledTrue(tournament.getId())
+                    .forEach(TournamentFavorite::disableReminder);
+            return;
+        }
+
+        LocalDateTime cutoff = registrationDeadline.atTime(23, 59, 59);
+        tournamentFavoriteRepository.findAllByTournament_IdAndNotificationEnabledTrue(tournament.getId())
+                .stream()
+                .filter(favorite -> favorite.getScheduledAt() == null || favorite.getScheduledAt().isAfter(cutoff))
+                .forEach(TournamentFavorite::disableReminder);
     }
 
     private String normalize(String value) {

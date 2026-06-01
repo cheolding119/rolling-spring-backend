@@ -104,6 +104,7 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/seminars", "/api/v1/seminars/{id}").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/community/posts", "/api/v1/community/posts/{id}", "/api/v1/community/posts/{postId}/comments").permitAll();
                     auth.requestMatchers("/api/v1/admin/open-mats", "/api/v1/admin/open-mats/**").hasRole("ADMIN");
+                    auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments/favorites").authenticated();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/tournaments", "/api/v1/tournaments/{id}").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/notices", "/api/v1/notices/{id}").permitAll();
                     auth.requestMatchers(HttpMethod.POST, "/api/v1/notices", "/api/v1/notices/**").hasRole("ADMIN");

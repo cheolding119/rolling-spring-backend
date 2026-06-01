@@ -18,6 +18,9 @@ public class SchedulerHealthIndicator implements HealthIndicator {
     private final boolean tournamentSchedulerEnabled;
     private final String tournamentSchedulerCron;
     private final String tournamentSchedulerZone;
+    private final boolean tournamentFavoriteReminderSchedulerEnabled;
+    private final String tournamentFavoriteReminderSchedulerCron;
+    private final String tournamentFavoriteReminderSchedulerZone;
     private final String withdrawalSchedulerCron;
     private final String withdrawalSchedulerZone;
 
@@ -29,6 +32,9 @@ public class SchedulerHealthIndicator implements HealthIndicator {
             @Value("${tournament.crawler.schedule.enabled:true}") boolean tournamentSchedulerEnabled,
             @Value("${tournament.crawler.schedule.cron:0 0 2 * * *}") String tournamentSchedulerCron,
             @Value("${tournament.crawler.schedule.zone:Asia/Seoul}") String tournamentSchedulerZone,
+            @Value("${tournament.favorite-reminder.schedule.enabled:true}") boolean tournamentFavoriteReminderSchedulerEnabled,
+            @Value("${tournament.favorite-reminder.schedule.cron:0 * * * * *}") String tournamentFavoriteReminderSchedulerCron,
+            @Value("${tournament.favorite-reminder.schedule.zone:Asia/Seoul}") String tournamentFavoriteReminderSchedulerZone,
             @Value("${auth.withdraw.schedule.cron:0 * * * * *}") String withdrawalSchedulerCron,
             @Value("${auth.withdraw.schedule.zone:Asia/Seoul}") String withdrawalSchedulerZone
     ) {
@@ -39,6 +45,9 @@ public class SchedulerHealthIndicator implements HealthIndicator {
         this.tournamentSchedulerEnabled = tournamentSchedulerEnabled;
         this.tournamentSchedulerCron = tournamentSchedulerCron;
         this.tournamentSchedulerZone = tournamentSchedulerZone;
+        this.tournamentFavoriteReminderSchedulerEnabled = tournamentFavoriteReminderSchedulerEnabled;
+        this.tournamentFavoriteReminderSchedulerCron = tournamentFavoriteReminderSchedulerCron;
+        this.tournamentFavoriteReminderSchedulerZone = tournamentFavoriteReminderSchedulerZone;
         this.withdrawalSchedulerCron = withdrawalSchedulerCron;
         this.withdrawalSchedulerZone = withdrawalSchedulerZone;
     }
@@ -47,10 +56,12 @@ public class SchedulerHealthIndicator implements HealthIndicator {
     public Health health() {
         ScheduledTaskSnapshot openMatSnapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.OPEN_MAT_STATUS_SYNC);
         ScheduledTaskSnapshot tournamentSnapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.TOURNAMENT_CRAWLER);
+        ScheduledTaskSnapshot tournamentFavoriteReminderSnapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.TOURNAMENT_FAVORITE_REMINDER);
         ScheduledTaskSnapshot withdrawalSnapshot = scheduledTaskTracker.snapshot(MonitoringTaskNames.WITHDRAWAL_PROCESSOR);
 
         Health.Builder builder = hasBlockingFailure(openMatSchedulerEnabled, openMatSnapshot)
                 || hasBlockingFailure(tournamentSchedulerEnabled, tournamentSnapshot)
+                || hasBlockingFailure(tournamentFavoriteReminderSchedulerEnabled, tournamentFavoriteReminderSnapshot)
                 || hasBlockingFailure(true, withdrawalSnapshot)
                 ? Health.down()
                 : Health.up();
@@ -58,6 +69,12 @@ public class SchedulerHealthIndicator implements HealthIndicator {
         return builder
                 .withDetail("openMatStatusSync", toDetail(openMatSnapshot, openMatSchedulerEnabled, openMatSchedulerCron, openMatSchedulerZone))
                 .withDetail("tournamentCrawler", toDetail(tournamentSnapshot, tournamentSchedulerEnabled, tournamentSchedulerCron, tournamentSchedulerZone))
+                .withDetail("tournamentFavoriteReminder", toDetail(
+                        tournamentFavoriteReminderSnapshot,
+                        tournamentFavoriteReminderSchedulerEnabled,
+                        tournamentFavoriteReminderSchedulerCron,
+                        tournamentFavoriteReminderSchedulerZone
+                ))
                 .withDetail("withdrawalProcessor", toDetail(withdrawalSnapshot, true, withdrawalSchedulerCron, withdrawalSchedulerZone))
                 .build();
     }
