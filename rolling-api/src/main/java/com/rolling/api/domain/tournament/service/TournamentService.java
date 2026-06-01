@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.service;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.tournament.dto.TournamentCreateRequest;
 import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlRequest;
 import com.rolling.api.domain.tournament.dto.TournamentPosterUploadUrlResponse;
@@ -9,6 +10,7 @@ import com.rolling.api.domain.tournament.entity.Tournament;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
+import com.rolling.api.domain.tournament.util.TournamentOrdering;
 import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.domain.report.entity.ReportTargetType;
 import com.rolling.api.domain.report.service.ReportService;
@@ -23,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -35,30 +36,32 @@ public class TournamentService {
     private final ReportService reportService;
     private final TournamentPosterService tournamentPosterService;
     private final AdminAccessConfig adminAccessConfig;
+    private final TournamentFavoriteService tournamentFavoriteService;
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable) {
-        return findAll(pageable, null);
+        return findAll(pageable, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
-        return findAll(pageable, source, null);
+        return findAll(pageable, source, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, Long viewerUserId) {
+        return findAll(pageable, source, null, viewerUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, Region region, Long viewerUserId) {
         List<Long> blockedUserIds = getBlockedUserIds(viewerUserId);
         List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
                 .filter(tournament -> matchesSource(tournament, source))
+                .filter(tournament -> matchesRegion(tournament, region))
                 .filter(tournament -> !isBlockedHostTournament(tournament, blockedUserIds))
+                .sorted(TournamentOrdering.byRegistrationAvailability())
                 .map(this::toResponse)
-                .sorted(
-                        Comparator.comparing(TournamentResponse::isRegistrationClosed)
-                                .thenComparing(TournamentResponse::getRegistrationDeadline, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(TournamentResponse::getCompetitionDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(TournamentResponse::getId, Comparator.nullsLast(Comparator.naturalOrder()))
-                )
                 .toList();
 
         int total = sorted.size();
@@ -106,6 +109,7 @@ public class TournamentService {
                 .competitionDate(TournamentDateUtils.toIsoString(competitionDate))
                 .registrationDeadline(TournamentDateUtils.toIsoString(registrationDeadline))
                 .location(optionalText(request.getLocation()))
+                .region(request.getRegion())
                 .applyLink(requireText(request.getApplyLink(), "외부 접수 링크는 필수입니다"))
                 .build();
 
@@ -146,6 +150,9 @@ public class TournamentService {
         String effectiveLocation = request.getLocation() != null
                 ? optionalText(request.getLocation())
                 : tournament.getLocation();
+        Region effectiveRegion = request.getRegion() != null
+                ? request.getRegion()
+                : tournament.getRegion();
         String effectiveApplyLink = request.getApplyLink() != null
                 ? requireText(request.getApplyLink(), "외부 접수 링크는 비어 있을 수 없습니다")
                 : tournament.getApplyLink();
@@ -157,9 +164,11 @@ public class TournamentService {
                 TournamentDateUtils.toIsoString(effectiveCompetitionDate),
                 TournamentDateUtils.toIsoString(effectiveRegistrationDeadline),
                 effectiveLocation,
+                effectiveRegion,
                 effectiveApplyLink
         );
 
+        tournamentFavoriteService.disableInvalidRemindersForTournament(tournamentId);
         return toResponse(tournament);
     }
 
@@ -168,6 +177,7 @@ public class TournamentService {
         Tournament tournament = tournamentRepository.findById(tournamentId)
                 .orElseThrow(() -> BusinessException.notFound("대회를 찾을 수 없습니다"));
         validateOwner(tournament, userId);
+        tournamentFavoriteService.removeFavoritesByTournament(tournamentId);
         tournamentRepository.delete(tournament);
     }
 
@@ -216,6 +226,7 @@ public class TournamentService {
                 && request.getCompetitionDate() == null
                 && request.getRegistrationDeadline() == null
                 && request.getLocation() == null
+                && request.getRegion() == null
                 && request.getApplyLink() == null) {
             throw BusinessException.badRequest("수정할 필드가 없습니다");
         }
@@ -232,6 +243,10 @@ public class TournamentService {
 
     private boolean matchesSource(Tournament tournament, TournamentSource source) {
         return source == null || resolveSource(tournament) == source;
+    }
+
+    private boolean matchesRegion(Tournament tournament, Region region) {
+        return region == null || tournament.getRegion() == region;
     }
 
     private boolean isBlockedHostTournament(Tournament tournament, List<Long> blockedUserIds) {

@@ -8,5 +8,6 @@ public final class MonitoringTaskNames {
 
     public static final String OPEN_MAT_STATUS_SYNC = "openMatStatusSync";
     public static final String TOURNAMENT_CRAWLER = "tournamentCrawler";
+    public static final String TOURNAMENT_FAVORITE_REMINDER = "tournamentFavoriteReminder";
     public static final String WITHDRAWAL_PROCESSOR = "withdrawalProcessor";
 }

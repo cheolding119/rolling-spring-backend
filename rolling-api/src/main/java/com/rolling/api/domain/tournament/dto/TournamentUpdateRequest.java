@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.dto;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
@@ -26,6 +27,9 @@ public class TournamentUpdateRequest {
 
     @Schema(description = "개최 장소", example = "서울 올림픽공원 체조경기장")
     private String location;
+
+    @Schema(description = "지역", example = "SEOUL")
+    private Region region;
 
     @Schema(description = "외부 접수 링크", example = "https://forms.google.com/...")
     private String applyLink;

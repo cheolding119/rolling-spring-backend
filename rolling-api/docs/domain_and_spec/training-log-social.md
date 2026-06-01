@@ -68,6 +68,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 친구 검색 결과는 `nickname`, `affiliation`, `beltColor`를 함께 노출한다.
 - 친구 검색 결과는 `friendRequestStatus`, `outgoingRequestId`를 함께 노출한다.
 - 현재 백엔드 사용자 엔티티의 source field는 `User.nickname`, `User.affiliation`, `User.beltColor`다.
+- `beltColor` raw value는 [shared/common-models.md](shared/common-models.md)의 공용 사용자 벨트 규칙을 따른다.
 - 소속이 없으면 `affiliation = null`로 반환하고, 화면 문구는 클라이언트가 결정한다.
 - 검색 결과에서는 차단 관계만 제외하고, 친구/보낸 요청/받은 요청 대상은 상태 필드로 구분해 반환한다.
 

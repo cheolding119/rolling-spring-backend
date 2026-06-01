@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.entity;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -71,6 +72,11 @@ public class Tournament extends BaseTimeEntity {
     @Column
     private String location;
 
+    // 지역 필터용 분류
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private Region region;
+
     // 외부 접수 링크
     @Column(name = "apply_link", nullable = false, length = 512)
     private String applyLink;
@@ -85,6 +91,7 @@ public class Tournament extends BaseTimeEntity {
                       String competitionDate,
                       String registrationDeadline,
                       String location,
+                      Region region,
                       String applyLink) {
         this.hostUserId = hostUserId;
         this.source = source;
@@ -95,6 +102,7 @@ public class Tournament extends BaseTimeEntity {
         this.competitionDate = competitionDate;
         this.registrationDeadline = registrationDeadline;
         this.location = location;
+        this.region = region;
         this.applyLink = applyLink;
     }
 
@@ -126,6 +134,7 @@ public class Tournament extends BaseTimeEntity {
                               String competitionDate,
                               String registrationDeadline,
                               String location,
+                              Region region,
                               String applyLink) {
         this.title = title;
         this.organizer = organizer;
@@ -133,6 +142,7 @@ public class Tournament extends BaseTimeEntity {
         this.competitionDate = competitionDate;
         this.registrationDeadline = registrationDeadline;
         this.location = location;
+        this.region = region;
         this.applyLink = applyLink;
     }
 }

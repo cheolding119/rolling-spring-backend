@@ -23,12 +23,16 @@ public class OpenMatParticipantResponse {
     @Schema(description = "참가자 벨트", example = "BLUE")
     private BeltColor beltColor;
 
+    @Schema(description = "참가자 그랄 수", example = "2", nullable = true)
+    private Integer stripeCount;
+
     public static OpenMatParticipantResponse from(User user) {
         return OpenMatParticipantResponse.builder()
                 .userId(user.getId())
                 .name(user.getNickname())
                 .affiliation(user.getAffiliation())
                 .beltColor(user.getBeltColor())
+                .stripeCount(user.getStripeCount())
                 .build();
     }
 }

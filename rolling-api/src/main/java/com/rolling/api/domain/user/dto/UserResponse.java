@@ -34,6 +34,9 @@ public class UserResponse {
     @Schema(description = "주짓수 벨트 색상", example = "BLUE")
     private String beltColor;
 
+    @Schema(description = "그랄 수", example = "2", nullable = true)
+    private Integer stripeCount;
+
     @Schema(description = "생성 시각")
     private LocalDateTime createdAt;
 
@@ -67,6 +70,7 @@ public class UserResponse {
                 .affiliation(user.getAffiliation())
                 .socialProvider(user.getSocialProvider().name())
                 .beltColor(user.getBeltColor().name())
+                .stripeCount(user.getStripeCount())
                 .createdAt(user.getCreatedAt())
                 .withdrawalPending(user.getWithdrawalPending())
                 .withdrawalScheduledAt(user.getWithdrawalScheduledAt())

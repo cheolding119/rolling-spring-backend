@@ -8,6 +8,7 @@ import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.entity.Tournament;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
 import com.rolling.api.domain.tournament.model.TournamentModel;
+import com.rolling.api.domain.tournament.repository.TournamentFavoriteRepository;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.infra.s3.S3Uploader;
 import com.rolling.api.global.exception.BusinessException;
@@ -47,6 +48,9 @@ class TournamentManagerServiceTest {
 
     @Mock
     private TournamentRepository tournamentRepository;
+
+    @Mock
+    private TournamentFavoriteRepository tournamentFavoriteRepository;
 
     @Mock
     private S3Uploader s3Uploader;
@@ -387,6 +391,7 @@ class TournamentManagerServiceTest {
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
         assertThat(result.getCrawledCount()).isEqualTo(0);
+        verify(tournamentFavoriteRepository).deleteAllByTournament_IdIn(List.of(10L));
         verify(tournamentRepository).deleteAllByIdInBatch(List.of(10L));
     }
 
@@ -464,7 +469,12 @@ class TournamentManagerServiceTest {
     }
 
     private TournamentManagerService managerService(TournamentCrawler... crawlers) {
-        TournamentManagerService managerService = new TournamentManagerService(List.of(crawlers), tournamentRepository, s3Uploader);
+        TournamentManagerService managerService = new TournamentManagerService(
+                List.of(crawlers),
+                tournamentRepository,
+                tournamentFavoriteRepository,
+                s3Uploader
+        );
         ReflectionTestUtils.setField(managerService, "meterRegistry", meterRegistry);
         return managerService;
     }

@@ -39,6 +39,7 @@ import com.rolling.api.domain.tournament.controller.TournamentCrawlerController;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.dto.TournamentResponse;
 import com.rolling.api.domain.tournament.entity.TournamentSource;
+import com.rolling.api.domain.tournament.service.TournamentFavoriteService;
 import com.rolling.api.domain.tournament.service.TournamentManagerService;
 import com.rolling.api.domain.tournament.service.TournamentService;
 import com.rolling.api.domain.user.entity.BeltColor;
@@ -353,6 +354,29 @@ class SecurityAuthorizationIntegrationTest {
                         .content("""
                                 {
                                   \"reason\": \"SPAM\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/tournaments/11/favorite"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/tournaments/favorites"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(patch("/api/v1/tournaments/11/favorite-reminder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"notificationEnabled\": true,
+                                  \"remindDate\": \"2026-04-01\",
+                                  \"remindTime\": \"09:00\"
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
@@ -744,12 +768,13 @@ class SecurityAuthorizationIntegrationTest {
                 .competitionDate(LocalDate.of(2026, 4, 5))
                 .registrationDeadline(LocalDate.of(2026, 3, 31))
                 .location("Seoul")
+                .region(Region.SEOUL)
                 .applyLink("https://example.com/apply")
                 .registrationClosed(false)
                 .createdAt(LocalDateTime.of(2026, 3, 20, 9, 0))
                 .build();
 
-        given(tournamentService.findAll(any(Pageable.class), isNull(), isNull()))
+        given(tournamentService.findAll(any(Pageable.class), isNull(), isNull(), isNull()))
                 .willReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 20), 1));
         given(tournamentService.findById(eq(1L), isNull())).willReturn(response);
     }
@@ -876,6 +901,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         TournamentManagerService tournamentManagerService() {
             return mock(TournamentManagerService.class);
+        }
+
+        @Bean
+        TournamentFavoriteService tournamentFavoriteService() {
+            return mock(TournamentFavoriteService.class);
         }
 
         @Bean
