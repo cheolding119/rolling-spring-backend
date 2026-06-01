@@ -51,6 +51,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private BeltColor beltColor;
 
+    @Column(name = "stripe_count")
+    private Integer stripeCount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AccountStatus accountStatus = AccountStatus.ACTIVE;
@@ -139,6 +142,12 @@ public class User extends BaseTimeEntity {
     public void updateBeltColor(BeltColor beltColor) {
         if (beltColor != null) {
             this.beltColor = beltColor;
+        }
+    }
+
+    public void updateStripeCount(Integer stripeCount) {
+        if (stripeCount != null) {
+            this.stripeCount = stripeCount;
         }
     }
 

@@ -79,6 +79,7 @@ class UserServiceTest {
                 .beltColor(BeltColor.BLACK)
                 .build();
         ReflectionTestUtils.setField(user, "id", 11L);
+        ReflectionTestUtils.setField(user, "stripeCount", 3);
 
         when(userRepository.findByIdAndIsWithdrawnFalse(11L)).thenReturn(Optional.of(user));
         when(adminAccessConfig.isAdmin(11L)).thenReturn(true);
@@ -88,6 +89,7 @@ class UserServiceTest {
         assertThat(response.getIsAdmin()).isTrue();
         assertThat(response.getNickname()).isEqualTo("admin-user");
         assertThat(response.getAffiliation()).isEqualTo("롤링짐 강남");
+        assertThat(response.getStripeCount()).isEqualTo(3);
         assertThat(response.getSettings().getPushNotificationEnabled()).isTrue();
     }
 
@@ -108,6 +110,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(request, "nickname", "new-nickname");
         ReflectionTestUtils.setField(request, "affiliation", "new-gym");
         ReflectionTestUtils.setField(request, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(request, "stripeCount", 2);
 
         when(userRepository.findByIdAndIsWithdrawnFalse(1L)).thenReturn(Optional.of(user));
 
@@ -116,6 +119,7 @@ class UserServiceTest {
         assertThat(response.getNickname()).isEqualTo("new-nickname");
         assertThat(response.getAffiliation()).isEqualTo("new-gym");
         assertThat(response.getBeltColor()).isEqualTo("BLUE");
+        assertThat(response.getStripeCount()).isEqualTo(2);
     }
 
     @Test
@@ -130,6 +134,7 @@ class UserServiceTest {
                 .beltColor(BeltColor.PURPLE)
                 .build();
         ReflectionTestUtils.setField(user, "id", 2L);
+        ReflectionTestUtils.setField(user, "stripeCount", 4);
 
         UserUpdateRequest request = new UserUpdateRequest();
 
@@ -140,6 +145,7 @@ class UserServiceTest {
         assertThat(response.getNickname()).isEqualTo("current");
         assertThat(response.getAffiliation()).isEqualTo("current-gym");
         assertThat(response.getBeltColor()).isEqualTo("PURPLE");
+        assertThat(response.getStripeCount()).isEqualTo(4);
     }
 
     @Test
