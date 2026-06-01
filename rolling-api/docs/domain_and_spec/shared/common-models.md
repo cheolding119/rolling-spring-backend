@@ -168,6 +168,7 @@ Response data:
 | `affiliation` | `String?` |
 | `socialProvider` | `String` |
 | `beltColor` | `String` |
+| `stripeCount` | `Integer?` |
 | `createdAt` | `DateTime` |
 | `withdrawalPending` | `Boolean` |
 | `withdrawalScheduledAt` | `DateTime?` |
@@ -184,12 +185,15 @@ Response data:
 - `/users/me` 응답에는 현재 사용자 기준 `isAdmin` 필드가 포함된다.
 - `/users/me` 응답에는 사용자 설정 `settings.pushNotificationEnabled`, `settings.showOwnReactions`와 소속 `affiliation`이 포함된다.
 - `/users/me` 응답에는 제재 상태 확인용 `accountStatus`, `suspensionUntil`, `sanctionReasonSummary`가 포함된다.
+- `/users/me` 응답에는 현재 그랄 수를 나타내는 `stripeCount`가 포함된다.
 - 로그인 응답과 토큰 갱신 응답에도 같은 의미의 `isAdmin`이 포함된다.
 - 프론트는 요청 시 `ROLE` 값을 따로 보내지 않고 `Authorization: Bearer {accessToken}`만 보낸다.
 - 서버는 accessToken에서 확인한 `userId`와 `admin.user-ids` 설정값으로 `ROLE_USER`/`ROLE_ADMIN`을 내부 판단한다.
 - 프론트는 `isAdmin=true`일 때 관리자 UI를 노출할 수 있다.
 - 실제 보호는 계속 서버의 관리자 API 권한 검사와 `403 FORBIDDEN` 응답으로 처리한다.
 - `isAdmin`은 UI 제어용 보조 정보이고, 최종 권한 판단 기준은 항상 서버다.
+- `beltColor`는 성인 벨트와 유소년 벨트를 함께 사용한다. 지원 raw value는 `WHITE`, `GRAY_WHITE`, `GRAY`, `GRAY_BLACK`, `YELLOW_WHITE`, `YELLOW`, `YELLOW_BLACK`, `ORANGE_WHITE`, `ORANGE`, `ORANGE_BLACK`, `GREEN_WHITE`, `GREEN`, `GREEN_BLACK`, `BLUE`, `PURPLE`, `BROWN`, `BLACK`이다.
+- `stripeCount`는 `null` 가능하며, 사용자 프로필의 현재 그랄 수를 의미한다.
 
 ### 5.2.2 내 정보 수정
 
@@ -204,11 +208,15 @@ Request body:
 | `nickname` | `String` | - |
 | `affiliation` | `String` | - |
 | `beltColor` | `String` | - |
+| `stripeCount` | `Integer?` | - |
 
 현재 구현 메모:
 
 - `phone` 수정은 아직 미지원이다.
 - `affiliation`은 선택 입력이며, 빈 값 없이 전달된 문자열을 그대로 반영한다.
+- `beltColor`는 성인 벨트와 유소년 벨트를 함께 사용한다. 지원 raw value는 `WHITE`, `GRAY_WHITE`, `GRAY`, `GRAY_BLACK`, `YELLOW_WHITE`, `YELLOW`, `YELLOW_BLACK`, `ORANGE_WHITE`, `ORANGE`, `ORANGE_BLACK`, `GREEN_WHITE`, `GREEN`, `GREEN_BLACK`, `BLUE`, `PURPLE`, `BROWN`, `BLACK`이다.
+- `stripeCount`는 선택 입력이며, 값이 없으면 기존 값을 유지한다.
+- `stripeCount`는 0 이상만 허용되며, 음수면 `400 Bad Request`를 반환한다.
 
 ### 5.2.3 내 설정 수정
 
@@ -443,6 +451,30 @@ Response data:
 - 앞뒤 공백은 trim 후 저장한다.
 - 공백만 있는 값은 `VALIDATION_ERROR`다.
 - MVP에서는 중복 닉네임을 허용한다.
+
+
+### 5.2.10 오픈매트 참가자 조회
+
+`GET /api/v1/open-mats/{id}/participants`
+
+- 인증: 필요
+
+Response data:
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `userId` | `Long` | 참가자 사용자 ID |
+| `name` | `String` | 참가자 이름 |
+| `affiliation` | `String?` | 소속 |
+| `beltColor` | `String` | 참가자 벨트 |
+| `stripeCount` | `Integer?` | 참가자 그랄 수 |
+
+현재 구현 메모:
+
+- 오픈매트 참가자 조회는 참가자의 현재 상태를 보여주는 용도다.
+- `beltColor`와 `stripeCount`는 모두 `User` 현재 상태를 source of truth로 사용한다.
+- 훈련일지 `PROMOTION` 기록에서 직접 계산하지 않는다.
+- `stripeCount`가 없으면 앱은 미설정 상태로 처리한다.
 
 
 ## 5.3 알림 API

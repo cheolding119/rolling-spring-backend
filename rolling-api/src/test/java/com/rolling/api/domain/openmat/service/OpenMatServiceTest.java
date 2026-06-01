@@ -637,9 +637,11 @@ class OpenMatServiceTest {
         User participant1 = createUser(2L, "participant-1", "alpha");
         ReflectionTestUtils.setField(participant1, "affiliation", "롤링짐 강남");
         ReflectionTestUtils.setField(participant1, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(participant1, "stripeCount", 1);
         User participant2 = createUser(3L, "participant-2", "beta");
         ReflectionTestUtils.setField(participant2, "affiliation", "롤링짐 잠실");
         ReflectionTestUtils.setField(participant2, "beltColor", BeltColor.PURPLE);
+        ReflectionTestUtils.setField(participant2, "stripeCount", 2);
 
         OpenMat openMat = createOpenMat(
                 35L,
@@ -665,6 +667,8 @@ class OpenMatServiceTest {
                 .containsExactly("롤링짐 잠실", "롤링짐 강남");
         assertThat(response).extracting(OpenMatParticipantResponse::getBeltColor)
                 .containsExactly(BeltColor.PURPLE, BeltColor.BLUE);
+        assertThat(response).extracting(OpenMatParticipantResponse::getStripeCount)
+                .containsExactly(2, 1);
     }
 
     @Test
@@ -674,6 +678,7 @@ class OpenMatServiceTest {
         User participant = createUser(2L, "participant-visible", "alpha");
         ReflectionTestUtils.setField(participant, "affiliation", "롤링짐 강남");
         ReflectionTestUtils.setField(participant, "beltColor", BeltColor.BLUE);
+        ReflectionTestUtils.setField(participant, "stripeCount", 3);
         OpenMat openMat = createOpenMat(
                 36L,
                 host,
@@ -695,6 +700,7 @@ class OpenMatServiceTest {
         assertThat(response.get(0).getName()).isEqualTo("alpha");
         assertThat(response.get(0).getAffiliation()).isEqualTo("롤링짐 강남");
         assertThat(response.get(0).getBeltColor()).isEqualTo(BeltColor.BLUE);
+        assertThat(response.get(0).getStripeCount()).isEqualTo(3);
     }
 
     @Test

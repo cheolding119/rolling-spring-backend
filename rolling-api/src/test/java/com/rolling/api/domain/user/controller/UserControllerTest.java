@@ -92,6 +92,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(2))
                 .andExpect(jsonPath("$.data.affiliation").value("롤링짐 강남"))
+                .andExpect(jsonPath("$.data.stripeCount").value(2))
                 .andExpect(jsonPath("$.data.settings.pushNotificationEnabled").value(true));
     }
 
@@ -115,6 +116,48 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.affiliation").value("롤링짐 강남"));
+    }
+
+    @Test
+    @DisplayName("내 정보 수정은 유소년 벨트 값도 허용한다")
+    void updateMe_withYouthBeltColor_returnsUpdatedProfile() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+        given(userService.updateMe(eq(2L), any())).willReturn(userResponseWithBeltColor("GRAY_BLACK"));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "beltColor": "GRAY_BLACK"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.beltColor").value("GRAY_BLACK"));
+    }
+
+    @Test
+    @DisplayName("내 정보 수정은 음수 그랄 값을 거부한다")
+    void updateMe_withNegativeStripeCount_returnsBadRequest() throws Exception {
+        given(jwtTokenProvider.validateToken("user-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("user-token")).willReturn(2L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(2L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(2L)).willReturn(false);
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header("Authorization", "Bearer user-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "stripeCount": -1
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
@@ -266,6 +309,14 @@ class UserControllerTest {
     }
 
     private UserResponse userResponse(boolean pushNotificationEnabled) {
+        return userResponseWithBeltColor(pushNotificationEnabled, "BLUE");
+    }
+
+    private UserResponse userResponseWithBeltColor(String beltColor) {
+        return userResponseWithBeltColor(true, beltColor);
+    }
+
+    private UserResponse userResponseWithBeltColor(boolean pushNotificationEnabled, String beltColor) {
         return UserResponse.builder()
                 .id(2L)
                 .nickname("rolling-user")
@@ -273,7 +324,8 @@ class UserControllerTest {
                 .phone("010-1234-5678")
                 .affiliation("롤링짐 강남")
                 .socialProvider("GOOGLE")
-                .beltColor("BLUE")
+                .beltColor(beltColor)
+                .stripeCount(2)
                 .createdAt(LocalDateTime.of(2026, 4, 6, 12, 0))
                 .withdrawalPending(false)
                 .withdrawalScheduledAt(null)
