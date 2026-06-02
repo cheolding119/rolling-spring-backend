@@ -1014,12 +1014,15 @@ React 메모:
 Query:
 
 - `source`: `STREET_JIU_JITSU | KOREA_JIU | HEROES_OF_JIU_JITSU | SPOTLITE | MANUAL`
+- `q`: 대회명 | 주최사 | 장소 | 접수 링크
 - `page`
 - `size`
 
 예시:
 
 `GET /api/v1/tournaments?source=MANUAL&page=0&size=20`
+
+`GET /api/v1/tournaments?source=MANUAL&q=롤링&page=0&size=20`
 
 Response item 필드:
 
@@ -1098,10 +1101,21 @@ Request:
 
 Request는 생성과 동일 필드, 모두 optional.
 
+예시:
+
+```json
+{
+  "title": "제5회 롤링컵",
+  "location": "대구체육관",
+  "region": "DAEGU"
+}
+```
+
 주의:
 
 - 최소 1개 필드는 보내야 한다
 - `registrationDeadline <= competitionDate` 규칙 유지
+- `region`도 생성과 동일하게 수정 가능하다
 - 작성자 본인만 수정 가능
 - 관리자 화면이어도 `403` 가능
 

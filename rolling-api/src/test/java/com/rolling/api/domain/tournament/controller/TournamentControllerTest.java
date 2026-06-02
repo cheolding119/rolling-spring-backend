@@ -46,6 +46,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -117,16 +118,16 @@ class TournamentControllerTest {
     }
 
     @Test
-    @DisplayName("대회 목록 조회는 인증 사용자의 viewer id와 region을 서비스에 전달한다")
-    void list_withUserToken_passesViewerIdAndRegion() {
+    @DisplayName("대회 목록 조회는 인증 사용자의 viewer id와 region, keyword를 서비스에 전달한다")
+    void list_withUserToken_passesViewerIdRegionAndKeyword() {
         TournamentController controller = new TournamentController(tournamentService, tournamentFavoriteService);
         PageRequest pageable = PageRequest.of(0, 20);
-        given(tournamentService.findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, 2L))
+        given(tournamentService.findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, "롤링", 2L))
                 .willReturn(new PageImpl<>(List.of(response(10L))));
 
-        controller.list(new UserPrincipal(2L), TournamentSource.MANUAL, Region.SEOUL, pageable);
+        controller.list(new UserPrincipal(2L), TournamentSource.MANUAL, Region.SEOUL, "롤링", pageable);
 
-        verify(tournamentService).findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, 2L);
+        verify(tournamentService).findAll(pageable, TournamentSource.MANUAL, Region.SEOUL, "롤링", 2L);
     }
 
     @Test
@@ -170,6 +171,31 @@ class TournamentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.tournamentId").value(10));
+    }
+
+    @Test
+    @DisplayName("대회 수정은 region 값을 포함해 인증 사용자 요청을 처리한다")
+    void update_withUserTokenAndRegion_returnsOk() throws Exception {
+        given(jwtTokenProvider.validateToken("admin-token")).willReturn(true);
+        given(jwtTokenProvider.getUserIdFromToken("admin-token")).willReturn(1L);
+        given(userRepository.existsByIdAndIsWithdrawnFalse(1L)).willReturn(true);
+        given(adminAccessConfig.isAdmin(1L)).willReturn(true);
+        given(tournamentService.update(eq(1L), eq(10L), any())).willReturn(response(10L));
+
+        mockMvc.perform(put("/api/v1/tournaments/10")
+                        .header("Authorization", "Bearer admin-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "region": "DAEGU"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(10))
+                .andExpect(jsonPath("$.data.region").value("SEOUL"));
+
+        verify(tournamentService).update(eq(1L), eq(10L), any());
     }
 
     @Test

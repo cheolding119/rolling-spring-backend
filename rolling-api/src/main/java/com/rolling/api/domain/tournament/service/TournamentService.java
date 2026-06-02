@@ -23,9 +23,11 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -40,25 +42,38 @@ public class TournamentService {
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable) {
-        return findAll(pageable, null, null);
+        return findAll(pageable, null, null, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source) {
-        return findAll(pageable, source, null, null);
+        return findAll(pageable, source, null, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, Long viewerUserId) {
-        return findAll(pageable, source, null, viewerUserId);
+        return findAll(pageable, source, null, null, viewerUserId);
     }
 
     @Transactional(readOnly = true)
     public Page<TournamentResponse> findAll(Pageable pageable, TournamentSource source, Region region, Long viewerUserId) {
+        return findAll(pageable, source, region, null, viewerUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TournamentResponse> findAll(
+            Pageable pageable,
+            TournamentSource source,
+            Region region,
+            String keyword,
+            Long viewerUserId
+    ) {
         List<Long> blockedUserIds = getBlockedUserIds(viewerUserId);
+        String normalizedKeyword = normalizeKeyword(keyword);
         List<TournamentResponse> sorted = tournamentRepository.findAll().stream()
                 .filter(tournament -> matchesSource(tournament, source))
                 .filter(tournament -> matchesRegion(tournament, region))
+                .filter(tournament -> matchesKeyword(tournament, normalizedKeyword))
                 .filter(tournament -> !isBlockedHostTournament(tournament, blockedUserIds))
                 .sorted(TournamentOrdering.byRegistrationAvailability())
                 .map(this::toResponse)
@@ -249,6 +264,17 @@ public class TournamentService {
         return region == null || tournament.getRegion() == region;
     }
 
+    private boolean matchesKeyword(Tournament tournament, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+
+        return containsIgnoreCase(tournament.getTitle(), keyword)
+                || containsIgnoreCase(tournament.getOrganizer(), keyword)
+                || containsIgnoreCase(tournament.getLocation(), keyword)
+                || containsIgnoreCase(tournament.getApplyLink(), keyword);
+    }
+
     private boolean isBlockedHostTournament(Tournament tournament, List<Long> blockedUserIds) {
         return tournament.getHostUserId() != null && blockedUserIds.contains(tournament.getHostUserId());
     }
@@ -267,6 +293,21 @@ public class TournamentService {
 
     private TournamentResponse toResponse(Tournament tournament) {
         return TournamentResponse.from(tournament, tournamentPosterService.resolveDisplayUrl(tournament));
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+
+        return keyword.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private boolean containsIgnoreCase(String value, String keyword) {
+        if (value == null) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains(keyword);
     }
 
     private String requireText(String value, String message) {
