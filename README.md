@@ -48,7 +48,7 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 
 ## ERD
 
-[![Rolling ERD](images/00514users/RollingERD.png)](images/00514users/RollingERD.png)
+[![Rolling ERD](images/00514users/Rolling_ERD.png)](images/00514users/Rolling_ERD.png)
 
 ## 🛠 기술 스택 (Tech Stack)
 
