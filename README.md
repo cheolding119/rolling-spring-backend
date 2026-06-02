@@ -43,11 +43,12 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 
 ## 시스템 아키텍처
 
-포트폴리오 관점에서 서비스의 전체 흐름과 운영 구조를 한눈에 보여주기 위해 아키텍처 다이어그램을 함께 정리했습니다.
 
 [![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
 
-https://dbdiagram.io/d/Rolling-ERD-691d10d26735e1117071fe63
+## ERD
+
+[![Rolling ERD](images/00514users/RollingERD.png)](images/00514users/RollingERD.png)
 
 ## 🛠 기술 스택 (Tech Stack)
 
