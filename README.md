@@ -40,33 +40,12 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 - `Nginx`, `Docker Compose`, `Prometheus`, `Grafana`, `Slack Webhook`, `Actuator` 기반의 배포 및 모니터링 체계를 도입해 실제 운영과 장애 대응까지 고려한 구조로 설계했습니다.
 
 
----
 
-## 핵심 기능
+## 시스템 아키텍처
 
-- 오픈매트와 대회 정보를 한곳에서 탐색할 수 있는 통합 조회 기능
-- 오픈매트 참가 신청, 취소, 개최자 관리까지 이어지는 참여 기능
-- 커뮤니티 게시글, 댓글, 좋아요, 신고를 통한 사용자 소통 기능
-- 훈련 기록 작성, 출석 잔디, 인사이트 확인, 친구 공유 기능을 포함한 훈련일지 기능
-- 공지사항, 알림, 문의, 사용자 차단 기능을 포함한 사용자 지원 기능
-- 공지, 문의, 신고, 대회 데이터, 사용자 제재를 관리하는 관리자 운영 기능
+포트폴리오 관점에서 서비스의 전체 흐름과 운영 구조를 한눈에 보여주기 위해 아키텍처 다이어그램을 함께 정리했습니다.
 
-
-## 주요 화면
-
-썸네일을 클릭하면 더 큰 이미지로 이동합니다.
-
-| 로그인 | 메인 페이지 | 오픈매트 목록 |
-| :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-login"><img src="images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="images/00514users/메인페이지.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="images/00514users/오픈매트리스트.jpg" width="250" alt="오픈매트 목록"></a> |
-
-| 오픈매트 신청 | 대회 목록 | 대회 상세 |
-| :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="images/00514users/오픈매트상세.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="images/00514users/대회리스트페이지.jpg" width="250" alt="대회 목록"></a> | <a href="./docs/screenshots.md#user-tournaments-detail"><img src="images/00514users/대회 상세 페이지.jpg" width="250" alt="대회 상세"></a> |
-
-| 알림 목록 | 커뮤니티 목록 | 커뮤니티 상세 |
-| :---: | :---: | :---: |
-| <a href="./docs/screenshots.md#user-notifications"><img src="images/00514users/알림리스트페이지.jpg" width="250" alt="알림 목록"></a> | <a href="./docs/screenshots.md#user-community-list"><img src="images/00514users/커뮤니티리스트페이지.jpg" width="250" alt="커뮤니티 목록"></a> | <a href="./docs/screenshots.md#user-community-detail"><img src="images/00514users/커뮤니티상세.jpg" width="250" alt="커뮤니티 상세"></a> |
+[![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
 
 
 
@@ -154,11 +133,6 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 ![Swagger](https://img.shields.io/badge/Swagger/OpenAPI-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
 
 
-## 시스템 아키텍처
-
-포트폴리오 관점에서 서비스의 전체 흐름과 운영 구조를 한눈에 보여주기 위해 아키텍처 다이어그램을 함께 정리했습니다.
-
-[![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
 
 
 ## 프로젝트 구조
@@ -166,29 +140,34 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 ### Frontend
 
 - Flutter 앱과 React 관리자 웹을 분리해 사용자 기능과 운영 기능을 구분
-- Feature-based 구조
 - MVVM 기반 화면 구성
 - GetX를 이용한 상태 관리, 의존성 주입, 라우팅
 
 ### Backend
 
-- REST API 기반 서버
-- 인증/인가 분리
-- 도메인별 API 구성
-- 관리자 기능 별도 운영 API 제공
-- 스케줄러, 알림, 모니터링, 운영 정책을 포함한 구조
+- Spring Boot 기반 REST API 서버
+- JWT 인증과 Spring Security를 활용한 인증/인가 분리
+- 오픈매트, 대회, 커뮤니티, 훈련일지 등 도메인 중심 API 설계
+- 사용자용 API와 관리자용 운영 API를 분리해 권한 경계를 명확히 구성
+- 스케줄러, 푸시 알림, 크롤링, 운영 정책을 포함한 서비스 구조 설계
+- Actuator, Prometheus, Grafana, Slack Webhook 기반 모니터링 및 장애 대응 체계 구성
+- Flyway 기반 데이터베이스 스키마 버전 관리 및 운영 반영 자동화
 
 ## API / 도메인 구성
 
-- **인증(Auth)**: 소셜 로그인, 토큰 발급 및 갱신, 로그아웃, 회원 탈퇴 예약/자동 처리 배치와 같은 사용자 인증 흐름을 담당합니다.
-- **사용자(User)**: 내 정보 조회 및 수정, FCM 토큰 등록 및 삭제, 사용자 차단 및 차단 목록 조회 기능을 제공합니다. 
-- **오픈매트(OpenMat)**: 오픈매트 생성, 수정, 삭제, 목록/상세 조회, 참가 신청 및 취소, 내가 신청한 목록과 내가 개최한 목록 조회, 모집 상태 변경, 참가자 관리 기능을 담당합니다.
-- **대회(Tournament)**: 대회 목록 및 상세 조회, 수동 등록/수정/삭제, 관리자 전용 크롤링 실행 기능을 제공합니다.
-- **알림(Notification)**: 사용자 알림 목록 조회와 읽음 처리 기능을 담당하며, 오픈매트 변경/삭제와 문의 답변 같은 이벤트를 관리합니다.
-- **공지사항(Notice)**: 일반 사용자 대상 공지사항 목록/상세 조회와 관리자 전용 공지 등록, 수정, 삭제 기능으로 구성됩니다.
-- **문의(Inquiry)**: 사용자의 문의 등록, 내 문의 목록/상세 조회 기능과 관리자 전용 문의 답변 및 상태 변경 기능을 포함합니다.
-- **신고(Report)**: 신고 생성, 관리자 전용 신고 목록/상세 조회, 상태 변경, 누적 신고 대상 요약 기능을 포함합니다.
-- **관리자(Admin)**: 공지 운영, 대회 크롤링 실행, 문의 응답 처리, 신고 및 운영 데이터 관리, 사용자 제재 이력 조회/생성/해제 기능을 담당합니다. 
+- 인증(Auth): 소셜 로그인, 액세스 토큰/리프레시 토큰 발급 및 갱신, 로그아웃, 회원 탈퇴 예약 및 자동 처리 배치 등 사용자 인증 흐름을 담당합니다.
+- 사용자(User): 내 정보 조회 및 수정, 푸시 알림 설정, FCM 토큰 등록 및 삭제, 사용자 차단 및 차단 목록 조회 기능을 제공합니다.
+- 오픈매트(OpenMat): 오픈매트 생성, 수정, 삭제, 목록 및 상세 조회, 참가 신청 및 취소, 내가 신청한 목록 조회, 내가 개최한 오픈매트 관리, 모집 상태 변경, 참가자 관리 기능을 담당합니다.
+- 대회(Tournament): 대회 목록 및 상세 조회, 지역 기반 탐색, 즐겨찾기와 리마인더 설정, 수동 등록/수정/삭제 기능을 제공하며, 각 대회 단체 웹사이트를 대상으로 한 크롤링과 스케줄러 기반 자동 수집 기능을 포함합니다.
+- 커뮤니티(Community): 게시글 작성, 수정, 삭제, 목록 및 상세 조회, 댓글, 좋아요, 신고 기능 등 사용자 간 소통 기능을 제공합니다.
+- 훈련일지(TrainingLog): 훈련 기록 작성 및 관리, 출석 잔디, 기간별 인사이트, 친구 관계, 친구 기록 열람, 좋아요, 댓글, 공유 설정 등 기록 기반 소셜 기능을 제공합니다.
+- 세미나(Seminar): 세미나 생성, 수정, 삭제, 목록 및 상세 조회, 참가 신청 및 취소, 호스트 기준 참가자 관리 기능을 제공합니다.
+- 알림(Notification): 사용자 알림 목록 조회, 읽음 처리, 배지 확인 기능을 담당하며 오픈매트, 세미나, 커뮤니티, 훈련일지, 문의 답변 등 이벤트 기반 알림을 관리합니다.
+- 공지사항(Notice): 일반 사용자 대상 공지사항 목록 및 상세 조회와 관리자용 공지 등록, 수정, 삭제 기능으로 구성됩니다.
+- 문의(Inquiry): 사용자의 문의 등록, 내 문의 목록 및 상세 조회 기능과 관리자용 문의 답변 및 상태 변경 기능을 포함합니다.
+- 신고(Report): 신고 생성, 관리자용 신고 목록 및 상세 조회, 상태 변경, 누적 신고 대상 관리 기능을 포함합니다.
+- 지도(Map): 주소 기반 좌표 변환과 위치 검색을 위한 지도 API 연동 기능을 제공합니다.
+- 관리자(Admin): 공지 운영, 문의 응답, 신고 처리, 대회 데이터 관리, 크롤링 실행, 사용자 제재 관리, 운영 상태 확인 기능을 담당합니다.
 
 
 
@@ -221,3 +200,29 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 - **해결:** **`ScheduledTaskTracker`**를 도입해 작업의 시작, 성공, 실패 상태를 추적하고, 이를 **Spring Actuator, Prometheus, Grafana, Slack Webhook**과 연동해 health check, 커스텀 메트릭, 운영 알림 체계를 구성했습니다.
 - **검증:** scheduler health indicator와 메트릭 기록 테스트를 추가해 배치 작업 단위의 최근 실행 상태가 헬스 체크와 운영 지표에 반영되는지 확인했습니다. 
 - **결과:** 배치 작업의 최근 실행 상태와 실패 이력을 빠르게 파악할 수 있게 되었고, 이상 징후를 이전보다 빠르게 감지할 수 있는 기반을 마련했습니다.
+
+
+
+## 주요 화면
+
+썸네일을 클릭하면 더 큰 이미지로 이동합니다.
+
+| 로그인 | 메인 페이지 | 오픈매트 목록 |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-login"><img src="images/users/login.jpg" width="250" alt="로그인"></a> | <a href="./docs/screenshots.md#user-main-page"><img src="images/00514users/메인페이지.jpg" width="250" alt="메인 페이지"></a> | <a href="./docs/screenshots.md#user-openmat-list"><img src="images/00514users/오픈매트리스트.jpg" width="250" alt="오픈매트 목록"></a> |
+
+| 오픈매트 신청 | 대회 목록 | 대회 상세 |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-openmat-sign-up"><img src="images/00514users/오픈매트상세.jpg" width="250" alt="오픈매트 신청"></a> | <a href="./docs/screenshots.md#user-tournaments-list"><img src="images/00514users/대회리스트페이지.jpg" width="250" alt="대회 목록"></a> | <a href="./docs/screenshots.md#user-tournaments-detail"><img src="images/00514users/대회 상세 페이지.jpg" width="250" alt="대회 상세"></a> |
+
+| 알림 목록 | 커뮤니티 목록 | 커뮤니티 상세 |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-notifications"><img src="images/00514users/알림리스트페이지.jpg" width="250" alt="알림 목록"></a> | <a href="./docs/screenshots.md#user-community-list"><img src="images/00514users/커뮤니티리스트페이지.jpg" width="250" alt="커뮤니티 목록"></a> | <a href="./docs/screenshots.md#user-community-detail"><img src="images/00514users/커뮤니티상세.jpg" width="250" alt="커뮤니티 상세"></a> |
+
+| 훈련일지 메인 | 훈련일지 작성 | 훈련일지 상세 |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-training-log-main"><img src="images/00514users/훈련일지메인페이지.jpg" width="250" alt="훈련일지 메인"></a> | <a href="./docs/screenshots.md#user-training-log-create"><img src="images/00514users/훈련일지작성페이지.jpg" width="250" alt="훈련일지 작성"></a> | <a href="./docs/screenshots.md#user-training-log-detail"><img src="images/00514users/훈련일지상세.jpg" width="250" alt="훈련일지 상세"></a> |
+
+| 친구 훈련일지 댓글달기 |  |  |
+| :---: | :---: | :---: |
+| <a href="./docs/screenshots.md#user-friend-training-log-comment"><img src="images/00514users/친구훈려일지 댓글달기.jpg" width="250" alt="친구 훈련일지 댓글달기"></a> |  |  |
