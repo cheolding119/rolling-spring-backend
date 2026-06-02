@@ -1,5 +1,5 @@
 ## 안드로이드 : https://play.google.com/store/apps/details?id=com.rolling.jiujits
-## Ios : https://apps.apple.com/app/id6764238741
+## Ios : [https://apps.apple.com/app/id6764238741](https://apps.apple.com/kr/app/%EB%A1%A4%EB%A7%81-%EC%A3%BC%EC%A7%93%EC%88%98%EC%9D%98-%EC%A0%95%EB%B3%B4%EB%A5%BC-%ED%95%9C%EB%88%88%EC%97%90/id6764238741)
 ---
 
 ## 서비스 소개 
