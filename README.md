@@ -47,6 +47,8 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 
 [![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
 
+https://dbdiagram.io/d/Rolling-ERD-691d10d26735e1117071fe63
+
 ## 🛠 기술 스택 (Tech Stack)
 
 | 구분 | 사용 기술 |
