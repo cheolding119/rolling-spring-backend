@@ -19,6 +19,39 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 
 ---
 
+
+
+## 🛠 기술 스택 (Tech Stack)
+
+| 구분 | 사용 기술 |
+| :--- | :--- |
+| **📱 Frontend** | ![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white) ![GetX](https://img.shields.io/badge/GetX-8A2BE2?style=for-the-badge&logo=flutter&logoColor=white) ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) |
+| **⚙️ Backend** | ![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white) ![Spring Data JPA](https://img.shields.io/badge/Spring_Data_JPA-59666C?style=for-the-badge&logo=spring&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white) |
+| **🗄️ Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white) |
+| **☁️ Infra & DevOps** | ![AWS Lightsail](https://img.shields.io/badge/AWS_Lightsail-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
+| **📈 Monitoring** | ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white) ![Spring Actuator](https://img.shields.io/badge/Actuator-6DB33F?style=for-the-badge&logo=spring&logoColor=white) ![Slack Webhook](https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white) |
+| **🔗 API & Auth** | ![Firebase](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black) ![OAuth2.0](https://img.shields.io/badge/Google_%7C_Kakao_Login-FFCD00?style=for-the-badge&logo=kakaotalk&logoColor=000000) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black) |
+
+
+
+---
+
+## 시스템 아키텍처
+
+
+[![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
+
+---
+
+## ERD
+
+[![Rolling ERD](images/00514users/Rolling_ERD.png)](images/00514users/Rolling_ERD.png)
+
+
+---
+
+
+
 ## 문제 정의
 
 - 주짓수 오픈매트와 대회 정보가 SNS, 단체 채팅방, 외부 사이트 등 여러 채널에 흩어져 있어 필요한 정보를 한곳에서 확인하기 어려웠습니다.
@@ -41,69 +74,8 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 
 
 
-## 시스템 아키텍처
+---
 
-
-[![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
-
-## ERD
-
-[![Rolling ERD](images/00514users/Rolling_ERD.png)](images/00514users/Rolling_ERD.png)
-
-## 🛠 기술 스택 (Tech Stack)
-
-| 구분 | 사용 기술 |
-| :--- | :--- |
-| **📱 Frontend** | ![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white) ![GetX](https://img.shields.io/badge/GetX-8A2BE2?style=for-the-badge&logo=flutter&logoColor=white) ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) |
-| **⚙️ Backend** | ![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white) ![Spring Data JPA](https://img.shields.io/badge/Spring_Data_JPA-59666C?style=for-the-badge&logo=spring&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white) |
-| **🗄️ Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white) |
-| **☁️ Infra & DevOps** | ![AWS Lightsail](https://img.shields.io/badge/AWS_Lightsail-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
-| **📈 Monitoring** | ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white) ![Spring Actuator](https://img.shields.io/badge/Actuator-6DB33F?style=for-the-badge&logo=spring&logoColor=white) ![Slack Webhook](https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white) |
-| **🔗 API & Auth** | ![Firebase](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black) ![OAuth2.0](https://img.shields.io/badge/Google_%7C_Kakao_Login-FFCD00?style=for-the-badge&logo=kakaotalk&logoColor=000000) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black) |
-
-
-
-
-
-
-## 프로젝트 구조
-
-### Frontend
-
-- Flutter 앱과 React 관리자 웹을 분리해 사용자 기능과 운영 기능을 구분
-- MVVM 기반 화면 구성
-- GetX를 이용한 상태 관리, 의존성 주입, 라우팅
-
-### Backend
-
-- Spring Boot 기반 REST API 서버
-- JWT 인증과 Spring Security를 활용한 인증/인가 분리
-- 오픈매트, 대회, 커뮤니티, 훈련일지 등 도메인 중심 API 설계
-- 사용자용 API와 관리자용 운영 API를 분리해 권한 경계를 명확히 구성
-- 스케줄러, 푸시 알림, 크롤링, 운영 정책을 포함한 서비스 구조 설계
-- Actuator, Prometheus, Grafana, Slack Webhook 기반 모니터링 및 장애 대응 체계 구성
-- Flyway 기반 데이터베이스 스키마 버전 관리 및 운영 반영 자동화
-
-## API / 도메인 구성
-
-**핵심 비즈니스 (Core Business)**
-- **오픈매트(OpenMat):** 오픈매트 생성, 수정, 삭제, 목록 및 상세 조회, 참가 신청 및 취소, 내가 신청한 목록 조회, 내가 개최한 오픈매트 관리, 모집 상태 변경, 참가자 관리 기능을 담당합니다.
-- **대회(Tournament):** 대회 목록 및 상세 조회, 지역 기반 탐색, 즐겨찾기와 리마인더 설정, 수동 등록/수정/삭제 기능을 제공하며, 각 대회 단체 웹사이트를 대상으로 한 크롤링과 스케줄러 기반 자동 수집 기능을 포함합니다.
-- **세미나(Seminar):** 세미나 생성, 수정, 삭제, 목록 및 상세 조회, 참가 신청 및 취소, 호스트 기준 참가자 관리 기능을 제공합니다.
-
-**커뮤니티 및 기록 (Social & Log)**
-- **커뮤니티(Community):** 게시글 작성, 수정, 삭제, 목록 및 상세 조회, 댓글, 좋아요, 신고 기능 등 사용자 간 소통 기능을 제공합니다.
-- **훈련일지(TrainingLog):** 훈련 기록 작성 및 관리, 출석 잔디, 기간별 인사이트, 친구 관계, 친구 기록 열람, 좋아요, 댓글, 공유 설정 등 기록 기반 소셜 기능을 제공합니다.
-
-**인증 및 사용자 (Auth & User)**
-- **인증(Auth):** 소셜 로그인, 액세스 토큰/리프레시 토큰 발급 및 갱신, 로그아웃, 회원 탈퇴 예약 및 자동 처리 배치 등 사용자 인증 흐름을 담당합니다.
-- **사용자(User):** 내 정보 조회 및 수정, 푸시 알림 설정, FCM 토큰 등록 및 삭제, 사용자 차단 및 차단 목록 조회 기능을 제공합니다.
-
-**운영 및 시스템 (Admin & System)**
-- **관리자(Admin):** 공지 운영, 문의 응답, 신고 처리, 대회 데이터 관리, 크롤링 실행, 사용자 제재 관리, 운영 상태 확인 기능을 담당합니다.
-- **알림(Notification):** 사용자 알림 목록 조회, 읽음 처리, 배지 확인 기능을 담당하며 오픈매트, 세미나, 커뮤니티, 훈련일지, 문의 답변 등 이벤트 기반 알림을 관리합니다.
-- **공지/문의/신고:** 일반 사용자 대상 공지사항 조회 및 문의/신고 등록 기능을 제공하며, 관리자용 등록, 수정, 삭제, 상태 변경, 누적 제재 관리 기능을 포함합니다.
-- **지도(Map):** 주소 기반 좌표 변환과 위치 검색을 위한 지도 API 연동 기능을 제공합니다.
 
 
 
@@ -136,6 +108,48 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 - 해결: `ScheduledTaskTracker`를 도입해 작업의 시작, 성공, 실패 상태를 추적하고, 이를 Spring Actuator, Prometheus, Grafana, Slack Webhook과 연동해 health check, 커스텀 메트릭, 운영 알림 체계를 구성했습니다. 대회 크롤링은 각 크롤러를 개별적으로 예외 처리해 특정 사이트 수집이 실패해도 전체 배치가 중단되지 않도록 했고, 스케줄러 실패 시 운영 알림이 발송되도록 구성했습니다.
 - 검증: 스케줄러 성공/실패가 `rolling_scheduler_execution_total` 메트릭으로 각각 1건씩 기록되는 테스트를 추가했고, 최근 실행 상태에 따라 scheduler health가 `UP` 또는 `DOWN`으로 반영되는 것도 확인했습니다. 또한 대회 크롤링 스케줄러는 예외 발생 시에도 배치 메서드가 중단되지 않고 실패 상태를 기록하도록 검증했습니다.
 - 결과: 배치 작업의 최근 실행 상태와 실패 여부를 수치와 상태값으로 추적할 수 있게 되었고, 크롤링/스케줄러 장애 발생 시 운영자가 더 빠르게 감지하고 대응할 수 있는 구조를 마련했습니다.
+
+
+---
+
+
+## 프로젝트 구조
+
+### Frontend
+
+- Flutter 앱과 React 관리자 웹을 분리해 사용자 기능과 운영 기능을 구분
+- MVVM 기반 화면 구성
+- GetX를 이용한 상태 관리, 의존성 주입, 라우팅
+
+### Backend
+
+- Spring Boot 기반 REST API 서버
+- JWT 인증과 Spring Security를 활용한 인증/인가 분리
+- 오픈매트, 대회, 커뮤니티, 훈련일지 등 도메인 중심 API 설계
+- 사용자용 API와 관리자용 운영 API를 분리해 권한 경계를 명확히 구성
+- 스케줄러, 푸시 알림, 크롤링, 운영 정책을 포함한 서비스 구조 설계
+- Actuator, Prometheus, Grafana, Slack Webhook 기반 모니터링 및 장애 대응 체계 구성
+- Flyway 기반 데이터베이스 스키마 버전 관리 및 운영 반영 자동화
+
+## API / 도메인 구성
+
+**핵심 비즈니스 (Core Business)**
+- **오픈매트(OpenMat):** 오픈매트 생성, 수정, 삭제, 목록 및 상세 조회, 참가 신청 및 취소, 내가 신청한 목록 조회, 내가 개최한 오픈매트 관리, 모집 상태 변경, 참가자 관리 기능을 담당합니다.
+- **대회(Tournament):** 대회 목록 및 상세 조회, 지역 기반 탐색, 즐겨찾기와 리마인더 설정, 수동 등록/수정/삭제 기능을 제공하며, 각 대회 단체 웹사이트를 대상으로 한 크롤링과 스케줄러 기반 자동 수집 기능을 포함합니다.
+
+**커뮤니티 및 기록 (Social & Log)**
+- **커뮤니티(Community):** 게시글 작성, 수정, 삭제, 목록 및 상세 조회, 댓글, 좋아요, 신고 기능 등 사용자 간 소통 기능을 제공합니다.
+- **훈련일지(TrainingLog):** 훈련 기록 작성 및 관리, 출석 잔디, 기간별 인사이트, 친구 관계, 친구 기록 열람, 좋아요, 댓글, 공유 설정 등 기록 기반 소셜 기능을 제공합니다.
+
+**인증 및 사용자 (Auth & User)**
+- **인증(Auth):** 소셜 로그인, 액세스 토큰/리프레시 토큰 발급 및 갱신, 로그아웃, 회원 탈퇴 예약 및 자동 처리 배치 등 사용자 인증 흐름을 담당합니다.
+- **사용자(User):** 내 정보 조회 및 수정, 푸시 알림 설정, FCM 토큰 등록 및 삭제, 사용자 차단 및 차단 목록 조회 기능을 제공합니다.
+
+**운영 및 시스템 (Admin & System)**
+- **관리자(Admin):** 공지 운영, 문의 응답, 신고 처리, 대회 데이터 관리, 크롤링 실행, 사용자 제재 관리, 운영 상태 확인 기능을 담당합니다.
+- **알림(Notification):** 사용자 알림 목록 조회, 읽음 처리, 배지 확인 기능을 담당하며 오픈매트, 세미나, 커뮤니티, 훈련일지, 문의 답변 등 이벤트 기반 알림을 관리합니다.
+- **공지/문의/신고:** 일반 사용자 대상 공지사항 조회 및 문의/신고 등록 기능을 제공하며, 관리자용 등록, 수정, 삭제, 상태 변경, 누적 제재 관리 기능을 포함합니다.
+- **지도(Map):** 주소 기반 좌표 변환과 위치 검색을 위한 지도 API 연동 기능을 제공합니다.
 
 
 
