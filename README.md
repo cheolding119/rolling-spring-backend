@@ -46,14 +46,14 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 ---
 
 ## 시스템 아키텍처
-
+* 이미지를 클릭하면 원본 화면으로 이동하거나 확대하여 볼 수 있습니다.*
 
 [![롤링 시스템 아키텍처](images/architecture/롤링_아키텍처_다이어그램.png)](images/architecture/롤링_아키텍처_다이어그램.png)
 
 ---
 
 ## ERD
-
+* 이미지를 클릭하면 원본 화면으로 이동하거나 확대하여 볼 수 있습니다.*
 [![Rolling ERD](images/00514users/Rolling_ERD.png)](images/00514users/Rolling_ERD.png)
 
 
