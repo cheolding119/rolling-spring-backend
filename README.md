@@ -41,9 +41,7 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 | **🗄️ Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white) |
 | **☁️ Infra & DevOps** | ![AWS Lightsail](https://img.shields.io/badge/AWS_Lightsail-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
 | **📈 Monitoring** | ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white) ![Spring Actuator](https://img.shields.io/badge/Actuator-6DB33F?style=for-the-badge&logo=spring&logoColor=white) ![Slack Webhook](https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white) |
-| **🔗 API & Auth** | ![Firebase](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black) ![OAuth2.0](https://img.shields.io/badge/Google_%7C_Kakao_Login-FFCD00?style=for-the-badge&logo=kakaotalk&logoColor=000000) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black) |
-
-
+| **🔗 API & Auth** | ![Firebase](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black) ![OAuth2.0](https://img.shields.io/badge/Google_%7C_Kakao_Login-FFCD00?style=for-the-badge&logo=kakaotalk&logoColor=000000) ![Apple Login](https://img.shields.io/badge/Apple_Login-000000?style=for-the-badge&logo=apple&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black) |
 
 ---
 
@@ -187,3 +185,19 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 | 친구 훈련일지 댓글달기 |  |  |
 | :---: | :---: | :---: |
 | <a href="./docs/screenshots.md#user-friend-training-log-comment"><img src="images/00514users/친구훈려일지 댓글달기.jpg" width="250" alt="친구 훈련일지 댓글달기"></a> |  |  |
+
+
+###  관리자 웹 (Admin)
+
+
+| 관리자 기능 | 화면 |
+| :--- | :--- |
+| **메인 대시보드** | <a href="images/admin/메인 대시보드.jpg"><img src="images/admin/메인 대시보드.jpg" width="600" alt="메인 대시보드"></a> |
+| **대회 운영** | <a href="images/admin/대회 운영.jpg"><img src="images/admin/대회 운영.jpg" width="600" alt="대회 운영"></a> |
+| **대회 수동 등록** | <a href="images/admin/대회 수동 등록.jpg"><img src="images/admin/대회 수동 등록.jpg" width="600" alt="대회 수동 등록"></a> |
+| **대회 운영 크롤링 실행** | <a href="images/admin/대회 운영 크롤링 실행.jpg"><img src="images/admin/대회 운영 크롤링 실행.jpg" width="600" alt="대회 운영 크롤링 실행"></a> |
+| **공지사항 관리** | <a href="images/admin/공지사항 관리.jpg"><img src="images/admin/공지사항 관리.jpg" width="600" alt="공지사항 관리"></a> |
+| **공지사항 작성** | <a href="images/admin/공지사항 작성.jpg"><img src="images/admin/공지사항 작성.jpg" width="600" alt="공지사항 작성"></a> |
+| **문의 관리** | <a href="images/admin/문의 관리.jpg"><img src="images/admin/문의 관리.jpg" width="600" alt="문의 관리"></a> |
+| **문의 답변** | <a href="images/admin/문의 답변.jpg"><img src="images/admin/문의 답변.jpg" width="600" alt="문의 답변"></a> |
+| **신고 관리** | <a href="images/admin/신고 관리.jpg"><img src="images/admin/신고 관리.jpg" width="600" alt="신고 관리"></a> |
