@@ -53,7 +53,7 @@ Rolling은 오픈매트와 대회 정보를 지역과 일정 기준으로 통합
 ---
 
 ## ERD
-* 이미지를 클릭하면 원본 화면으로 이동하거나 확대하여 볼 수 있습니다.*
+* 원본이 잘 안보이기 때문에 다운로드 해서 봐주시면 감사하겠습니다.*
 [![Rolling ERD](images/00514users/Rolling_ERD.png)](images/00514users/Rolling_ERD.png)
 
 
