@@ -32,6 +32,7 @@ public class TrainingLogFriendEntryDetailResponse {
     private List<String> hashtags;
     private String imageUrl;
     private List<String> imageUrls;
+    private List<TrainingLogLinkedTrainingCardResponse> trainingCards;
     private List<TrainingLogExternalLink> externalLinks;
     private BeltColor beltColor;
     private Integer stripeCount;

@@ -1,0 +1,63 @@
+package com.rolling.api.domain.traininglog.dto;
+
+import com.rolling.api.domain.traininglog.entity.TrainingCard;
+import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
+import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+public class TrainingCardListItemResponse {
+
+    @Schema(description = "훈련카드 ID", example = "1")
+    private Long id;
+
+    @Schema(description = "기술 제목", example = "Knee Cut Pass")
+    private String title;
+
+    @Schema(description = "짧은 요약", example = "상대 가드를 가로질러 압박으로 통과하는 패스")
+    private String summary;
+
+    @Schema(description = "기술 분류", example = "PASS")
+    private String topic;
+
+    @Schema(description = "기술 레벨", example = "BEGINNER")
+    private TrainingCardLevel level;
+
+    @Schema(description = "기술 포지션", example = "GUARD")
+    private TrainingCardPosition position;
+
+    @Schema(description = "어떤 상황에서 쓰는지에 대한 짧은 문구", example = "상대의 니쉴드나 하프가드 압박 상황")
+    private String situationSummary;
+
+    @Schema(description = "좋아요 수", example = "12")
+    private Long likeCount;
+
+    @Schema(description = "현재 로그인 사용자의 좋아요 여부", example = "false")
+    private Boolean likedByMe;
+
+    @Schema(description = "현재 로그인 사용자의 즐겨찾기 여부", example = "false")
+    private Boolean favoritedByMe;
+
+    public static TrainingCardListItemResponse from(
+            TrainingCard card,
+            long likeCount,
+            boolean likedByMe,
+            boolean favoritedByMe
+    ) {
+        return TrainingCardListItemResponse.builder()
+                .id(card.getId())
+                .title(card.getTitle())
+                .summary(card.getSummary())
+                .topic(card.getTopic())
+                .level(card.getLevel())
+                .position(card.getPosition())
+                .situationSummary(card.getSituationSummary())
+                .likeCount(likeCount)
+                .likedByMe(likedByMe)
+                .favoritedByMe(favoritedByMe)
+                .build();
+    }
+}

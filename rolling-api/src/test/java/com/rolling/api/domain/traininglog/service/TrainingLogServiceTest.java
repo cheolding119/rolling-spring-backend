@@ -1,23 +1,31 @@
 package com.rolling.api.domain.traininglog.service;
 
+import com.rolling.api.domain.traininglog.config.TrainingCardFeatureProperties;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogLinkedTrainingCardResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
+import com.rolling.api.domain.traininglog.entity.TrainingCard;
+import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
+import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogEntryCard;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.repository.TrainingCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogEntryCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
@@ -61,6 +69,12 @@ class TrainingLogServiceTest {
     private TrainingLogEntryRepository trainingLogEntryRepository;
 
     @Mock
+    private TrainingLogEntryCardRepository trainingLogEntryCardRepository;
+
+    @Mock
+    private TrainingCardRepository trainingCardRepository;
+
+    @Mock
     private TrainingLogLikeRepository trainingLogLikeRepository;
 
     @Mock
@@ -81,7 +95,10 @@ class TrainingLogServiceTest {
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-05-17T03:00:00Z"), SEOUL_ZONE);
         trainingLogService = new TrainingLogService(
+                new TrainingCardFeatureProperties(true),
                 trainingLogEntryRepository,
+                trainingLogEntryCardRepository,
+                trainingCardRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
                 trainingLogCommentReportRepository,
@@ -93,6 +110,7 @@ class TrainingLogServiceTest {
                 any(),
                 any(TrainingLogCategory.class)
         )).thenReturn(Optional.empty());
+        lenient().when(trainingLogEntryCardRepository.findAllByEntryIdsWithCard(any())).thenReturn(List.of());
     }
 
     @Test
@@ -171,6 +189,67 @@ class TrainingLogServiceTest {
                 "https://cdn.test.com/training-log-1.jpg",
                 "https://cdn.test.com/training-log-2.jpg"
         );
+        assertThat(response.getTrainingCards()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("create links active training cards in request order")
+    void create_linksTrainingCards() {
+        User user = createUser(10L);
+        TrainingCard firstCard = trainingCard(1L, "Knee Cut Pass");
+        TrainingCard secondCard = trainingCard(2L, "Scissor Sweep");
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+        ReflectionTestUtils.setField(request, "title", "Linked cards");
+        ReflectionTestUtils.setField(request, "content", "Cards for today's training");
+        ReflectionTestUtils.setField(request, "trainingCardIds", List.of(2L, 1L, 2L));
+
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+        given(trainingCardRepository.findAllByIdInAndActiveTrue(List.of(2L, 1L))).willReturn(List.of(firstCard, secondCard));
+        given(trainingLogEntryRepository.save(any(TrainingLogEntry.class))).willAnswer(invocation -> {
+            TrainingLogEntry entry = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entry, "id", 100L);
+            ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 12, 0));
+            ReflectionTestUtils.setField(entry, "updatedAt", LocalDateTime.of(2026, 5, 17, 12, 0));
+            return entry;
+        });
+
+        TrainingLogEntryResponse response = trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request);
+
+        ArgumentCaptor<List<TrainingLogEntryCard>> captor = ArgumentCaptor.forClass(List.class);
+        verify(trainingLogEntryCardRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue()).extracting(link -> link.getCard().getId()).containsExactly(2L, 1L);
+        assertThat(response.getTrainingCards()).extracting(TrainingLogLinkedTrainingCardResponse::getId)
+                .containsExactly(2L, 1L);
+    }
+
+    @Test
+    @DisplayName("create rejects linked cards when feature is disabled")
+    void create_whenTrainingCardFeatureDisabled_throwsValidationError() {
+        trainingLogService = new TrainingLogService(
+                new TrainingCardFeatureProperties(false),
+                trainingLogEntryRepository,
+                trainingLogEntryCardRepository,
+                trainingCardRepository,
+                trainingLogLikeRepository,
+                trainingLogCommentRepository,
+                trainingLogCommentReportRepository,
+                userBlockRepository,
+                userRepository,
+                Clock.fixed(Instant.parse("2026-05-17T03:00:00Z"), SEOUL_ZONE)
+        );
+        User user = createUser(10L);
+        TrainingLogEntryCreateRequest request = new TrainingLogEntryCreateRequest();
+        ReflectionTestUtils.setField(request, "category", TrainingLogCategory.TECHNIQUE);
+        ReflectionTestUtils.setField(request, "title", "Linked cards");
+        ReflectionTestUtils.setField(request, "content", "Cards for today's training");
+        ReflectionTestUtils.setField(request, "trainingCardIds", List.of(1L));
+        given(userRepository.findByIdAndIsWithdrawnFalse(10L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> trainingLogService.create(10L, LocalDate.of(2026, 5, 17), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("훈련카드 기능이 비활성화되어 연결할 수 없습니다");
     }
 
     @Test
@@ -396,6 +475,29 @@ class TrainingLogServiceTest {
     }
 
     @Test
+    @DisplayName("update can replace linked training cards")
+    void update_replacesLinkedTrainingCards() {
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        TrainingCard firstCard = trainingCard(1L, "Knee Cut Pass");
+        TrainingCard secondCard = trainingCard(2L, "Scissor Sweep");
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+        given(trainingCardRepository.findAllByIdInAndActiveTrue(List.of(2L, 1L))).willReturn(List.of(firstCard, secondCard));
+
+        TrainingLogEntryUpdateRequest request = new TrainingLogEntryUpdateRequest();
+        request.setTrainingCardIds(List.of(2L, 1L));
+
+        TrainingLogEntryResponse response = trainingLogService.update(10L, 1L, request);
+
+        verify(trainingLogEntryCardRepository).deleteAllByEntry_Id(1L);
+        ArgumentCaptor<List<TrainingLogEntryCard>> captor = ArgumentCaptor.forClass(List.class);
+        verify(trainingLogEntryCardRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(link -> link.getCard().getId()).containsExactly(2L, 1L);
+        assertThat(response.getTrainingCards()).extracting(TrainingLogLinkedTrainingCardResponse::getId)
+                .containsExactly(2L, 1L);
+    }
+
+    @Test
     @DisplayName("update clears promotion fields when category changes away from promotion")
     void update_clearsPromotionFieldsForNonPromotionCategory() {
         User user = createUser(10L);
@@ -588,6 +690,8 @@ class TrainingLogServiceTest {
         given(trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(List.of(1L)))
                 .willReturn(List.of(visibleComment));
         given(userBlockRepository.findBlockedRelationUserIds(10L, List.of(20L))).willReturn(List.of());
+        given(trainingLogEntryCardRepository.findAllByEntryIdsWithCard(List.of(1L)))
+                .willReturn(List.of(entryCard(100L, entry, trainingCard(1L, "Knee Cut Pass"))));
 
         TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
 
@@ -600,6 +704,8 @@ class TrainingLogServiceTest {
         assertThat(response.getCommentCount()).isEqualTo(1L);
         assertThat(response.getLikedByMe()).isFalse();
         assertThat(response.getCommentableByMe()).isTrue();
+        assertThat(response.getTrainingCards()).extracting(TrainingLogLinkedTrainingCardResponse::getTitle)
+                .containsExactly("Knee Cut Pass");
     }
 
     @Test
@@ -618,6 +724,34 @@ class TrainingLogServiceTest {
         assertThat(response.getCommentableByMe()).isFalse();
         verify(trainingLogLikeRepository, never()).countByEntryIds(any());
         verify(trainingLogCommentRepository, never()).findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(any());
+    }
+
+    @Test
+    @DisplayName("detail hides linked training cards when feature is disabled")
+    void findEntryDetail_whenTrainingCardFeatureDisabled_returnsEmptyTrainingCards() {
+        trainingLogService = new TrainingLogService(
+                new TrainingCardFeatureProperties(false),
+                trainingLogEntryRepository,
+                trainingLogEntryCardRepository,
+                trainingCardRepository,
+                trainingLogLikeRepository,
+                trainingLogCommentRepository,
+                trainingLogCommentReportRepository,
+                userBlockRepository,
+                userRepository,
+                Clock.fixed(Instant.parse("2026-05-17T03:00:00Z"), SEOUL_ZONE)
+        );
+        User user = createUser(10L);
+        TrainingLogEntry entry = createEntry(1L, user, LocalDate.of(2026, 5, 17));
+        given(trainingLogEntryRepository.findById(1L)).willReturn(Optional.of(entry));
+        given(trainingLogLikeRepository.countByEntryIds(List.of(1L))).willReturn(List.of());
+        given(trainingLogCommentRepository.findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(List.of(1L)))
+                .willReturn(List.of());
+
+        TrainingLogEntryResponse response = trainingLogService.findEntryDetail(10L, 1L);
+
+        assertThat(response.getTrainingCards()).isEmpty();
+        verify(trainingLogEntryCardRepository, never()).findAllByEntryIdsWithCard(any());
     }
 
     @Test
@@ -662,6 +796,7 @@ class TrainingLogServiceTest {
 
         trainingLogService.delete(10L, 1L);
 
+        verify(trainingLogEntryCardRepository).deleteAllByEntry_Id(1L);
         verify(trainingLogLikeRepository).deleteAllByEntry_Id(1L);
         verify(trainingLogCommentReportRepository).deleteAllByComment_Entry_Id(1L);
         verify(trainingLogCommentRepository).deleteAllByEntry_Id(1L);
@@ -746,5 +881,36 @@ class TrainingLogServiceTest {
         ReflectionTestUtils.setField(entry, "createdAt", LocalDateTime.of(2026, 5, 17, 9, 0));
         ReflectionTestUtils.setField(entry, "updatedAt", LocalDateTime.of(2026, 5, 17, 9, 0));
         return entry;
+    }
+
+    private TrainingCard trainingCard(Long id, String title) {
+        TrainingCard card = TrainingCard.builder()
+                .title(title)
+                .summary(title + " summary")
+                .topic("PASS")
+                .level(TrainingCardLevel.BEGINNER)
+                .position(TrainingCardPosition.GUARD)
+                .situationSummary(title + " situation")
+                .description(title + " description")
+                .situationDescription(title + " situation description")
+                .startingPositionDescription(title + " start")
+                .flowDescription(title + " flow")
+                .keyPoints(title + " points")
+                .commonMistakes(title + " mistakes")
+                .cautions(title + " cautions")
+                .active(true)
+                .displayOrder(0)
+                .build();
+        ReflectionTestUtils.setField(card, "id", id);
+        return card;
+    }
+
+    private TrainingLogEntryCard entryCard(Long id, TrainingLogEntry entry, TrainingCard card) {
+        TrainingLogEntryCard entryCard = TrainingLogEntryCard.builder()
+                .entry(entry)
+                .card(card)
+                .build();
+        ReflectionTestUtils.setField(entryCard, "id", id);
+        return entryCard;
     }
 }

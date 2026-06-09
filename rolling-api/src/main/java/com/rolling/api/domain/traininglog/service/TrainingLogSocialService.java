@@ -4,6 +4,7 @@ import com.rolling.api.domain.notification.model.PushNotificationType;
 import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
 import com.rolling.api.domain.report.entity.ReportReason;
 import com.rolling.api.domain.report.entity.ReportStatus;
+import com.rolling.api.domain.traininglog.config.TrainingCardFeatureProperties;
 import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
 import com.rolling.api.domain.traininglog.dto.FriendResponse;
 import com.rolling.api.domain.traininglog.dto.FriendSearchResultResponse;
@@ -17,6 +18,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailRespon
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogLinkedTrainingCardResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
@@ -27,6 +29,7 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCommentReport;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogEntryCard;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLike;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.UserTrainingLogShareSetting;
@@ -37,6 +40,7 @@ import com.rolling.api.domain.traininglog.repository.FriendshipRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogEntryCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.traininglog.repository.UserTrainingLogShareSettingRepository;
@@ -84,11 +88,13 @@ public class TrainingLogSocialService {
             .and(Sort.by("createdAt").descending())
             .and(Sort.by("id").descending());
 
+    private final TrainingCardFeatureProperties trainingCardFeatureProperties;
     private final UserRepository userRepository;
     private final UserBlockRepository userBlockRepository;
     private final FriendshipRepository friendshipRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final TrainingLogEntryRepository trainingLogEntryRepository;
+    private final TrainingLogEntryCardRepository trainingLogEntryCardRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
     private final TrainingLogCommentReportRepository trainingLogCommentReportRepository;
@@ -331,7 +337,7 @@ public class TrainingLogSocialService {
         requireActiveUser(userId);
         TrainingLogEntry entry = loadAccessibleEntry(userId, entryId);
         if (!isReactionVisible(entry)) {
-            return toFriendDetailResponse(entry, 0L, 0L, false, false);
+            return toFriendDetailResponse(entry, 0L, 0L, false, false, loadLinkedCards(entry.getId()));
         }
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
         Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId, false);
@@ -342,7 +348,8 @@ public class TrainingLogSocialService {
                 likeCounts.getOrDefault(entry.getId(), 0L),
                 commentCounts.getOrDefault(entry.getId(), 0L),
                 likedByMe,
-                true
+                true,
+                loadLinkedCards(entry.getId())
         );
     }
 
@@ -532,7 +539,8 @@ public class TrainingLogSocialService {
             long likeCount,
             long commentCount,
             boolean likedByMe,
-            boolean commentableByMe
+            boolean commentableByMe,
+            List<TrainingLogLinkedTrainingCardResponse> trainingCards
     ) {
         List<String> imageUrls = readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl());
         return TrainingLogFriendEntryDetailResponse.builder()
@@ -553,6 +561,7 @@ public class TrainingLogSocialService {
                 .hashtags(TrainingLogJsonCodec.readStringList(entry.getHashtagsJson()))
                 .imageUrl(entry.getImageUrl())
                 .imageUrls(imageUrls)
+                .trainingCards(trainingCards)
                 .externalLinks(TrainingLogJsonCodec.readExternalLinks(entry.getExternalLinksJson()))
                 .beltColor(entry.getBeltColor())
                 .stripeCount(entry.getStripeCount())
@@ -890,6 +899,16 @@ public class TrainingLogSocialService {
             return Set.of();
         }
         return new HashSet<>(userBlockRepository.findBlockedRelationUserIds(viewerUserId, candidateIds));
+    }
+
+    private List<TrainingLogLinkedTrainingCardResponse> loadLinkedCards(Long entryId) {
+        if (!trainingCardFeatureProperties.enabled()) {
+            return List.of();
+        }
+        return trainingLogEntryCardRepository.findAllByEntryIdsWithCard(List.of(entryId)).stream()
+                .map(TrainingLogEntryCard::getCard)
+                .map(TrainingLogLinkedTrainingCardResponse::from)
+                .toList();
     }
 
     private boolean isCommentVisible(TrainingLogComment comment, Set<Long> blockedRelationUserIds) {

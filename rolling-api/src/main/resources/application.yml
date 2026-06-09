@@ -130,6 +130,10 @@ firebase:
 push-notification:
   android-channel-id: ${PUSH_NOTIFICATION_ANDROID_CHANNEL_ID:rolling_open_mat_alerts}
 
+feature:
+  training-card:
+    enabled: ${TRAINING_CARD_ENABLED:true}
+
 # 대회 크롤링 스케줄링 주기
 tournament:
   crawler:
