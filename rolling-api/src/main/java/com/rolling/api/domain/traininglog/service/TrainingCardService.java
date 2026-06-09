@@ -46,7 +46,9 @@ public class TrainingCardService {
         requireFeatureEnabled();
         requireActiveUserExists(userId);
         String normalizedQuery = normalizeQuery(query);
-        List<TrainingCard> cards = trainingCardRepository.searchActiveCards(normalizedQuery, level, position);
+        List<TrainingCard> cards = normalizedQuery == null
+                ? trainingCardRepository.findAllActiveCards(level, position)
+                : trainingCardRepository.searchActiveCards(toSearchPattern(normalizedQuery), level, position);
         if (cards.isEmpty()) {
             return List.of();
         }
@@ -151,6 +153,10 @@ public class TrainingCardService {
             return null;
         }
         return query.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String toSearchPattern(String normalizedQuery) {
+        return "%" + normalizedQuery + "%";
     }
 
     private void requireFeatureEnabled() {

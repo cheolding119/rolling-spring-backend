@@ -66,7 +66,7 @@ class TrainingCardServiceTest {
     @DisplayName("findCards normalizes blank query to null and applies filter arguments")
     void findCards_normalizesBlankQuery() {
         given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
-        given(trainingCardRepository.searchActiveCards(null, TrainingCardLevel.BEGINNER, TrainingCardPosition.GUARD))
+        given(trainingCardRepository.findAllActiveCards(TrainingCardLevel.BEGINNER, TrainingCardPosition.GUARD))
                 .willReturn(List.of(trainingCard(
                         1L,
                         "Knee Cut Pass",
@@ -97,7 +97,7 @@ class TrainingCardServiceTest {
     @DisplayName("findCards lowercases and trims search query")
     void findCards_normalizesSearchQuery() {
         given(userRepository.existsByIdAndIsWithdrawnFalse(10L)).willReturn(true);
-        given(trainingCardRepository.searchActiveCards("knee cut", null, null))
+        given(trainingCardRepository.searchActiveCards("%knee cut%", null, null))
                 .willReturn(List.of(trainingCard(
                         1L,
                         "Knee Cut Pass",
