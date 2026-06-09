@@ -81,17 +81,19 @@
 새로 추가된 점:
 
 - query param `region`
+- query param `q`
 - response field `region`
 
 예시:
 
 ```http
-GET /api/v1/tournaments?region=GYEONGGI&page=0&size=20
+GET /api/v1/tournaments?region=GYEONGGI&q=롤링&page=0&size=20
 ```
 
 프론트 사용처:
 
 - 대회 목록 지역 필터
+- 어드민/사용자 대회 검색
 
 ### 3.2 대회 상세 조회
 

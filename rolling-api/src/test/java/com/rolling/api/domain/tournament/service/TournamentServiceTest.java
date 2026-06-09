@@ -102,6 +102,20 @@ class TournamentServiceTest {
     }
 
     @Test
+    @DisplayName("대회 목록 조회 시 keyword 필터를 적용한다")
+    void findAll_filtersByKeyword() {
+        Tournament titleMatch = tournament(1L, 10L, TournamentSource.MANUAL, "롤링컵 서울 오픈", "2026-04-10", "2999-04-01", "https://apply/seoul");
+        Tournament organizerMatch = tournament(2L, 10L, TournamentSource.MANUAL, "다른 대회", "2026-05-10", "2999-05-01", "https://apply/busan");
+        ReflectionTestUtils.setField(organizerMatch, "organizer", "롤링 주짓수");
+        Tournament noMatch = tournament(3L, 10L, TournamentSource.MANUAL, "부산 오픈", "2026-06-10", "2999-06-01", "https://apply/etc");
+        when(tournamentRepository.findAll()).thenReturn(List.of(titleMatch, organizerMatch, noMatch));
+
+        Page<TournamentResponse> page = service().findAll(PageRequest.of(0, 10), null, null, "롤링", null);
+
+        assertThat(page.getContent()).extracting(TournamentResponse::getId).containsExactly(1L, 2L);
+    }
+
+    @Test
     @DisplayName("차단한 사용자가 등록한 대회는 목록에서 제외한다")
     void findAll_excludesBlockedHosts() {
         Tournament blocked = tournament(1L, 10L, TournamentSource.MANUAL, "blocked", "2026-04-10", "2999-04-01", "https://apply/blocked");
