@@ -64,6 +64,9 @@ public class TrainingLogEntryResponse {
     @Schema(description = "대표 이미지 URL", example = "https://cdn.rolling.com/training/logs/images/sample.jpg")
     private String imageUrl;
 
+    @Schema(description = "연결된 훈련카드 목록")
+    private List<TrainingLogLinkedTrainingCardResponse> trainingCards;
+
     @Schema(description = "승급 기록 전용 벨트 색상", example = "BLUE")
     private BeltColor beltColor;
 

@@ -86,4 +86,8 @@ public class TrainingLogEntryCreateRequest {
     @Min(value = 0, message = "stripeCount는 0 이상이어야 합니다")
     @Schema(description = "승급 기록 전용 stripe 수", example = "1")
     private Integer stripeCount;
+
+    @Size(max = 5, message = "훈련카드는 최대 5개까지 연결할 수 있습니다")
+    @Schema(description = "연결할 훈련카드 ID 목록", example = "[1, 2, 3]")
+    private List<Long> trainingCardIds;
 }

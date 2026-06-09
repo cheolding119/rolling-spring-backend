@@ -1,5 +1,6 @@
 package com.rolling.api.domain.traininglog.service;
 
+import com.rolling.api.domain.traininglog.config.TrainingCardFeatureProperties;
 import com.rolling.api.domain.notification.model.PushNotificationType;
 import com.rolling.api.domain.report.dto.ReportStatusUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.FriendRequestResponse;
@@ -9,6 +10,7 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogCommentCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntryDetailResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogLinkedTrainingCardResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendSharingUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogFriendEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.entity.FriendRequest;
@@ -19,7 +21,11 @@ import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCommentReport;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogEntryCard;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLike;
+import com.rolling.api.domain.traininglog.entity.TrainingCard;
+import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
+import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
 import com.rolling.api.domain.traininglog.event.FriendRequestNotificationEvent;
 import com.rolling.api.domain.traininglog.event.TrainingLogCommentNotificationEvent;
@@ -28,6 +34,7 @@ import com.rolling.api.domain.traininglog.repository.FriendshipRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogEntryCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.traininglog.repository.UserTrainingLogShareSettingRepository;
@@ -67,6 +74,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -89,6 +97,9 @@ class TrainingLogSocialServiceTest {
     private TrainingLogEntryRepository trainingLogEntryRepository;
 
     @Mock
+    private TrainingLogEntryCardRepository trainingLogEntryCardRepository;
+
+    @Mock
     private TrainingLogLikeRepository trainingLogLikeRepository;
 
     @Mock
@@ -109,11 +120,13 @@ class TrainingLogSocialServiceTest {
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-05-23T03:00:00Z"), ZoneId.of("Asia/Seoul"));
         trainingLogSocialService = new TrainingLogSocialService(
+                new TrainingCardFeatureProperties(true),
                 userRepository,
                 userBlockRepository,
                 friendshipRepository,
                 friendRequestRepository,
                 trainingLogEntryRepository,
+                trainingLogEntryCardRepository,
                 trainingLogLikeRepository,
                 trainingLogCommentRepository,
                 trainingLogCommentReportRepository,
@@ -121,6 +134,7 @@ class TrainingLogSocialServiceTest {
                 applicationEventPublisher,
                 clock
         );
+        lenient().when(trainingLogEntryCardRepository.findAllByEntryIdsWithCard(any())).thenReturn(List.of());
     }
 
     @Test
@@ -410,6 +424,8 @@ class TrainingLogSocialServiceTest {
         given(userRepository.findByIdAndIsWithdrawnFalseAndWithdrawalPendingFalseAndAccountStatus(20L, AccountStatus.ACTIVE))
                 .willReturn(Optional.of(owner));
         given(userTrainingLogShareSettingRepository.existsByUser_IdAndShareWithFriendsTrue(20L)).willReturn(true);
+        given(trainingLogEntryCardRepository.findAllByEntryIdsWithCard(List.of(40L)))
+                .willReturn(List.of(entryCard(70L, entry, trainingCard(1L, "Knee Cut Pass"))));
 
         TrainingLogFriendEntryDetailResponse response = trainingLogSocialService.findFriendEntryDetail(10L, 40L);
 
@@ -417,6 +433,8 @@ class TrainingLogSocialServiceTest {
         assertThat(response.getCommentCount()).isZero();
         assertThat(response.isLikedByMe()).isFalse();
         assertThat(response.isCommentableByMe()).isFalse();
+        assertThat(response.getTrainingCards()).extracting(TrainingLogLinkedTrainingCardResponse::getTitle)
+                .containsExactly("Knee Cut Pass");
         verify(trainingLogLikeRepository, never()).countByEntryIds(any());
         verify(trainingLogCommentRepository, never()).findAllByEntry_IdInOrderByEntry_IdAscCreatedAtAscIdAsc(any());
     }
@@ -1021,5 +1039,36 @@ class TrainingLogSocialServiceTest {
                 return count;
             }
         };
+    }
+
+    private TrainingCard trainingCard(Long id, String title) {
+        TrainingCard card = TrainingCard.builder()
+                .title(title)
+                .summary(title + " summary")
+                .topic("PASS")
+                .level(TrainingCardLevel.BEGINNER)
+                .position(TrainingCardPosition.GUARD)
+                .situationSummary(title + " situation")
+                .description(title + " description")
+                .situationDescription(title + " situation description")
+                .startingPositionDescription(title + " start")
+                .flowDescription(title + " flow")
+                .keyPoints(title + " points")
+                .commonMistakes(title + " mistakes")
+                .cautions(title + " cautions")
+                .active(true)
+                .displayOrder(0)
+                .build();
+        ReflectionTestUtils.setField(card, "id", id);
+        return card;
+    }
+
+    private TrainingLogEntryCard entryCard(Long id, TrainingLogEntry entry, TrainingCard card) {
+        TrainingLogEntryCard entryCard = TrainingLogEntryCard.builder()
+                .entry(entry)
+                .card(card)
+                .build();
+        ReflectionTestUtils.setField(entryCard, "id", id);
+        return entryCard;
     }
 }

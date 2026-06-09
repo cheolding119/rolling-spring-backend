@@ -13,8 +13,11 @@ import com.rolling.api.domain.traininglog.dto.TrainingLogImageUploadUrlResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogInsightPeriod;
 import com.rolling.api.domain.traininglog.dto.TrainingLogInsightResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogInsightSummary;
+import com.rolling.api.domain.traininglog.dto.TrainingLogLinkedTrainingCardResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
+import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
+import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
@@ -116,6 +119,7 @@ class TrainingLogControllerTest {
                                   "gymAttendance": true,
                                   "condition": 3,
                                   "trainingMinutes": 90,
+                                  "trainingCardIds": [1, 2],
                                   "checklist": [
                                     {
                                       "text": "Triangle Review",
@@ -151,6 +155,7 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
                 .andExpect(jsonPath("$.data.imageUrls[1]").value("https://cdn.test.com/training-log-2.jpg"))
+                .andExpect(jsonPath("$.data.trainingCards[0].id").value(1))
                 .andExpect(jsonPath("$.data.externalLinks[0].type").value("INSTAGRAM"))
                 .andExpect(jsonPath("$.data.externalLinks[0].url").value("https://www.instagram.com/p/triangle"))
                 .andExpect(jsonPath("$.data.checklist[0].text").value("Triangle Review"))
@@ -327,7 +332,8 @@ class TrainingLogControllerTest {
                 .andExpect(jsonPath("$.data.likedByMe").value(false))
                 .andExpect(jsonPath("$.data.commentableByMe").value(true))
                 .andExpect(jsonPath("$.data.checklist[0].favorite").value(true))
-                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"));
+                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://cdn.test.com/training-log-1.jpg"))
+                .andExpect(jsonPath("$.data.trainingCards[0].id").value(1));
     }
 
     @Test
@@ -468,7 +474,8 @@ class TrainingLogControllerTest {
                         "https://cdn.test.com/training-log-1.jpg",
                         "https://cdn.test.com/training-log-2.jpg"
                 ))
-                        .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
+                .trainingCards(List.of(linkedTrainingCard()))
+                .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
                         .imageUrl("https://cdn.test.com/training-log-1.jpg")
                         .build();
     }
@@ -492,6 +499,7 @@ class TrainingLogControllerTest {
                         "https://cdn.test.com/training-log-1.jpg",
                         "https://cdn.test.com/training-log-2.jpg"
                 ))
+                .trainingCards(List.of(linkedTrainingCard()))
                 .externalLinks(List.of(new TrainingLogExternalLink(TrainingLogLinkType.INSTAGRAM, "https://www.instagram.com/p/triangle")))
                 .imageUrl("https://cdn.test.com/training-log-1.jpg")
                 .likeCount(3L)
@@ -568,6 +576,18 @@ class TrainingLogControllerTest {
                         90
                 )))
                 .topHashtags(List.of(new TrainingLogHashtagInsight("guard-pass", 2)))
+                .build();
+    }
+
+    private TrainingLogLinkedTrainingCardResponse linkedTrainingCard() {
+        return TrainingLogLinkedTrainingCardResponse.builder()
+                .id(1L)
+                .title("Knee Cut Pass")
+                .summary("pass summary")
+                .topic("PASS")
+                .level(TrainingCardLevel.BEGINNER)
+                .position(TrainingCardPosition.GUARD)
+                .situationSummary("guard passing situation")
                 .build();
     }
 

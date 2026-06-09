@@ -1,6 +1,7 @@
 # Training Log
 
 - 개인 훈련 기록 도메인과 API 스펙을 관리한다.
+- 훈련카드 조회/상호작용 계약은 [training-card.md](training-card.md)에서 별도 관리한다.
 - 공통 응답, 인증, 날짜/시간 포맷은 [shared/common-models.md](shared/common-models.md)를 따른다.
 - 현재 구현 범위는 `training-log-product-plan.md` 기준 Phase 1~10, 훈련 강도/체육관 출석/컨디션 확장, 365일 출석 잔디와 주간/월간 인사이트 조회다.
 - 친구 공개 범위, 친구 열람, 좋아요, 댓글 확장 계약은 [training-log-social.md](training-log-social.md)에서 별도 관리한다.
@@ -25,6 +26,7 @@
 - 이미지 업로드용 presigned URL 발급
 - 365일 출석 잔디 조회
 - 주간/월간 훈련 인사이트 조회
+- 훈련카드 연결 저장/조회
 - `PROMOTION` 카테고리 전용 검증 및 최신 벨트 동기화
 
 ## 2. 도메인 모델
@@ -44,6 +46,7 @@
 | `externalLinksJson` | `String?` | 외부 링크 JSON |
 | `imageUrl` | `String?` | 대표 이미지 URL |
 | `imageUrlsJson` | `String?` | 이미지 목록 JSON |
+| `trainingCards` | `List<TrainingLogLinkedTrainingCardResponse>` | 연결된 훈련카드 읽기 모델 |
 | `color` | `TrainingLogColor?` | 기록 색상 |
 | `visibility` | `TrainingLogVisibility` | 기록 공개 범위 |
 | `trainingIntensity` | `Integer?` | 훈련 강도(1~5) |
@@ -60,6 +63,7 @@
 - DB에는 `checklist_json`, `hashtags_json`, `external_links_json` 문자열 컬럼으로 저장한다.
 - `checklist_json`의 각 항목은 `text`, `checked`, `favorite`, `emoji` 필드를 가진다.
 - `imageUrl`, `imageUrls`, `color`, `visibility`, `trainingIntensity`, `gymAttendance`, `condition`, `trainingMinutes`, `beltColor`, `stripeCount`는 response DTO에 노출된다.
+- `trainingCards`는 상세/최근 응답에서만 노출하고 날짜별 요약 응답에는 포함하지 않는다.
 - 최신 `PROMOTION` 기록이 있으면 그 값으로 `User.beltColor`를 동기화한다.
 - `PROMOTION.stripeCount`는 기록 자체에만 저장하며, 사용자 프로필 `stripeCount`와는 동기화하지 않는다.
 - `beltColor` raw value는 [shared/common-models.md](shared/common-models.md)의 공용 사용자 벨트 규칙을 따른다.
@@ -241,7 +245,15 @@
 - `PROMOTION`이 아닌 카테고리에서 `beltColor`, `stripeCount`를 보내면 `VALIDATION_ERROR`를 반환한다.
 - `PROMOTION` 기록의 생성/수정/삭제 시 최신 `PROMOTION` 기록을 기준으로 `User.beltColor`를 동기화한다.
 
-### 4.8 이미지 업로드
+### 4.8 훈련카드 연결
+
+- `trainingCardIds`는 생성/수정 request에서 최대 5개까지 허용한다.
+- 중복 ID는 제거하되 최초 입력 순서는 유지한다.
+- 존재하지 않거나 비활성 카드 ID는 허용하지 않는다.
+- 기능 비활성화 상태에서는 새 카드 연결 쓰기를 허용하지 않는다.
+- 기능 비활성화 상태에서는 상세 응답의 `trainingCards`를 빈 배열로 축소한다.
+
+### 4.9 이미지 업로드
 
 - 업로드 API는 presigned PUT URL을 발급한다.
 - 허용 파일 형식은 `jpg`, `jpeg`, `png`와 대응 content type(`image/jpeg`, `image/jpg`, `image/png`)이다.
@@ -297,6 +309,7 @@ Request body:
 | `trainingMinutes` | `Integer?` | - | 훈련 시간(분) |
 | `beltColor` | `BeltColor?` | `PROMOTION`일 때 필수 | 승급 기록 전용 |
 | `stripeCount` | `Integer?` | - | 승급 기록 전용 |
+| `trainingCardIds` | `List<Long>?` | - | 연결할 훈련카드 ID 목록. 최대 5개 |
 
 ### 5.4 훈련 기록 수정
 
@@ -325,6 +338,7 @@ Request body:
 | `trainingMinutes` | `Integer?` | `null`이면 비움 |
 | `beltColor` | `BeltColor?` | `PROMOTION` 전용, `null`이면 비움 |
 | `stripeCount` | `Integer?` | `PROMOTION` 전용, `null`이면 비움 |
+| `trainingCardIds` | `List<Long>?` | `[]` 또는 `null`이면 비움 |
 
 구현 메모:
 
@@ -403,6 +417,7 @@ Request body:
 - `color`, `visibility`는 기록 메타데이터다.
 - `trainingIntensity`, `gymAttendance`, `condition`은 훈련 상태 메타데이터로 함께 반환된다.
 - `imageUrls`와 대표 `imageUrl`, `beltColor`, `stripeCount`, `trainingMinutes`가 함께 반환된다.
+- `trainingCards`는 연결된 카드의 읽기용 요약 목록이다.
 - 본인 상세 조회에서는 `likeCount`, `commentCount`, `likedByMe`, `commentableByMe`를 함께 반환한다.
 - 생성/수정/최근 목록 응답에서는 소셜 메타 필드가 생략될 수 있다.
 

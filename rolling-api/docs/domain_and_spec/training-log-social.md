@@ -115,6 +115,7 @@ Training Log Social은 개인 훈련일지를 `친구 관계 안에서만` 제�
 - 현재 구현은 `TrainingLogEntryResponse`의 핵심 필드에 아래 additive field를 합친 DTO를 사용한다.
   - `authorUserId`
   - `authorNickname`
+  - `trainingCards`
   - `likeCount`
   - `commentCount`
   - `likedByMe`

@@ -1,24 +1,30 @@
 package com.rolling.api.domain.traininglog.service;
 
+import com.rolling.api.domain.traininglog.config.TrainingCardFeatureProperties;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLink;
 import com.rolling.api.domain.traininglog.dto.TrainingLogExternalLinkRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItem;
 import com.rolling.api.domain.traininglog.dto.TrainingLogChecklistItemRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryCreateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingLogLinkedTrainingCardResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntrySummaryResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingLogEntryUpdateRequest;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarDailySummary;
 import com.rolling.api.domain.traininglog.dto.TrainingLogMonthlyCalendarResponse;
+import com.rolling.api.domain.traininglog.entity.TrainingCard;
 import com.rolling.api.domain.traininglog.entity.TrainingLogCategory;
 import com.rolling.api.domain.traininglog.entity.TrainingLogColor;
 import com.rolling.api.domain.traininglog.entity.TrainingLogComment;
 import com.rolling.api.domain.traininglog.entity.TrainingLogEntry;
+import com.rolling.api.domain.traininglog.entity.TrainingLogEntryCard;
 import com.rolling.api.domain.traininglog.entity.TrainingLogLinkType;
 import com.rolling.api.domain.traininglog.entity.TrainingLogVisibility;
+import com.rolling.api.domain.traininglog.repository.TrainingCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCommentReportRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
+import com.rolling.api.domain.traininglog.repository.TrainingLogEntryCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogEntryRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogLikeRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
@@ -51,6 +57,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TrainingLogService {
 
+    private static final int MAX_LINKED_TRAINING_CARDS = 5;
     private static final int MAX_CHECKLIST_ITEMS = 20;
     private static final int MAX_HASHTAGS = 10;
     private static final int MAX_EXTERNAL_LINKS = 3;
@@ -63,7 +70,10 @@ public class TrainingLogService {
             TrainingLogLinkType.YOUTUBE, Set.of("youtube.com", "youtu.be")
     );
 
+    private final TrainingCardFeatureProperties trainingCardFeatureProperties;
     private final TrainingLogEntryRepository trainingLogEntryRepository;
+    private final TrainingLogEntryCardRepository trainingLogEntryCardRepository;
+    private final TrainingCardRepository trainingCardRepository;
     private final TrainingLogLikeRepository trainingLogLikeRepository;
     private final TrainingLogCommentRepository trainingLogCommentRepository;
     private final TrainingLogCommentReportRepository trainingLogCommentReportRepository;
@@ -123,25 +133,32 @@ public class TrainingLogService {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
         if (!isReactionVisible(entry)) {
-            return toDetailResponse(entry, 0L, 0L, false);
+            return toDetailResponse(entry, 0L, 0L, false, loadLinkedCards(entry.getId()));
         }
         Map<Long, Long> likeCounts = toCountMap(trainingLogLikeRepository.countByEntryIds(List.of(entry.getId())));
         Map<Long, Long> commentCounts = resolveVisibleCommentCountMap(List.of(entry.getId()), userId);
+        List<TrainingLogLinkedTrainingCardResponse> trainingCards = loadLinkedCards(entry.getId());
         return toDetailResponse(
                 entry,
                 likeCounts.getOrDefault(entry.getId(), 0L),
                 commentCounts.getOrDefault(entry.getId(), 0L),
-                true
+                true,
+                trainingCards
         );
     }
 
     @Transactional(readOnly = true)
     public List<TrainingLogEntryResponse> findRecentEntries(Long userId) {
         requireActiveUserExists(userId);
-        return trainingLogEntryRepository
+        List<TrainingLogEntry> entries = trainingLogEntryRepository
                 .findAllByUser_IdOrderByTrainingDateDescCreatedAtDesc(userId, PageRequest.of(0, RECENT_LIMIT))
                 .stream()
-                .map(this::toResponse)
+                .toList();
+        Map<Long, List<TrainingLogLinkedTrainingCardResponse>> linkedCardsByEntryId = loadLinkedCardsByEntryIds(
+                entries.stream().map(TrainingLogEntry::getId).toList()
+        );
+        return entries.stream()
+                .map(entry -> toResponse(entry, linkedCardsByEntryId.getOrDefault(entry.getId(), List.of())))
                 .toList();
     }
 
@@ -159,6 +176,7 @@ public class TrainingLogService {
         Integer condition = validateCondition(request.getCondition());
         Integer trainingMinutes = request.getTrainingMinutes();
         TrainingLogVisibility visibility = normalizeVisibility(request.getVisibility());
+        List<TrainingCard> trainingCards = resolveTrainingCards(request.getTrainingCardIds());
         validateCategoryFields(category, request.getBeltColor(), request.getStripeCount());
 
         TrainingLogEntry saved = trainingLogEntryRepository.save(
@@ -187,7 +205,8 @@ public class TrainingLogService {
         if (category == TrainingLogCategory.PROMOTION) {
             syncUserBeltColor(userId);
         }
-        return toResponse(saved);
+        syncTrainingCards(saved, trainingCards);
+        return toResponse(saved, toLinkedCardResponses(trainingCards));
     }
 
     @Transactional
@@ -230,6 +249,9 @@ public class TrainingLogService {
         Integer trainingMinutes = request.hasTrainingMinutesField()
                 ? request.getTrainingMinutes()
                 : entry.getTrainingMinutes();
+        List<TrainingCard> trainingCards = request.hasTrainingCardIdsField()
+                ? resolveTrainingCards(request.getTrainingCardIds())
+                : loadTrainingCards(entry.getId());
         BeltColor beltColor = resolveBeltColor(entry, request, category);
         Integer stripeCount = resolveStripeCount(entry, request, category);
         validateCategoryFields(category, beltColor, stripeCount);
@@ -256,13 +278,17 @@ public class TrainingLogService {
         if (previousCategory == TrainingLogCategory.PROMOTION || category == TrainingLogCategory.PROMOTION) {
             syncUserBeltColor(userId);
         }
-        return toResponse(entry);
+        if (request.hasTrainingCardIdsField()) {
+            syncTrainingCards(entry, trainingCards);
+        }
+        return toResponse(entry, toLinkedCardResponses(trainingCards));
     }
 
     @Transactional
     public void delete(Long userId, Long entryId) {
         TrainingLogEntry entry = getEntry(entryId);
         validateOwner(entry, userId);
+        trainingLogEntryCardRepository.deleteAllByEntry_Id(entryId);
         trainingLogLikeRepository.deleteAllByEntry_Id(entryId);
         trainingLogCommentReportRepository.deleteAllByComment_Entry_Id(entryId);
         trainingLogCommentRepository.deleteAllByEntry_Id(entryId);
@@ -294,17 +320,18 @@ public class TrainingLogService {
         return List.copyOf(matched);
     }
 
-    private TrainingLogEntryResponse toResponse(TrainingLogEntry entry) {
-        return baseResponseBuilder(entry).build();
+    private TrainingLogEntryResponse toResponse(TrainingLogEntry entry, List<TrainingLogLinkedTrainingCardResponse> trainingCards) {
+        return baseResponseBuilder(entry, trainingCards).build();
     }
 
     private TrainingLogEntryResponse toDetailResponse(
             TrainingLogEntry entry,
             long likeCount,
             long commentCount,
-            boolean commentableByMe
+            boolean commentableByMe,
+            List<TrainingLogLinkedTrainingCardResponse> trainingCards
     ) {
-        return baseResponseBuilder(entry)
+        return baseResponseBuilder(entry, trainingCards)
                 .likeCount(likeCount)
                 .commentCount(commentCount)
                 .likedByMe(false)
@@ -312,7 +339,10 @@ public class TrainingLogService {
                 .build();
     }
 
-    private TrainingLogEntryResponse.TrainingLogEntryResponseBuilder baseResponseBuilder(TrainingLogEntry entry) {
+    private TrainingLogEntryResponse.TrainingLogEntryResponseBuilder baseResponseBuilder(
+            TrainingLogEntry entry,
+            List<TrainingLogLinkedTrainingCardResponse> trainingCards
+    ) {
         return TrainingLogEntryResponse.builder()
                 .id(entry.getId())
                 .trainingDate(entry.getTrainingDate())
@@ -329,6 +359,7 @@ public class TrainingLogService {
                 .externalLinks(TrainingLogJsonCodec.readExternalLinks(entry.getExternalLinksJson()))
                 .imageUrls(readImageUrls(entry.getImageUrlsJson(), entry.getImageUrl()))
                 .imageUrl(entry.getImageUrl())
+                .trainingCards(trainingCards)
                 .trainingMinutes(entry.getTrainingMinutes())
                 .beltColor(entry.getBeltColor())
                 .stripeCount(entry.getStripeCount());
@@ -748,7 +779,92 @@ public class TrainingLogService {
                 .collect(Collectors.toMap(TrainingLogCountProjection::getEntryId, TrainingLogCountProjection::getCount));
     }
 
-    private int safeToInt(Long value) {
-        return value == null ? 0 : Math.toIntExact(value);
+    private List<TrainingCard> resolveTrainingCards(List<Long> trainingCardIds) {
+        List<Long> normalizedIds = normalizeTrainingCardIds(trainingCardIds);
+        if (normalizedIds.isEmpty()) {
+            return List.of();
+        }
+        if (!trainingCardFeatureProperties.enabled()) {
+            throw BusinessException.badRequest("훈련카드 기능이 비활성화되어 연결할 수 없습니다");
+        }
+
+        Map<Long, TrainingCard> cardById = trainingCardRepository.findAllByIdInAndActiveTrue(normalizedIds).stream()
+                .collect(Collectors.toMap(TrainingCard::getId, card -> card));
+        if (cardById.size() != normalizedIds.size()) {
+            throw BusinessException.notFound("연결할 훈련카드를 찾을 수 없습니다");
+        }
+
+        return normalizedIds.stream()
+                .map(cardById::get)
+                .toList();
+    }
+
+    private List<Long> normalizeTrainingCardIds(List<Long> trainingCardIds) {
+        if (trainingCardIds == null) {
+            return List.of();
+        }
+        if (trainingCardIds.size() > MAX_LINKED_TRAINING_CARDS) {
+            throw BusinessException.badRequest("훈련카드는 최대 5개까지 연결할 수 있습니다");
+        }
+
+        LinkedHashSet<Long> normalized = new LinkedHashSet<>();
+        for (Long trainingCardId : trainingCardIds) {
+            if (trainingCardId == null || trainingCardId <= 0) {
+                throw BusinessException.badRequest("훈련카드 ID는 1 이상이어야 합니다");
+            }
+            normalized.add(trainingCardId);
+        }
+
+        if (normalized.size() > MAX_LINKED_TRAINING_CARDS) {
+            throw BusinessException.badRequest("훈련카드는 최대 5개까지 연결할 수 있습니다");
+        }
+        return List.copyOf(normalized);
+    }
+
+    private void syncTrainingCards(TrainingLogEntry entry, List<TrainingCard> trainingCards) {
+        trainingLogEntryCardRepository.deleteAllByEntry_Id(entry.getId());
+        if (trainingCards.isEmpty()) {
+            return;
+        }
+
+        trainingLogEntryCardRepository.saveAll(trainingCards.stream()
+                .map(card -> TrainingLogEntryCard.builder()
+                        .entry(entry)
+                        .card(card)
+                        .build())
+                .toList());
+    }
+
+    private List<TrainingCard> loadTrainingCards(Long entryId) {
+        if (!trainingCardFeatureProperties.enabled()) {
+            return List.of();
+        }
+        return trainingLogEntryCardRepository.findAllByEntryIdsWithCard(List.of(entryId)).stream()
+                .map(TrainingLogEntryCard::getCard)
+                .toList();
+    }
+
+    private List<TrainingLogLinkedTrainingCardResponse> loadLinkedCards(Long entryId) {
+        return toLinkedCardResponses(loadTrainingCards(entryId));
+    }
+
+    private Map<Long, List<TrainingLogLinkedTrainingCardResponse>> loadLinkedCardsByEntryIds(List<Long> entryIds) {
+        if (!trainingCardFeatureProperties.enabled() || entryIds == null || entryIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<TrainingLogLinkedTrainingCardResponse>> linkedCardsByEntryId = new LinkedHashMap<>();
+        for (TrainingLogEntryCard entryCard : trainingLogEntryCardRepository.findAllByEntryIdsWithCard(entryIds)) {
+            linkedCardsByEntryId
+                    .computeIfAbsent(entryCard.getEntry().getId(), ignored -> new java.util.ArrayList<>())
+                    .add(TrainingLogLinkedTrainingCardResponse.from(entryCard.getCard()));
+        }
+        return linkedCardsByEntryId;
+    }
+
+    private List<TrainingLogLinkedTrainingCardResponse> toLinkedCardResponses(List<TrainingCard> trainingCards) {
+        return trainingCards.stream()
+                .map(TrainingLogLinkedTrainingCardResponse::from)
+                .toList();
     }
 }
