@@ -250,6 +250,7 @@ Query params:
 
 - `source`
 - `region`
+- `q`
 - pageable
 
 Response data: `Page<TournamentResponse>`
@@ -258,6 +259,7 @@ Response data: `Page<TournamentResponse>`
 
 - `source`는 `STREET_JIU_JITSU`, `KOREA_JIU`, `HEROES_OF_JIU_JITSU`, `SPOTLITE`, `MANUAL` 중 하나다.
 - `region`은 optional이다.
+- `q`는 대회명, 주최사, 장소, 접수 링크를 대상으로 검색한다.
 
 ### 5.2 대회 상세 조회
 

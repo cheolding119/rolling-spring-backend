@@ -58,9 +58,11 @@ public class TournamentController {
             @RequestParam(required = false) TournamentSource source,
             @Parameter(description = "지역 필터 (예: SEOUL, GYEONGGI)")
             @RequestParam(required = false) Region region,
+            @Parameter(description = "검색어 (대회명, 주최사, 장소, 접수 링크)")
+            @RequestParam(required = false, name = "q") String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
         Long userId = principal != null ? principal.getUserId() : null;
-        Page<TournamentResponse> response = tournamentService.findAll(pageable, source, region, userId);
+        Page<TournamentResponse> response = tournamentService.findAll(pageable, source, region, keyword, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

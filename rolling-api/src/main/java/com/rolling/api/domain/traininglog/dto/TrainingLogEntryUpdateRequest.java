@@ -123,6 +123,13 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     private boolean stripeCountFieldPresent;
 
+    @Size(max = 5, message = "훈련카드는 최대 5개까지 연결할 수 있습니다")
+    @Schema(description = "연결할 훈련카드 ID 목록. 빈 배열 또는 null을 보내면 비운다.", example = "[1, 2, 3]", nullable = true)
+    private List<Long> trainingCardIds;
+
+    @JsonIgnore
+    private boolean trainingCardIdsFieldPresent;
+
     @JsonSetter("checklist")
     public void setChecklist(List<TrainingLogChecklistItemRequest> checklist) {
         this.checklist = checklist;
@@ -201,6 +208,12 @@ public class TrainingLogEntryUpdateRequest {
         this.stripeCountFieldPresent = true;
     }
 
+    @JsonSetter("trainingCardIds")
+    public void setTrainingCardIds(List<Long> trainingCardIds) {
+        this.trainingCardIds = trainingCardIds;
+        this.trainingCardIdsFieldPresent = true;
+    }
+
     @JsonIgnore
     public boolean hasChecklistField() {
         return checklistFieldPresent;
@@ -264,5 +277,10 @@ public class TrainingLogEntryUpdateRequest {
     @JsonIgnore
     public boolean hasStripeCountField() {
         return stripeCountFieldPresent;
+    }
+
+    @JsonIgnore
+    public boolean hasTrainingCardIdsField() {
+        return trainingCardIdsFieldPresent;
     }
 }
