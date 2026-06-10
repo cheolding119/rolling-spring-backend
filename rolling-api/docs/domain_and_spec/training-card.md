@@ -144,7 +144,15 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 | Raw value | 설명 |
 | --- | --- |
 | `STANDING` | 스탠딩 |
-| `GUARD` | 가드 |
+| `GUARD` | 가드 공통 분류, 기존 데이터 호환용 legacy 값 |
+| `CLOSED_GUARD` | 클로즈드 가드 |
+| `OPEN_GUARD` | 오픈 가드 |
+| `HALF_GUARD` | 하프 가드 |
+| `SIDE_CONTROL` | 사이드 컨트롤 |
+| `MOUNT` | 마운트 |
+| `BACK` | 백 |
+| `TURTLE` | 터틀 |
+| `LEG_ENTANGLEMENT` | 레그 엔탱글먼트 |
 
 ## 4. API
 
@@ -269,6 +277,7 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - `V37__grant_training_card_interactions_and_entry_links_permissions.sql`
 - `V38__add_training_card_relations.sql`
 - `V39__grant_training_card_relations_permissions.sql`
+- `V40__expand_training_card_position_values.sql`
 
 정리:
 
