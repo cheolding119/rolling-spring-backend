@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @Builder
 public class TrainingCardDetailResponse {
@@ -65,11 +67,15 @@ public class TrainingCardDetailResponse {
     @Schema(description = "현재 로그인 사용자의 즐겨찾기 여부", example = "false")
     private Boolean favoritedByMe;
 
+    @Schema(description = "연관 훈련카드 목록")
+    private List<TrainingCardRelatedItemResponse> relatedCards;
+
     public static TrainingCardDetailResponse from(
             TrainingCard card,
             long likeCount,
             boolean likedByMe,
-            boolean favoritedByMe
+            boolean favoritedByMe,
+            List<TrainingCardRelatedItemResponse> relatedCards
     ) {
         return TrainingCardDetailResponse.builder()
                 .id(card.getId())
@@ -90,6 +96,7 @@ public class TrainingCardDetailResponse {
                 .likeCount(likeCount)
                 .likedByMe(likedByMe)
                 .favoritedByMe(favoritedByMe)
+                .relatedCards(relatedCards)
                 .build();
     }
 }

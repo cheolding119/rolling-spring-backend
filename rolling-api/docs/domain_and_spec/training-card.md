@@ -12,6 +12,7 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - 로그인 사용자의 훈련카드 상세 조회
 - 카드 좋아요 추가/취소
 - 카드 즐겨찾기 추가/취소
+- 카드별 연관 훈련카드 다중 연결 및 상세 내 노출
 - 훈련일지 생성/수정 payload에서 카드 연결
 - 훈련일지 상세, 최근 목록, 친구 상세에서 연결 카드 읽기
 
@@ -95,7 +96,26 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - `(entry_id, card_id)` unique 제약으로 동일 카드 중복 연결을 막는다.
 - 훈련일지 삭제 시 `ON DELETE CASCADE` 및 서비스 삭제로 함께 정리된다.
 
-### 2.5 `TrainingLogLinkedTrainingCardResponse`
+### 2.5 `TrainingCardRelation`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | PK |
+| `cardId` | `Long` | 기준 훈련카드 ID |
+| `relatedCardId` | `Long` | 연관 훈련카드 ID |
+| `displayOrder` | `int` | 상세 내 노출 순서 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+
+구현 메모:
+
+- 저장 테이블은 `training_card_relations`다.
+- 한 카드에 여러 연관 카드를 연결할 수 있다.
+- `(card_id, related_card_id)` unique 제약으로 중복 연결을 막는다.
+- 자기 자신을 연관 카드로 연결하지 못하도록 check 제약을 둔다.
+- 현재 관계는 `card -> related cards` 방향성으로 저장한다. 양방향 노출이 필요하면 운영 데이터 적재 시 반대 방향도 함께 넣는다.
+
+### 2.6 `TrainingLogLinkedTrainingCardResponse`
 
 훈련일지 상세/최근 목록/친구 상세에서 공통으로 사용하는 연결 카드 요약 응답이다.
 
@@ -124,7 +144,15 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 | Raw value | 설명 |
 | --- | --- |
 | `STANDING` | 스탠딩 |
-| `GUARD` | 가드 |
+| `GUARD` | 가드 공통 분류, 기존 데이터 호환용 legacy 값 |
+| `CLOSED_GUARD` | 클로즈드 가드 |
+| `OPEN_GUARD` | 오픈 가드 |
+| `HALF_GUARD` | 하프 가드 |
+| `SIDE_CONTROL` | 사이드 컨트롤 |
+| `MOUNT` | 마운트 |
+| `BACK` | 백 |
+| `TURTLE` | 터틀 |
+| `LEG_ENTANGLEMENT` | 레그 엔탱글먼트 |
 
 ## 4. API
 
@@ -172,6 +200,17 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - `commonMistakes`
 - `cautions`
 - `youtubeUrl`
+- `relatedCards`
+
+`relatedCards` 응답 필드:
+
+- `id`
+- `title`
+- `summary`
+- `topic`
+- `level`
+- `position`
+- `situationSummary`
 
 ### 4.3 훈련카드 좋아요
 
@@ -236,10 +275,13 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - `V35__grant_training_cards_permissions.sql`
 - `V36__add_training_card_interactions_and_entry_links.sql`
 - `V37__grant_training_card_interactions_and_entry_links_permissions.sql`
+- `V38__add_training_card_relations.sql`
+- `V39__grant_training_card_relations_permissions.sql`
+- `V40__expand_training_card_position_values.sql`
 
 정리:
 
-- 신규 테이블: `training_cards`, `training_card_likes`, `training_card_favorites`, `training_log_entry_cards`
+- 신규 테이블: `training_cards`, `training_card_likes`, `training_card_favorites`, `training_log_entry_cards`, `training_card_relations`
 - 기존 `training_log_entries` 테이블 자체 컬럼 변경은 없다.
 - 기존 운영 데이터와 충돌을 피하기 위해 모두 additive migration으로만 추가한다.
 
@@ -251,9 +293,9 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 
 권장 배포 순서:
 
-1. `V34`~`V37` 적용
+1. `V34`~`V39` 적용
 2. 애플리케이션 배포
-3. 카드 초기 데이터 적재
+3. 카드 초기 데이터와 연관 카드 매핑 적재
 4. 운영 smoke test
 5. 사용자 노출
 
@@ -264,12 +306,14 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 - 리스트/상세 응답의 `favoritedByMe`는 현재 로그인 사용자 기준의 개인 상태이며 타인에게 공유되지 않는다.
 - 카드 생성/수정/삭제 관리자 API는 아직 구현하지 않았다. 카드 쓰기 경로를 열 경우 `ADMIN` 전용이 기본 정책이다.
 - 훈련카드의 외부 링크는 현재 읽기 전용 `youtubeUrl` 단일 필드다. 추후 쓰기 API 추가 시 `youtube.com`, `youtu.be`만 허용하는 검증이 필요하다.
+- 연관 카드는 같은 로그인 사용자의 상세 응답에서만 노출되며, 비활성 카드와 자기 자신은 응답에서 제외한다.
 
 ## 8. 성능과 운영 안정성
 
 조회 전략:
 
 - 카드 리스트는 카드 본문 조회 1회 + 좋아요 수 집계 1회 + 사용자 좋아요 상태 1회 + 사용자 즐겨찾기 상태 1회로 처리한다.
+- 카드 상세는 카드 본문 조회 외에 연관 카드 fetch join 1회로 관련 카드 목록을 함께 읽는다.
 - 훈련일지 상세/최근/친구 상세의 연결 카드는 `training_log_entry_cards -> card fetch join`으로 조회한다.
 - 최근 목록은 entry ID 집합 단위로 연결 카드를 한 번에 불러와 N+1을 피한다.
 
@@ -282,7 +326,8 @@ Training Card는 기술 복기용 읽기 콘텐츠 도메인이다. 현재 구�
 
 환경 검증 메모:
 
-- 배포 전 운영 DB에 `V34`~`V37` 적용 여부 확인
+- 배포 전 운영 DB에 `V34`~`V39` 적용 여부 확인
 - 운영 카드 seed 데이터 존재 여부 확인
+- 운영 연관 카드 매핑 데이터 존재 여부 확인
 - `TRAINING_CARD_ENABLED` 기본값과 비상 시 변경 절차 확인
 - 카드 상세 YouTube URL이 허용 도메인 정책에 맞는지 샘플 검증
