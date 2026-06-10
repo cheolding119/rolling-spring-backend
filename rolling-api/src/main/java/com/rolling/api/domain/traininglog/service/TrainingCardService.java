@@ -3,11 +3,13 @@ package com.rolling.api.domain.traininglog.service;
 import com.rolling.api.domain.traininglog.config.TrainingCardFeatureProperties;
 import com.rolling.api.domain.traininglog.dto.TrainingCardDetailResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingCardListItemResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingCardRelatedItemResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingCardFavorite;
 import com.rolling.api.domain.traininglog.entity.TrainingCard;
 import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
 import com.rolling.api.domain.traininglog.entity.TrainingCardLike;
 import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
+import com.rolling.api.domain.traininglog.repository.TrainingCardRelationRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingCardFavoriteRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingCardLikeRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingCardRepository;
@@ -32,6 +34,7 @@ public class TrainingCardService {
 
     private final TrainingCardFeatureProperties trainingCardFeatureProperties;
     private final TrainingCardRepository trainingCardRepository;
+    private final TrainingCardRelationRepository trainingCardRelationRepository;
     private final TrainingCardLikeRepository trainingCardLikeRepository;
     private final TrainingCardFavoriteRepository trainingCardFavoriteRepository;
     private final UserRepository userRepository;
@@ -81,7 +84,11 @@ public class TrainingCardService {
                 .getOrDefault(cardId, 0L);
         boolean likedByMe = trainingCardLikeRepository.existsByCard_IdAndUser_Id(cardId, userId);
         boolean favoritedByMe = trainingCardFavoriteRepository.existsByCard_IdAndUser_Id(cardId, userId);
-        return TrainingCardDetailResponse.from(card, likeCount, likedByMe, favoritedByMe);
+        List<TrainingCardRelatedItemResponse> relatedCards = trainingCardRelationRepository.findActiveRelationsByCardId(cardId)
+                .stream()
+                .map(relation -> TrainingCardRelatedItemResponse.from(relation.getRelatedCard()))
+                .toList();
+        return TrainingCardDetailResponse.from(card, likeCount, likedByMe, favoritedByMe, relatedCards);
     }
 
     @Transactional

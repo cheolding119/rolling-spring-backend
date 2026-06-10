@@ -8,8 +8,10 @@ import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
 import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
 import com.rolling.api.domain.traininglog.entity.TrainingCardFavorite;
 import com.rolling.api.domain.traininglog.entity.TrainingCardLike;
+import com.rolling.api.domain.traininglog.entity.TrainingCardRelation;
 import com.rolling.api.domain.traininglog.repository.TrainingCardFavoriteRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingCardLikeRepository;
+import com.rolling.api.domain.traininglog.repository.TrainingCardRelationRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingCardRepository;
 import com.rolling.api.domain.traininglog.repository.TrainingLogCountProjection;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -47,6 +49,9 @@ class TrainingCardServiceTest {
     private TrainingCardFavoriteRepository trainingCardFavoriteRepository;
 
     @Mock
+    private TrainingCardRelationRepository trainingCardRelationRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     private TrainingCardService trainingCardService;
@@ -56,6 +61,7 @@ class TrainingCardServiceTest {
         trainingCardService = new TrainingCardService(
                 new TrainingCardFeatureProperties(true),
                 trainingCardRepository,
+                trainingCardRelationRepository,
                 trainingCardLikeRepository,
                 trainingCardFavoriteRepository,
                 userRepository
@@ -128,6 +134,18 @@ class TrainingCardServiceTest {
         given(trainingCardLikeRepository.countByCardIds(List.of(1L))).willReturn(List.of(countProjection(1L, 2L)));
         given(trainingCardLikeRepository.existsByCard_IdAndUser_Id(1L, 10L)).willReturn(true);
         given(trainingCardFavoriteRepository.existsByCard_IdAndUser_Id(1L, 10L)).willReturn(true);
+        given(trainingCardRelationRepository.findActiveRelationsByCardId(1L)).willReturn(List.of(
+                relation(
+                        1L,
+                        trainingCard(2L, "Toreando Pass", TrainingCardLevel.INTERMEDIATE, TrainingCardPosition.STANDING),
+                        0
+                ),
+                relation(
+                        1L,
+                        trainingCard(3L, "X Pass", TrainingCardLevel.ADVANCED, TrainingCardPosition.GUARD),
+                        1
+                )
+        ));
 
         TrainingCardDetailResponse response = trainingCardService.findCardDetail(10L, 1L);
 
@@ -137,6 +155,11 @@ class TrainingCardServiceTest {
         assertThat(response.getLikeCount()).isEqualTo(2L);
         assertThat(response.getLikedByMe()).isTrue();
         assertThat(response.getFavoritedByMe()).isTrue();
+        assertThat(response.getRelatedCards()).extracting("id", "title")
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(2L, "Toreando Pass"),
+                        org.assertj.core.groups.Tuple.tuple(3L, "X Pass")
+                );
     }
 
     @Test
@@ -197,6 +220,7 @@ class TrainingCardServiceTest {
         trainingCardService = new TrainingCardService(
                 new TrainingCardFeatureProperties(false),
                 trainingCardRepository,
+                trainingCardRelationRepository,
                 trainingCardLikeRepository,
                 trainingCardFavoriteRepository,
                 userRepository
@@ -244,6 +268,16 @@ class TrainingCardServiceTest {
                 .build();
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private TrainingCardRelation relation(Long id, TrainingCard relatedCard, int displayOrder) {
+        TrainingCardRelation relation = TrainingCardRelation.builder()
+                .card(trainingCard(1L, "Knee Cut Pass", TrainingCardLevel.BEGINNER, TrainingCardPosition.GUARD))
+                .relatedCard(relatedCard)
+                .displayOrder(displayOrder)
+                .build();
+        ReflectionTestUtils.setField(relation, "id", id);
+        return relation;
     }
 
     private TrainingLogCountProjection countProjection(Long cardId, Long count) {
