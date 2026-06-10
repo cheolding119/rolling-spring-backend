@@ -2,6 +2,7 @@ package com.rolling.api.domain.traininglog.controller;
 
 import com.rolling.api.domain.traininglog.dto.TrainingCardDetailResponse;
 import com.rolling.api.domain.traininglog.dto.TrainingCardListItemResponse;
+import com.rolling.api.domain.traininglog.dto.TrainingCardRelatedItemResponse;
 import com.rolling.api.domain.traininglog.entity.TrainingCardLevel;
 import com.rolling.api.domain.traininglog.entity.TrainingCardPosition;
 import com.rolling.api.domain.traininglog.service.TrainingCardService;
@@ -144,6 +145,17 @@ class TrainingCardControllerTest {
                         .likeCount(4L)
                         .likedByMe(true)
                         .favoritedByMe(true)
+                        .relatedCards(List.of(
+                                TrainingCardRelatedItemResponse.builder()
+                                        .id(2L)
+                                        .title("Toreando Pass")
+                                        .summary("양쪽 다리를 밀어내며 각도를 만들어 통과하는 패스")
+                                        .topic("PASS")
+                                        .level(TrainingCardLevel.INTERMEDIATE)
+                                        .position(TrainingCardPosition.STANDING)
+                                        .situationSummary("오픈가드에서 다리 라인을 치우는 상황")
+                                        .build()
+                        ))
                         .build());
 
         mockMvc.perform(get("/api/v1/training-logs/me/cards/1")
@@ -157,7 +169,9 @@ class TrainingCardControllerTest {
                 .andExpect(jsonPath("$.data.youtubeUrl").value("https://www.youtube.com/watch?v=example"))
                 .andExpect(jsonPath("$.data.likeCount").value(4))
                 .andExpect(jsonPath("$.data.likedByMe").value(true))
-                .andExpect(jsonPath("$.data.favoritedByMe").value(true));
+                .andExpect(jsonPath("$.data.favoritedByMe").value(true))
+                .andExpect(jsonPath("$.data.relatedCards[0].id").value(2))
+                .andExpect(jsonPath("$.data.relatedCards[0].title").value("Toreando Pass"));
     }
 
     @Test
