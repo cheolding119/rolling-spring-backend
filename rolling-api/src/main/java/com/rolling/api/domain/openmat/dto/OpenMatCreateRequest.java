@@ -8,10 +8,12 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Schema(description = "오픈매트 생성 요청")
@@ -67,6 +69,10 @@ public class OpenMatCreateRequest {
 
     @Schema(description = "호스트 인스타그램 ID", example = "rolling_bjj")
     private String hostInstagramId;
+
+    @Size(max = 3, message = "imageUrls는 최대 3장까지 허용합니다")
+    @Schema(description = "오픈매트 이미지 목록. 최대 3장까지 허용하며 null 또는 미전달이면 이미지 없음으로 처리한다.", example = "[\"https://cdn.rolling.com/openmats/images/1.jpg\", \"https://cdn.rolling.com/openmats/images/2.jpg\"]", nullable = true)
+    private List<String> imageUrls;
 
     @JsonSetter("latitude")
     public void setLatitude(BigDecimal latitude) {

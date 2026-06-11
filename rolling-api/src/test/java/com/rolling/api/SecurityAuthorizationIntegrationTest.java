@@ -26,9 +26,11 @@ import com.rolling.api.domain.traininglog.controller.TrainingLogAdminController;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminResponse;
 import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
+import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.openmat.service.OpenMatImageUploadService;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.domain.seminar.controller.SeminarController;
 import com.rolling.api.domain.seminar.dto.SeminarResponse;
@@ -107,6 +109,7 @@ class SecurityAuthorizationIntegrationTest {
     private TournamentService tournamentService;
     private TournamentManagerService tournamentManagerService;
     private KakaoGeocodeService kakaoGeocodeService;
+    private OpenMatImageUploadService openMatImageUploadService;
     private UserRepository userRepository;
     private JwtTokenProvider jwtTokenProvider;
 
@@ -131,6 +134,7 @@ class SecurityAuthorizationIntegrationTest {
         tournamentService = context.getBean(TournamentService.class);
         tournamentManagerService = context.getBean(TournamentManagerService.class);
         kakaoGeocodeService = context.getBean(KakaoGeocodeService.class);
+        openMatImageUploadService = context.getBean(OpenMatImageUploadService.class);
         userRepository = context.getBean(UserRepository.class);
         jwtTokenProvider = context.getBean(JwtTokenProvider.class);
 
@@ -349,6 +353,18 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
 
+        mockMvc.perform(post("/api/v1/open-mats/image-upload-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"fileName\": \"openmat.jpg\",
+                                  \"contentType\": \"image/jpeg\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
         mockMvc.perform(post("/api/v1/tournaments/11/report")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -424,6 +440,32 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("인증 사용자는 오픈매트 이미지 업로드 URL 발급 API에 접근할 수 있다")
+    void openMatImageUploadUrl_withUserToken_returnsOk() throws Exception {
+        given(openMatImageUploadService.createUploadUrl(any())).willReturn(
+                OpenMatImageUploadUrlResponse.builder()
+                        .uploadUrl("https://upload.test/presigned")
+                        .imageKey("openmats/images/sample.jpg")
+                        .imageUrl("https://cdn.test.com/openmats/images/sample.jpg")
+                        .expiresAt(LocalDateTime.of(2026, 6, 11, 16, 40))
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/open-mats/image-upload-url")
+                        .header("Authorization", bearerToken(2L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"fileName\": \"openmat.jpg\",
+                                  \"contentType\": \"image/jpeg\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.imageKey").value("openmats/images/sample.jpg"));
     }
 
     @Test
@@ -774,7 +816,7 @@ class SecurityAuthorizationIntegrationTest {
                 .createdAt(LocalDateTime.of(2026, 3, 20, 9, 0))
                 .build();
 
-        given(tournamentService.findAll(any(Pageable.class), isNull(), isNull(), isNull()))
+        given(tournamentService.findAll(any(Pageable.class), isNull(), isNull(), isNull(), isNull()))
                 .willReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 20), 1));
         given(tournamentService.findById(eq(1L), isNull())).willReturn(response);
     }
@@ -866,6 +908,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         OpenMatService openMatService() {
             return mock(OpenMatService.class);
+        }
+
+        @Bean
+        OpenMatImageUploadService openMatImageUploadService() {
+            return mock(OpenMatImageUploadService.class);
         }
 
         @Bean
