@@ -51,6 +51,9 @@ public class OpenMat extends BaseTimeEntity {
     @Column(precision = 10, scale = 7)
     private BigDecimal longitude;
 
+    @Column(name = "image_urls_json", columnDefinition = "TEXT")
+    private String imageUrlsJson;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Region region;
@@ -90,6 +93,7 @@ public class OpenMat extends BaseTimeEntity {
                    String address,
                    BigDecimal latitude,
                    BigDecimal longitude,
+                   String imageUrlsJson,
                    Region region,
                    Integer maxCapacity,
                    String hostInstagramId,
@@ -104,6 +108,7 @@ public class OpenMat extends BaseTimeEntity {
         this.address = address;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.imageUrlsJson = imageUrlsJson;
         this.region = region;
         if (maxCapacity != null) {
             this.maxCapacity = maxCapacity;
@@ -142,6 +147,10 @@ public class OpenMat extends BaseTimeEntity {
     public void updateCoordinates(BigDecimal latitude, BigDecimal longitude) {
         this.latitude = latitude;
         this.longitude = longitude;
+    }
+
+    public void updateImageUrlsJson(String imageUrlsJson) {
+        this.imageUrlsJson = imageUrlsJson;
     }
 
     public boolean hasParticipants() {
