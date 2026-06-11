@@ -107,6 +107,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - 테스트 매트릭스: [hanes/TEST_MATRIX.md](hanes/TEST_MATRIX.md)
 - 실패 로그: [hanes/FAILURE_LOG.md](hanes/FAILURE_LOG.md)
 - 도메인/API 공통: [domain_and_spec/shared/common-models.md](domain_and_spec/shared/common-models.md)
+- 오픈매트: [domain_and_spec/openmat.md](domain_and_spec/openmat.md)
 - 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
 - 세미나 제품 계획: [domain_and_spec/seminar-product-plan.md](domain_and_spec/seminar-product-plan.md)
 - 훈련 기록: [domain_and_spec/training-log.md](domain_and_spec/training-log.md)
@@ -121,6 +122,7 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 ## 8. 문서 맵
 
 - [shared/common-models.md](domain_and_spec/shared/common-models.md): 공통 모델, 인증/사용자/알림/공지/문의 API, 날짜/시간 형식
+- [openmat.md](domain_and_spec/openmat.md): 오픈매트 도메인 모델 + API 스펙
 - [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
 - [seminar-product-plan.md](domain_and_spec/seminar-product-plan.md): 세미나 제품 범위와 출시 계획
 - [training-log.md](domain_and_spec/training-log.md): 훈련 기록 도메인 모델 + API 스펙
