@@ -1,6 +1,10 @@
 package com.rolling.api.domain.openmat.controller;
 
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatCommentCreateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatCommentReportRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatCommentResponse;
+import com.rolling.api.domain.openmat.dto.OpenMatCommentUpdateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatHostStatusUpdateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlResponse;
@@ -10,6 +14,7 @@ import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.service.OpenMatImageUploadService;
+import com.rolling.api.domain.openmat.service.OpenMatCommentService;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.global.exception.AuthException;
@@ -49,6 +54,7 @@ public class OpenMatController {
 
     private final OpenMatService openMatService;
     private final OpenMatImageUploadService openMatImageUploadService;
+    private final OpenMatCommentService openMatCommentService;
 
     @Operation(summary = "오픈매트 생성", description = "새로운 오픈매트를 생성합니다. 인증이 필요합니다.")
     @SecurityRequirement(name = "bearerAuth")
@@ -121,6 +127,67 @@ public class OpenMatController {
         boolean isAdmin = principal != null && principal.isAdmin();
         OpenMatResponse response = openMatService.findById(id, userId, isAdmin);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 댓글 목록 조회", description = "오픈매트의 댓글과 1단계 대댓글 목록을 조회합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "오픈매트를 찾을 수 없음")
+    })
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<ApiResponse<List<OpenMatCommentResponse>>> comments(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        Long userId = principal != null ? principal.getUserId() : null;
+        boolean isAdmin = principal != null && principal.isAdmin();
+        return ResponseEntity.ok(ApiResponse.success(
+                openMatCommentService.findComments(userId, isAdmin, id)
+        ));
+    }
+
+    @Operation(summary = "오픈매트 댓글 작성", description = "오픈매트에 댓글 또는 1단계 대댓글을 작성합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<ApiResponse<OpenMatCommentResponse>> createComment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody OpenMatCommentCreateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                openMatCommentService.createComment(requireUserId(principal), id, request)
+        ));
+    }
+
+    @Operation(summary = "오픈매트 댓글 수정", description = "오픈매트 댓글을 수정합니다. 작성자 본인만 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/comments/{commentId}")
+    public ResponseEntity<ApiResponse<OpenMatCommentResponse>> updateComment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long commentId,
+            @Valid @RequestBody OpenMatCommentUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                openMatCommentService.updateComment(requireUserId(principal), commentId, request)
+        ));
+    }
+
+    @Operation(summary = "오픈매트 댓글 삭제", description = "오픈매트 댓글을 삭제합니다. 작성자, 호스트, 관리자만 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long commentId) {
+        openMatCommentService.deleteComment(requireUserId(principal), principal != null && principal.isAdmin(), commentId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "오픈매트 댓글 신고", description = "오픈매트 댓글을 신고합니다. 동일 사용자는 같은 댓글을 한 번만 신고할 수 있습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/comments/{commentId}/report")
+    public ResponseEntity<ApiResponse<Void>> reportComment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long commentId,
+            @Valid @RequestBody OpenMatCommentReportRequest request) {
+        openMatCommentService.reportComment(requireUserId(principal), commentId, request);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @Operation(summary = "오픈매트 수정", description = "오픈매트를 수정합니다. 작성자 본인만 가능합니다.")

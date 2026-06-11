@@ -26,6 +26,9 @@
 - 오픈매트 신고
 - 오픈매트 삭제
 - 관리자 신고 차단 해제
+- 오픈매트 댓글/대댓글 조회, 작성, 수정, 삭제
+- 오픈매트 댓글 신고
+- 관리자 오픈매트 댓글 신고 목록/상세/상태 변경
 - 상태 자동 동기화 스케줄러
 - 참가자 대상 수정/삭제 알림 발송
 
@@ -253,6 +256,143 @@
 | `openMatId` | `Long` | 오픈매트 ID |
 | `openMatTitle` | `String` | 오픈매트 제목 |
 | `participantUserIds` | `List<Long>` | 알림 대상 참가자 ID |
+
+### 2.13 `OpenMatComment`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | 댓글 ID |
+| `openMat` | `OpenMat` | 대상 오픈매트 |
+| `parentComment` | `OpenMatComment?` | 상위 댓글 |
+| `author` | `User` | 작성자 |
+| `content` | `String?` | 댓글 본문, soft delete 후 `null` |
+| `deleted` | `Boolean` | 삭제 여부 |
+| `deletedAt` | `LocalDateTime?` | 삭제 시각 |
+| `reportCount` | `Long` | 댓글 신고 누적 수 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+
+현재 구현 메모:
+
+- `parentComment = null`이면 원댓글이다.
+- 대댓글은 1단계까지만 허용한다.
+- soft delete 시 `deleted = true`, `deletedAt` 저장, `content = null` 처리한다.
+- `reportCount >= 3`이면 해당 댓글은 soft delete 된다.
+
+### 2.14 `OpenMatCommentCreateRequest`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `content` | `String` | 댓글 본문 |
+| `parentCommentId` | `Long?` | 대댓글이면 상위 댓글 ID |
+
+현재 구현 메모:
+
+- `content`는 trim 후 1자 이상 1000자 이하여야 한다.
+- `parentCommentId`가 있으면 같은 오픈매트의 원댓글만 허용한다.
+
+### 2.15 `OpenMatCommentUpdateRequest`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `content` | `String` | 수정할 댓글 본문 |
+
+### 2.16 `OpenMatCommentResponse`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | 댓글 ID |
+| `openMatId` | `Long` | 대상 오픈매트 ID |
+| `parentCommentId` | `Long?` | 상위 댓글 ID |
+| `authorUserId` | `Long` | 작성자 ID |
+| `authorNickname` | `String` | 작성자 닉네임 |
+| `content` | `String?` | 삭제된 댓글이면 `null` |
+| `deleted` | `Boolean` | 삭제 여부 |
+| `editableByMe` | `Boolean` | 현재 로그인 사용자의 수정 가능 여부 |
+| `deletableByMe` | `Boolean` | 현재 로그인 사용자의 삭제 가능 여부 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+| `replies` | `List<OpenMatCommentResponse>` | 1단계 대댓글 목록 |
+
+현재 구현 메모:
+
+- 댓글 목록 API는 비페이징 구조다.
+- soft delete 된 댓글도 placeholder row 용도로 목록에 남을 수 있다.
+- 차단 관계의 댓글/대댓글은 로그인 조회자 기준으로 숨긴다.
+
+### 2.17 `OpenMatCommentReport`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | 신고 ID |
+| `comment` | `OpenMatComment` | 신고 대상 댓글 |
+| `reporter` | `User` | 신고자 |
+| `reason` | `ReportReason` | 신고 사유 |
+| `customReason` | `String?` | 기타 신고 사유 |
+| `status` | `ReportStatus` | 운영 처리 상태 |
+| `processedByUserId` | `Long?` | 처리 관리자 ID |
+| `processedAt` | `LocalDateTime?` | 처리 시각 |
+| `processingMemo` | `String?` | 처리 메모 |
+| `finalAction` | `String?` | 최종 조치 메모 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+
+현재 구현 메모:
+
+- `(comment_id, reporter_id)` unique 제약으로 중복 신고를 막는다.
+- 신고 상태 변경은 관리자 운영 메모 용도이며 사용자 제재를 자동 생성하지 않는다.
+
+### 2.18 `OpenMatCommentReportRequest`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `reason` | `ReportReason` | 신고 사유 |
+| `customReason` | `String?` | 기타 신고 사유 |
+
+현재 구현 메모:
+
+- `reason = OTHER`면 `customReason`이 필수다.
+
+### 2.19 `OpenMatCommentReportAdminResponse`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | `Long` | 신고 ID |
+| `commentId` | `Long` | 댓글 ID |
+| `openMatId` | `Long` | 오픈매트 ID |
+| `openMatTitle` | `String` | 오픈매트 제목 |
+| `parentCommentId` | `Long?` | 상위 댓글 ID |
+| `commentContent` | `String?` | 댓글 본문 |
+| `commentDeleted` | `Boolean` | 댓글 삭제 여부 |
+| `commentAuthorUserId` | `Long` | 댓글 작성자 ID |
+| `commentAuthorNickname` | `String` | 댓글 작성자 닉네임 |
+| `reporterUserId` | `Long` | 신고자 ID |
+| `reporterNickname` | `String` | 신고자 닉네임 |
+| `reason` | `ReportReason` | 신고 사유 |
+| `customReason` | `String?` | 기타 신고 사유 |
+| `status` | `ReportStatus` | 처리 상태 |
+| `processedByUserId` | `Long?` | 처리 관리자 ID |
+| `processedAt` | `LocalDateTime?` | 처리 시각 |
+| `processingMemo` | `String?` | 처리 메모 |
+| `finalAction` | `String?` | 최종 조치 메모 |
+| `createdAt` | `LocalDateTime` | 생성 시각 |
+| `updatedAt` | `LocalDateTime` | 수정 시각 |
+
+### 2.20 `OpenMatCommentNotificationEvent`
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `openMatId` | `Long` | 오픈매트 ID |
+| `recipientUserId` | `Long` | 알림 수신자 ID |
+| `actorUserId` | `Long` | 댓글 작성자 ID |
+| `actorNickname` | `String` | 댓글 작성자 닉네임 |
+| `openMatTitle` | `String` | 오픈매트 제목 |
+| `type` | `PushNotificationType` | 알림 타입 |
+
+현재 구현 메모:
+
+- 댓글 알림은 after-commit 이벤트 핸들러에서 알림함 저장 후 push 전송을 시도한다.
+- route는 `/openmat/detail`, targetId는 `openMatId`를 사용한다.
 
 ## 3. API 스펙
 
@@ -492,6 +632,138 @@ Response data: `OpenMatResponse`
 - 신고 누적으로 차단된 오픈매트의 `reportCount`를 0으로 초기화한다.
 - 운영자 전용 API다.
 
+### 3.16 오픈매트 댓글 목록 조회
+
+`GET /api/v1/open-mats/{id}/comments`
+
+- 인증: 선택
+
+Response data: `List<OpenMatCommentResponse>`
+
+현재 구현 메모:
+
+- 비회원 호출이 가능하다.
+- 로그인 사용자는 댓글 작성자/상위 댓글 작성자와의 양방향 차단 관계를 반영한 결과를 받는다.
+- 삭제된 오픈매트는 기존 상세 조회와 같은 접근 권한을 통과한 사용자만 댓글을 볼 수 있다.
+- 비회원 둘러보기 공개 조회 요청은 `Authorization` 헤더 없이 호출하는 것을 계약으로 한다.
+
+### 3.17 오픈매트 댓글 작성
+
+`POST /api/v1/open-mats/{id}/comments`
+
+- 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `content` | `String` | Y | 댓글 본문 |
+| `parentCommentId` | `Long` | - | 대댓글이면 상위 댓글 ID |
+
+Response data: `OpenMatCommentResponse`
+
+현재 구현 메모:
+
+- 삭제된 오픈매트에는 새 댓글을 작성할 수 없다.
+- 종료된 오픈매트(`FINISHED`)에도 댓글 작성은 허용한다.
+- 차단 관계의 호스트 또는 상위 댓글 작성자에게는 댓글/대댓글을 작성할 수 없다.
+
+### 3.18 오픈매트 댓글 수정
+
+`PATCH /api/v1/open-mats/comments/{commentId}`
+
+- 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `content` | `String` | Y | 수정할 댓글 본문 |
+
+Response data: `OpenMatCommentResponse`
+
+현재 구현 메모:
+
+- 작성자 본인만 수정할 수 있다.
+- 삭제된 댓글은 수정할 수 없다.
+
+### 3.19 오픈매트 댓글 삭제
+
+`DELETE /api/v1/open-mats/comments/{commentId}`
+
+- 인증: 필요
+
+Response data: `null`
+
+현재 구현 메모:
+
+- 댓글 작성자, 오픈매트 호스트, 관리자만 삭제할 수 있다.
+- 삭제는 soft delete다.
+
+### 3.20 오픈매트 댓글 신고
+
+`POST /api/v1/open-mats/comments/{commentId}/report`
+
+- 인증: 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `reason` | `ReportReason` | Y | 신고 사유 |
+| `customReason` | `String` | - | 기타 신고 사유 |
+
+Response data: `null`
+
+현재 구현 메모:
+
+- 자기 댓글은 신고할 수 없다.
+- 동일 사용자는 같은 댓글을 한 번만 신고할 수 있다.
+- 삭제된 댓글과 삭제된 오픈매트의 댓글은 새 신고를 받을 수 없다.
+- 신고 누적이 3건 이상이면 댓글은 soft delete 된다.
+
+### 3.21 관리자 오픈매트 댓글 신고 목록 조회
+
+`GET /api/v1/admin/open-mats/comments/reports`
+
+- 인증: 관리자 필요
+
+Query params:
+
+- `status`
+- pageable
+
+Response data: `Page<OpenMatCommentReportAdminResponse>`
+
+현재 구현 메모:
+
+- 기본 정렬은 `createdAt desc, id desc`다.
+- 허용 sort는 `createdAt`, `updatedAt`, `status`, `processedAt`, `id`다.
+
+### 3.22 관리자 오픈매트 댓글 신고 상세 조회
+
+`GET /api/v1/admin/open-mats/comments/reports/{id}`
+
+- 인증: 관리자 필요
+
+Response data: `OpenMatCommentReportAdminResponse`
+
+### 3.23 관리자 오픈매트 댓글 신고 상태 변경
+
+`PATCH /api/v1/admin/open-mats/comments/reports/{id}/status`
+
+- 인증: 관리자 필요
+
+Request body:
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `status` | `ReportStatus` | Y | 신고 처리 상태 |
+| `processingMemo` | `String` | - | 처리 메모 |
+| `finalAction` | `String` | - | 최종 조치 메모 |
+
+Response data: `OpenMatCommentReportAdminResponse`
+
 ## 4. 도메인 규칙
 
 - 오픈매트는 `startDateTime`, `endDateTime`, `maxCapacity`, `region`을 핵심 운영 필드로 사용한다.
@@ -500,8 +772,14 @@ Response data: `OpenMatResponse`
 - `manualClosed = true`이면 `CLOSED`를 유지한다.
 - `reportCount >= 3`이면 신규 신청을 막는다.
 - 목록 조회는 작성자 차단 상태를 반영하고, 상세 조회는 삭제된 오픈매트의 접근 권한을 별도로 검사한다.
+- 댓글 목록 조회는 로그인 조회자 기준 양방향 차단 관계를 반영한다.
+- 댓글은 원댓글과 1단계 대댓글만 허용한다.
+- 댓글 삭제는 작성자, 오픈매트 호스트, 관리자만 가능하다.
+- 댓글 신고는 자기 신고와 중복 신고를 막고, 3회 누적 시 soft delete 한다.
+- 댓글 알림은 원댓글이면 호스트, 대댓글이면 상위 댓글 작성자 1명에게만 발행한다.
 - 오픈매트 수정/삭제는 작성자만 가능하다.
 - 참가자 알림은 `OpenMatUpdatedEvent`, `OpenMatDeletedEvent`를 통해 after-commit으로 발송한다.
+- 댓글 알림은 `OpenMatCommentNotificationEvent`를 통해 after-commit으로 발송한다.
 - 오픈매트 상태 자동 동기화는 스케줄러가 수행한다.
 - 좌표는 생성/수정 모두에서 pair 단위로 다룬다.
 - 이미지 URL은 최대 3장까지 허용한다.
@@ -512,6 +790,7 @@ Response data: `OpenMatResponse`
 - `OpenMatResponse`는 참가자 목록을 포함하지 않는다. 참가자 목록은 `GET /api/v1/open-mats/{id}/participants`에서 별도로 조회한다.
 - `GET /api/v1/open-mats/{id}`는 공개 조회이지만, 삭제된 오픈매트는 호스트/참가자/알림 수신자/관리자만 볼 수 있다.
 - `GET /api/v1/open-mats`는 로그인 사용자의 `Authorization` 헤더가 있으면 차단 필터가 적용된다.
+- `GET /api/v1/open-mats/{id}/comments`도 공개 조회지만, 로그인 사용자의 `Authorization` 헤더가 있으면 차단 필터와 제재 필터 영향을 받을 수 있다.
 - `GET /api/v1/open-mats/my`와 `GET /api/v1/open-mats/my-hosting`은 정렬 기본값이 `startDateTime asc`다.
 - 좌표 업데이트는 `latitude`와 `longitude`가 모두 명시된 경우에만 반영한다.
 - 작성자 관리 UI는 상세 화면에서 직접 참가자 강제 취소와 모집 상태 변경을 호출한다.
