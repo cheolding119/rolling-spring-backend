@@ -26,10 +26,12 @@ import com.rolling.api.domain.traininglog.controller.TrainingLogAdminController;
 import com.rolling.api.domain.traininglog.dto.TrainingLogCommentReportAdminResponse;
 import com.rolling.api.domain.traininglog.service.TrainingLogSocialService;
 import com.rolling.api.domain.openmat.controller.OpenMatController;
+import com.rolling.api.domain.openmat.dto.OpenMatCommentResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.openmat.service.OpenMatCommentService;
 import com.rolling.api.domain.openmat.service.OpenMatImageUploadService;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.domain.seminar.controller.SeminarController;
@@ -102,6 +104,7 @@ class SecurityAuthorizationIntegrationTest {
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mockMvc;
     private OpenMatService openMatService;
+    private OpenMatCommentService openMatCommentService;
     private SeminarService seminarService;
     private NoticeService noticeService;
     private CommunityService communityService;
@@ -127,6 +130,7 @@ class SecurityAuthorizationIntegrationTest {
         context.refresh();
 
         openMatService = context.getBean(OpenMatService.class);
+        openMatCommentService = context.getBean(OpenMatCommentService.class);
         seminarService = context.getBean(SeminarService.class);
         noticeService = context.getBean(NoticeService.class);
         communityService = context.getBean(CommunityService.class);
@@ -176,6 +180,12 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.data.address").value("Seoul"))
                 .andExpect(jsonPath("$.data.hostNickname").value("host"))
                 .andExpect(jsonPath("$.data.deleted").value(false));
+
+        mockMvc.perform(get("/api/v1/open-mats/1/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(11))
+                .andExpect(jsonPath("$.data[0].content").value("첫 댓글"));
 
         mockMvc.perform(get("/api/v1/seminars"))
                 .andExpect(status().isOk())
@@ -343,6 +353,28 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(post("/api/v1/open-mats/11/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"reason\": \"SPAM\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/open-mats/11/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"content\": \"댓글\"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/v1/open-mats/comments/11/report")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -769,6 +801,21 @@ class SecurityAuthorizationIntegrationTest {
         given(openMatService.findAll(isNull(), isNull(), isNull(), any(Pageable.class), isNull()))
                 .willReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 20), 1));
         given(openMatService.findById(eq(1L), isNull(), eq(false))).willReturn(response);
+        given(openMatCommentService.findComments(isNull(), eq(false), eq(1L))).willReturn(List.of(
+                OpenMatCommentResponse.builder()
+                        .id(11L)
+                        .openMatId(1L)
+                        .authorUserId(2L)
+                        .authorNickname("commenter")
+                        .content("첫 댓글")
+                        .deleted(false)
+                        .editableByMe(false)
+                        .deletableByMe(false)
+                        .createdAt(LocalDateTime.of(2026, 3, 20, 10, 30))
+                        .updatedAt(LocalDateTime.of(2026, 3, 20, 10, 30))
+                        .replies(List.of())
+                        .build()
+        ));
     }
 
     private void stubSeminarResponses() {
@@ -908,6 +955,11 @@ class SecurityAuthorizationIntegrationTest {
         @Bean
         OpenMatService openMatService() {
             return mock(OpenMatService.class);
+        }
+
+        @Bean
+        OpenMatCommentService openMatCommentService() {
+            return mock(OpenMatCommentService.class);
         }
 
         @Bean

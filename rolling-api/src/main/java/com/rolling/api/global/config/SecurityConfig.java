@@ -99,7 +99,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasRole("ADMIN");
 
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats/my", "/api/v1/open-mats/my-hosting").authenticated();
-                    auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}").permitAll();
+                    auth.requestMatchers(HttpMethod.GET, "/api/v1/open-mats", "/api/v1/open-mats/{id}", "/api/v1/open-mats/{id}/comments").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/seminars/my", "/api/v1/seminars/my-applications").authenticated();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/seminars", "/api/v1/seminars/{id}").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/community/posts", "/api/v1/community/posts/{id}", "/api/v1/community/posts/{postId}/comments").permitAll();

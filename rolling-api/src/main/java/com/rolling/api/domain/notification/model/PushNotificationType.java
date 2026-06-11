@@ -3,6 +3,8 @@ package com.rolling.api.domain.notification.model;
 public enum PushNotificationType {
     OPEN_MAT_UPDATED,
     OPEN_MAT_DELETED,
+    OPEN_MAT_COMMENT_CREATED,
+    OPEN_MAT_COMMENT_REPLY_CREATED,
     SEMINAR_APPLIED,
     SEMINAR_APPLICATION_CANCELED,
     SEMINAR_APPLICATION_CANCELED_BY_HOST,
