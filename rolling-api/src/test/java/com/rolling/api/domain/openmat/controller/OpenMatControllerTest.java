@@ -1,8 +1,10 @@
 package com.rolling.api.domain.openmat.controller;
 
+import com.rolling.api.domain.openmat.dto.OpenMatCommentResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
+import com.rolling.api.domain.openmat.service.OpenMatCommentService;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.service.OpenMatImageUploadService;
 import com.rolling.api.domain.openmat.service.OpenMatService;
@@ -33,10 +35,13 @@ class OpenMatControllerTest {
     @Mock
     private OpenMatImageUploadService openMatImageUploadService;
 
+    @Mock
+    private OpenMatCommentService openMatCommentService;
+
     @Test
     @DisplayName("오픈매트 목록 조회는 인증 사용자의 viewer id를 서비스에 전달한다")
     void list_withUserToken_passesViewerId() {
-        OpenMatController controller = new OpenMatController(openMatService, openMatImageUploadService);
+        OpenMatController controller = new OpenMatController(openMatService, openMatImageUploadService, openMatCommentService);
         PageRequest pageable = PageRequest.of(0, 20);
         when(openMatService.findAll(null, OpenMatStatus.RECRUITING, null, pageable, 2L))
                 .thenReturn(new PageImpl<>(List.of(OpenMatResponse.builder().id(10L).title("오픈매트 10").build())));
@@ -49,7 +54,7 @@ class OpenMatControllerTest {
     @Test
     @DisplayName("오픈매트 이미지 업로드 URL 발급은 업로드 서비스 응답을 그대로 반환한다")
     void createImageUploadUrl_returnsUploadMetadata() {
-        OpenMatController controller = new OpenMatController(openMatService, openMatImageUploadService);
+        OpenMatController controller = new OpenMatController(openMatService, openMatImageUploadService, openMatCommentService);
         OpenMatImageUploadUrlRequest request = new OpenMatImageUploadUrlRequest();
         when(openMatImageUploadService.createUploadUrl(any()))
                 .thenReturn(OpenMatImageUploadUrlResponse.builder()
@@ -64,5 +69,29 @@ class OpenMatControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getData().getImageKey()).isEqualTo("openmats/images/sample.jpg");
         verify(openMatImageUploadService).createUploadUrl(request);
+    }
+
+    @Test
+    @DisplayName("오픈매트 댓글 목록 조회는 인증 사용자 정보를 서비스에 전달한다")
+    void comments_withUserToken_passesViewerInfo() {
+        OpenMatController controller = new OpenMatController(openMatService, openMatImageUploadService, openMatCommentService);
+        when(openMatCommentService.findComments(2L, false, 10L))
+                .thenReturn(List.of(OpenMatCommentResponse.builder()
+                        .id(1L)
+                        .openMatId(10L)
+                        .authorUserId(2L)
+                        .authorNickname("viewer")
+                        .content("질문 있습니다")
+                        .deleted(false)
+                        .editableByMe(true)
+                        .deletableByMe(true)
+                        .replies(List.of())
+                        .build()));
+
+        var response = controller.comments(new UserPrincipal(2L), 10L);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getData()).hasSize(1);
+        verify(openMatCommentService).findComments(2L, false, 10L);
     }
 }

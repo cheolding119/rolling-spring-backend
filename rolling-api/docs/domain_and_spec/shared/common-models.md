@@ -459,7 +459,7 @@ Response data:
 
 - 현재 서버는 `GET /api/v1/notifications` 목록 조회, `GET /api/v1/notifications/badge` 미읽음 개수 조회, `PATCH /api/v1/notifications/{id}/read` 읽음 처리를 지원한다.
 - notification badge 같은 미읽음 개수 확장은 `새로운 version을 올리기보다 /api/v1 안에서 additive change`로 진행하는 것을 기본 원칙으로 한다.
-- 현재 알림 type 예시에는 `COMMUNITY_COMMENT_CREATED`, `FRIEND_REQUEST_RECEIVED`, `TRAINING_LOG_COMMENT_CREATED`, `TRAINING_LOG_COMMENT_REPLY_CREATED`, `INQUIRY_ANSWERED`, `TOURNAMENT_FAVORITE_REMINDER`가 포함된다.
+- 현재 알림 type 예시에는 `COMMUNITY_COMMENT_CREATED`, `FRIEND_REQUEST_RECEIVED`, `OPEN_MAT_COMMENT_CREATED`, `OPEN_MAT_COMMENT_REPLY_CREATED`, `TRAINING_LOG_COMMENT_CREATED`, `TRAINING_LOG_COMMENT_REPLY_CREATED`, `INQUIRY_ANSWERED`, `TOURNAMENT_FAVORITE_REMINDER`가 포함된다.
 
 ### 5.3.1 알림 목록 조회
 
