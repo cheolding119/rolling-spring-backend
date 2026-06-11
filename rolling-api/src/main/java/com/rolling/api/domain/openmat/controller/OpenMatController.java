@@ -2,11 +2,14 @@ package com.rolling.api.domain.openmat.controller;
 
 import com.rolling.api.domain.openmat.dto.OpenMatCreateRequest;
 import com.rolling.api.domain.openmat.dto.OpenMatHostStatusUpdateRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlRequest;
+import com.rolling.api.domain.openmat.dto.OpenMatImageUploadUrlResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatParticipantResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatResponse;
 import com.rolling.api.domain.openmat.dto.OpenMatUpdateRequest;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.openmat.service.OpenMatImageUploadService;
 import com.rolling.api.domain.openmat.service.OpenMatService;
 import com.rolling.api.domain.report.dto.ReportCreateRequest;
 import com.rolling.api.global.exception.AuthException;
@@ -45,6 +48,7 @@ import java.util.List;
 public class OpenMatController {
 
     private final OpenMatService openMatService;
+    private final OpenMatImageUploadService openMatImageUploadService;
 
     @Operation(summary = "오픈매트 생성", description = "새로운 오픈매트를 생성합니다. 인증이 필요합니다.")
     @SecurityRequirement(name = "bearerAuth")
@@ -133,6 +137,22 @@ public class OpenMatController {
             @Valid @RequestBody OpenMatUpdateRequest request) {
         Long userId = principal != null ? principal.getUserId() : null;
         OpenMatResponse response = openMatService.update(userId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "오픈매트 이미지 업로드 URL 발급", description = "오픈매트 이미지 업로드용 presigned URL을 발급합니다. 인증이 필요합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @PostMapping("/image-upload-url")
+    public ResponseEntity<ApiResponse<OpenMatImageUploadUrlResponse>> createImageUploadUrl(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody OpenMatImageUploadUrlRequest request) {
+        requireUserId(principal);
+        OpenMatImageUploadUrlResponse response = openMatImageUploadService.createUploadUrl(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

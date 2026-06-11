@@ -87,6 +87,7 @@ class OpenMatServiceTest {
                 fixedClock,
                 applicationEventPublisher);
         ReflectionTestUtils.setField(openMatService, "meterRegistry", meterRegistry);
+        ReflectionTestUtils.setField(openMatService, "publicBaseUrl", "https://cdn.test.com");
     }
 
     @Test
@@ -108,6 +109,66 @@ class OpenMatServiceTest {
         assertThat(openMatCaptor.getValue().getLongitude()).isEqualByComparingTo("127.0398765");
         assertThat(response.getLatitude()).isEqualByComparingTo("37.5012345");
         assertThat(response.getLongitude()).isEqualByComparingTo("127.0398765");
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 이미지 URL 목록을 저장하고 응답에 포함한다")
+    void create_withImageUrls_savesAndReturnsImageUrls() {
+        User host = createUser(1L, "host-create-images", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "imageUrls", List.of(
+                "https://cdn.test.com/openmats/images/1.jpg",
+                "https://cdn.test.com/openmats/images/2.png"
+        ));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+        when(openMatRepository.save(any(OpenMat.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OpenMatResponse response = openMatService.create(1L, request);
+
+        ArgumentCaptor<OpenMat> openMatCaptor = ArgumentCaptor.forClass(OpenMat.class);
+        verify(openMatRepository).save(openMatCaptor.capture());
+        assertThat(openMatCaptor.getValue().getImageUrlsJson())
+                .isEqualTo("[\"https://cdn.test.com/openmats/images/1.jpg\",\"https://cdn.test.com/openmats/images/2.png\"]");
+        assertThat(response.getImageUrls())
+                .containsExactly("https://cdn.test.com/openmats/images/1.jpg", "https://cdn.test.com/openmats/images/2.png");
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 허용되지 않은 외부 이미지 URL은 거부한다")
+    void create_withDisallowedImageUrl_throwsValidationError() {
+        User host = createUser(1L, "host-create-invalid-image", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "imageUrls", List.of("https://evil.example.com/openmats/images/1.jpg"));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+
+        assertThatThrownBy(() -> openMatService.create(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("허용된 이미지 URL만 사용할 수 있습니다");
+                });
+        verify(openMatRepository, never()).save(any(OpenMat.class));
+    }
+
+    @Test
+    @DisplayName("오픈매트 생성 시 중복 이미지 URL은 거부한다")
+    void create_withDuplicateImageUrls_throwsValidationError() {
+        User host = createUser(1L, "host-create-duplicate-image", "host");
+        OpenMatCreateRequest request = createOpenMatCreateRequest();
+        ReflectionTestUtils.setField(request, "imageUrls", List.of(
+                "https://cdn.test.com/openmats/images/1.jpg",
+                "https://cdn.test.com/openmats/images/1.jpg"
+        ));
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(host));
+
+        assertThatThrownBy(() -> openMatService.create(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("중복된 imageUrl은 허용되지 않습니다");
+                });
+        verify(openMatRepository, never()).save(any(OpenMat.class));
     }
 
     @Test
@@ -136,6 +197,107 @@ class OpenMatServiceTest {
         assertThat(openMat.getLongitude()).isEqualByComparingTo("127.0300000");
         assertThat(response.getLatitude()).isEqualByComparingTo("37.5000000");
         assertThat(response.getLongitude()).isEqualByComparingTo("127.0300000");
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 이미지 URL 목록을 교체하고 응답에 포함한다")
+    void update_withImageUrls_updatesAndReturnsImageUrls() {
+        User host = createUser(1L, "host-update-images", "host");
+        OpenMat openMat = createOpenMat(
+                47L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        ReflectionTestUtils.setField(openMat, "imageUrlsJson", "[\"https://cdn.test.com/openmats/images/old.jpg\"]");
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        request.setImageUrls(List.of(
+                "https://cdn.test.com/openmats/images/1.jpg",
+                "https://cdn.test.com/openmats/images/2.png"
+        ));
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(47L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 47L, request);
+
+        assertThat(openMat.getImageUrlsJson())
+                .isEqualTo("[\"https://cdn.test.com/openmats/images/1.jpg\",\"https://cdn.test.com/openmats/images/2.png\"]");
+        assertThat(response.getImageUrls())
+                .containsExactly("https://cdn.test.com/openmats/images/1.jpg", "https://cdn.test.com/openmats/images/2.png");
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 imageUrls 필드가 없으면 기존 이미지를 유지한다")
+    void update_whenImageUrlsFieldMissing_keepsExistingImages() {
+        User host = createUser(1L, "host-keep-images", "host");
+        OpenMat openMat = createOpenMat(
+                48L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        ReflectionTestUtils.setField(openMat, "imageUrlsJson", "[\"https://cdn.test.com/openmats/images/existing.jpg\"]");
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        ReflectionTestUtils.setField(request, "title", "changed title");
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(48L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 48L, request);
+
+        assertThat(response.getImageUrls()).containsExactly("https://cdn.test.com/openmats/images/existing.jpg");
+        assertThat(openMat.getImageUrlsJson()).isEqualTo("[\"https://cdn.test.com/openmats/images/existing.jpg\"]");
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 빈 배열을 보내면 기존 이미지를 모두 제거한다")
+    void update_whenImageUrlsEmptyArray_clearsImages() {
+        User host = createUser(1L, "host-clear-images", "host");
+        OpenMat openMat = createOpenMat(
+                49L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        ReflectionTestUtils.setField(openMat, "imageUrlsJson", "[\"https://cdn.test.com/openmats/images/existing.jpg\"]");
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        request.setImageUrls(List.of());
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(49L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.update(1L, 49L, request);
+
+        assertThat(openMat.getImageUrlsJson()).isNull();
+        assertThat(response.getImageUrls()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("오픈매트 수정 시 imageUrls에 null을 명시하면 요청을 거부한다")
+    void update_whenImageUrlsExplicitNull_throwsValidationError() {
+        User host = createUser(1L, "host-null-images", "host");
+        OpenMat openMat = createOpenMat(
+                51L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        OpenMatUpdateRequest request = new OpenMatUpdateRequest();
+        request.setImageUrls(null);
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(51L)).thenReturn(java.util.Optional.of(openMat));
+
+        assertThatThrownBy(() -> openMatService.update(1L, 51L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(exception).hasMessage("imageUrls는 null일 수 없습니다");
+                });
     }
 
     @Test
@@ -344,6 +506,28 @@ class OpenMatServiceTest {
 
         assertThat(response.getHostId()).isEqualTo(1L);
         assertThat(response.getHostNickname()).isEqualTo("rolling-host");
+        assertThat(response.getImageUrls()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("오픈매트 응답은 저장된 이미지 JSON이 깨져 있어도 빈 배열로 fallback 한다")
+    void findById_whenImageUrlsJsonMalformed_returnsEmptyImageUrls() {
+        User host = createUser(1L, "host-malformed-images", "host");
+        OpenMat openMat = createOpenMat(
+                52L,
+                host,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                10,
+                OpenMatStatus.RECRUITING
+        );
+        ReflectionTestUtils.setField(openMat, "imageUrlsJson", "not-json");
+
+        when(openMatRepository.findByIdAndIsHiddenFalse(52L)).thenReturn(java.util.Optional.of(openMat));
+
+        OpenMatResponse response = openMatService.findById(52L);
+
+        assertThat(response.getImageUrls()).isEmpty();
     }
 
     @Test

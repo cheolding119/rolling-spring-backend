@@ -13,6 +13,7 @@ import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.openmat.repository.OpenMatRepository;
+import com.rolling.api.domain.openmat.util.OpenMatImageJsonCodec;
 import com.rolling.api.domain.report.entity.ReportReason;
 import com.rolling.api.domain.report.entity.ReportTargetType;
 import com.rolling.api.domain.report.service.ReportService;
@@ -23,6 +24,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,21 +33,28 @@ import org.springframework.http.HttpStatus;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OpenMatService {
+
+    private static final int MAX_IMAGE_COUNT = 3;
+    private static final int MAX_IMAGE_URL_LENGTH = 1000;
+    private static final Set<String> ALLOWED_IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png");
 
     private final OpenMatRepository openMatRepository;
     private final NotificationRepository notificationRepository;
@@ -54,6 +63,9 @@ public class OpenMatService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
     private MeterRegistry meterRegistry;
+
+    @Value("${cloud.aws.s3.public-base-url:}")
+    private String publicBaseUrl;
 
     @Autowired(required = false)
     void setMeterRegistry(MeterRegistry meterRegistry) {
@@ -68,6 +80,7 @@ public class OpenMatService {
         validateDateRange(request.getStartDateTime(), request.getEndDateTime());
         validateCapacity(request.getMaxCapacity());
         validateCreateCoordinates(request);
+        List<String> imageUrls = normalizeImageUrls(request.getImageUrls(), true);
 
         OpenMat openMat = OpenMat.builder()
                 .host(host)
@@ -79,6 +92,7 @@ public class OpenMatService {
                 .address(request.getAddress())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
+                .imageUrlsJson(OpenMatImageJsonCodec.writeStringListJson(imageUrls))
                 .region(request.getRegion())
                 .maxCapacity(request.getMaxCapacity())
                 .hostInstagramId(request.getHostInstagramId())
@@ -170,6 +184,7 @@ public class OpenMatService {
 
         validateCapacity(request.getMaxCapacity());
         validateUpdateCoordinates(request);
+        validateUpdateImageUrls(request);
 
         if (request.getMaxCapacity() != null && request.getMaxCapacity() != -1
                 && request.getMaxCapacity() < openMat.getParticipantUids().size()) {
@@ -189,6 +204,7 @@ public class OpenMatService {
                 request.getHostInstagramId()
         );
         applyCoordinateUpdate(openMat, request);
+        applyImageUrlUpdate(openMat, request);
         openMat.synchronizeStatus(now());
 
         log.info(
@@ -515,6 +531,21 @@ public class OpenMatService {
         openMat.updateCoordinates(request.getLatitude(), request.getLongitude());
     }
 
+    private void validateUpdateImageUrls(OpenMatUpdateRequest request) {
+        if (!request.hasImageUrlsField()) {
+            return;
+        }
+        normalizeImageUrls(request.getImageUrls(), false);
+    }
+
+    private void applyImageUrlUpdate(OpenMat openMat, OpenMatUpdateRequest request) {
+        if (!request.hasImageUrlsField()) {
+            return;
+        }
+        List<String> imageUrls = normalizeImageUrls(request.getImageUrls(), false);
+        openMat.updateImageUrlsJson(OpenMatImageJsonCodec.writeStringListJson(imageUrls));
+    }
+
     private boolean willCoordinatesChange(OpenMat openMat, OpenMatUpdateRequest request) {
         if (!request.hasLatitudeField() && !request.hasLongitudeField()) {
             return false;
@@ -534,6 +565,51 @@ public class OpenMatService {
 
     private boolean isChanged(Object currentValue, Object newValue) {
         return newValue != null && !Objects.equals(currentValue, newValue);
+    }
+
+    private List<String> normalizeImageUrls(List<String> imageUrls, boolean allowNullAsEmpty) {
+        if (imageUrls == null) {
+            if (allowNullAsEmpty) {
+                return List.of();
+            }
+            throw BusinessException.badRequest("imageUrls는 null일 수 없습니다");
+        }
+        if (imageUrls.size() > MAX_IMAGE_COUNT) {
+            throw BusinessException.badRequest("imageUrls는 최대 3장까지 허용합니다");
+        }
+
+        LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
+        for (String imageUrl : imageUrls) {
+            String normalized = normalizeImageUrl(imageUrl);
+            if (!normalizedValues.add(normalized)) {
+                throw BusinessException.badRequest("중복된 imageUrl은 허용되지 않습니다");
+            }
+        }
+        return List.copyOf(normalizedValues);
+    }
+
+    private String normalizeImageUrl(String value) {
+        if (!StringUtils.hasText(value)) {
+            throw BusinessException.badRequest("imageUrl은 비어 있을 수 없습니다");
+        }
+
+        String normalized = value.trim();
+        if (normalized.length() > MAX_IMAGE_URL_LENGTH) {
+            throw BusinessException.badRequest("imageUrl은 1000자 이하여야 합니다");
+        }
+        if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) {
+            throw BusinessException.badRequest("imageUrl은 http 또는 https URL이어야 합니다");
+        }
+        if (StringUtils.hasText(publicBaseUrl) && !normalized.startsWith(publicBaseUrl.trim())) {
+            throw BusinessException.badRequest("허용된 이미지 URL만 사용할 수 있습니다");
+        }
+
+        String lower = normalized.toLowerCase();
+        boolean allowed = ALLOWED_IMAGE_EXTENSIONS.stream().anyMatch(ext -> lower.endsWith("." + ext));
+        if (!allowed) {
+            throw BusinessException.badRequest("지원하지 않는 이미지 형식입니다");
+        }
+        return normalized;
     }
 
     private Page<OpenMat> findOpenMats(

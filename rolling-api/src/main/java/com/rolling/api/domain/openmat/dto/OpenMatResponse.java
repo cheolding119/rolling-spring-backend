@@ -3,11 +3,13 @@ package com.rolling.api.domain.openmat.dto;
 import com.rolling.api.domain.openmat.entity.OpenMat;
 import com.rolling.api.domain.openmat.entity.OpenMatStatus;
 import com.rolling.api.domain.openmat.entity.Region;
+import com.rolling.api.domain.openmat.util.OpenMatImageJsonCodec;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -22,6 +24,7 @@ public class OpenMatResponse {
     private String address;
     private BigDecimal latitude;
     private BigDecimal longitude;
+    private List<String> imageUrls;
     private Region region;
     private Integer maxCapacity;
     private Integer currentParticipants;
@@ -49,6 +52,7 @@ public class OpenMatResponse {
                 .address(openMat.getAddress())
                 .latitude(openMat.getLatitude())
                 .longitude(openMat.getLongitude())
+                .imageUrls(OpenMatImageJsonCodec.readStringList(openMat.getImageUrlsJson()))
                 .region(openMat.getRegion())
                 .maxCapacity(openMat.getMaxCapacity())
                 .currentParticipants(currentParticipants)
