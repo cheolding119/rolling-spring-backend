@@ -69,9 +69,8 @@ public class TournamentManagerService {
 
     @Transactional
     public TournamentCrawlResult crawlAndSaveAll() {
-        int deletedCount = deleteExpiredTournamentsByRegistrationDeadline();
         List<TournamentModel> crawled = crawlAll();
-        return saveCrawledTournaments(crawled, deletedCount);
+        return saveCrawledTournaments(crawled);
     }
 
     @Transactional
@@ -81,12 +80,11 @@ public class TournamentManagerService {
         }
 
         TournamentCrawler crawler = findCrawlerBySource(source);
-        int deletedCount = deleteExpiredTournamentsByRegistrationDeadline();
         List<TournamentModel> crawled = crawlSingle(crawler);
-        return saveCrawledTournaments(crawled, deletedCount);
+        return saveCrawledTournaments(crawled);
     }
 
-    private TournamentCrawlResult saveCrawledTournaments(List<TournamentModel> crawled, int deletedCount) {
+    private TournamentCrawlResult saveCrawledTournaments(List<TournamentModel> crawled) {
         List<TournamentModel> safeCrawled = crawled == null ? List.of() : crawled;
 
         int createdCount = 0;
@@ -112,8 +110,6 @@ public class TournamentManagerService {
             }
         }
 
-        incrementDeletedTournaments(deletedCount);
-
         TournamentCrawlResult crawlResult = TournamentCrawlResult.builder()
                 .crawledCount(safeCrawled.size())
                 .createdCount(createdCount)
@@ -121,8 +117,7 @@ public class TournamentManagerService {
                 .skippedCount(skippedCount)
                 .build();
 
-        log.info("Tournament crawl/save finished: deleted={}, crawled={}, created={}, updated={}, skipped={}",
-                deletedCount,
+        log.info("Tournament crawl/save finished: crawled={}, created={}, updated={}, skipped={}",
                 crawlResult.getCrawledCount(),
                 crawlResult.getCreatedCount(),
                 crawlResult.getUpdatedCount(),
@@ -165,27 +160,6 @@ public class TournamentManagerService {
             }
         }
         return safeCrawled;
-    }
-
-    private int deleteExpiredTournamentsByRegistrationDeadline() {
-        LocalDate today = LocalDate.now(SEOUL_ZONE);
-        List<Long> deleteIds = tournamentRepository.findAll().stream()
-                .filter(tournament -> {
-                    LocalDate registrationDeadline = TournamentDateUtils.parse(tournament.getRegistrationDeadline());
-                    return registrationDeadline != null && registrationDeadline.isBefore(today);
-                })
-                .map(Tournament::getId)
-                .filter(id -> id != null)
-                .toList();
-
-        if (deleteIds.isEmpty()) {
-            return 0;
-        }
-
-        tournamentFavoriteRepository.deleteAllByTournament_IdIn(deleteIds);
-        tournamentRepository.deleteAllByIdInBatch(deleteIds);
-        log.info("Deleted expired tournaments by registration deadline. today={}, deletedCount={}", today, deleteIds.size());
-        return deleteIds.size();
     }
 
     private void enrichPosterUrl(TournamentModel crawledModel) {
@@ -366,14 +340,6 @@ public class TournamentManagerService {
         }
         meterRegistry.counter("rolling_tournament_crawl_items_total", "source", source, "result", result)
                 .increment(amount);
-    }
-
-    private void incrementDeletedTournaments(int deletedCount) {
-        if (meterRegistry == null || deletedCount <= 0) {
-            return;
-        }
-        meterRegistry.counter("rolling_tournament_crawl_deleted_total")
-                .increment(deletedCount);
     }
 
     private void recordCrawlDuration(String source, long startedAtNanos) {
