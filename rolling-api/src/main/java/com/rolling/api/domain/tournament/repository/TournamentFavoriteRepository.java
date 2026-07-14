@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +33,4 @@ public interface TournamentFavoriteRepository extends JpaRepository<TournamentFa
     List<TournamentFavorite> findAllByTournament_IdAndNotificationEnabledTrue(Long tournamentId);
 
     void deleteAllByTournament_Id(Long tournamentId);
-
-    void deleteAllByTournament_IdIn(Collection<Long> tournamentIds);
 }

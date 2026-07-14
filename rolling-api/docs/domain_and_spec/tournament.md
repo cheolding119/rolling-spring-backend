@@ -440,3 +440,5 @@ Response data: `TournamentCrawlResult`
 
 - `source`가 없으면 전체 크롤러를 실행한다.
 - `source`가 있으면 해당 출처만 실행한다.
+- 크롤링 시 접수 마감일이 지난 기존 대회와 연결된 찜은 삭제하지 않는다.
+- 접수 마감일이 지난 대회는 조회 응답에서 `registrationClosed=true`로 반환한다.
