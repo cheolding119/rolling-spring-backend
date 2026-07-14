@@ -358,31 +358,8 @@ class TournamentManagerServiceTest {
     }
 
     @Test
-    @DisplayName("크롤링 시작 전에 접수 마감일이 지난 대회는 DB에서 삭제한다")
-    void crawlAndSaveAll_deletesExpiredByRegistrationDeadline() {
-        Tournament expired = Tournament.builder()
-                .source(TournamentSource.STREET_JIU_JITSU)
-                .title("expired")
-                .organizer("org")
-                .competitionDate(LocalDate.now().plusDays(2).toString())
-                .registrationDeadline(LocalDate.now().minusDays(1).toString())
-                .location("서울")
-                .applyLink("https://expired")
-                .build();
-        ReflectionTestUtils.setField(expired, "id", 10L);
-
-        Tournament active = Tournament.builder()
-                .source(TournamentSource.KOREA_JIU)
-                .title("active")
-                .organizer("org")
-                .competitionDate(LocalDate.now().plusDays(3).toString())
-                .registrationDeadline(LocalDate.now().plusDays(1).toString())
-                .location("서울")
-                .applyLink("https://active")
-                .build();
-        ReflectionTestUtils.setField(active, "id", 11L);
-
-        when(tournamentRepository.findAll()).thenReturn(List.of(expired, active));
+    @DisplayName("크롤링 시 접수 마감일이 지난 기존 대회와 즐겨찾기를 삭제하지 않는다")
+    void crawlAndSaveAll_keepsExpiredTournamentAndFavorite() {
         when(successCrawler.crawlAll()).thenReturn(List.of());
 
         TournamentManagerService managerService =
@@ -391,8 +368,8 @@ class TournamentManagerServiceTest {
         TournamentCrawlResult result = managerService.crawlAndSaveAll();
 
         assertThat(result.getCrawledCount()).isEqualTo(0);
-        verify(tournamentFavoriteRepository).deleteAllByTournament_IdIn(List.of(10L));
-        verify(tournamentRepository).deleteAllByIdInBatch(List.of(10L));
+        verify(tournamentRepository, never()).findAll();
+        verify(tournamentRepository, never()).deleteAllByIdInBatch(any());
     }
 
     @Test
