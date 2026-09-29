@@ -27,14 +27,15 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-    command: |
-      test -n "$$SLACK_METRICS_ALERT_WEBHOOK_URL"
-      sed \
-        -e "s|__SLACK_METRICS_ALERT_WEBHOOK_URL__|$$SLACK_METRICS_ALERT_WEBHOOK_URL|g" \
-        -e "s|__SLACK_METRICS_ALERT_ENVIRONMENT__|$$SLACK_METRICS_ALERT_ENVIRONMENT|g" \
-        -e "s|__GRAFANA_ROOT_URL__|$$GRAFANA_ROOT_URL|g" \
-        /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
-      exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    command:
+      - |
+        test -n "$$SLACK_METRICS_ALERT_WEBHOOK_URL"
+        sed \
+          -e "s|__SLACK_METRICS_ALERT_WEBHOOK_URL__|$$SLACK_METRICS_ALERT_WEBHOOK_URL|g" \
+          -e "s|__SLACK_METRICS_ALERT_ENVIRONMENT__|$$SLACK_METRICS_ALERT_ENVIRONMENT|g" \
+          -e "s|__GRAFANA_ROOT_URL__|$$GRAFANA_ROOT_URL|g" \
+          /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
     volumes:
       - ./monitoring/alertmanager/alertmanager.yml.tmpl:/etc/alertmanager/alertmanager.yml.tmpl:ro
       - alertmanager_data:/alertmanager
