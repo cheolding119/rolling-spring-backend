@@ -118,6 +118,7 @@ public class Tournament extends BaseTimeEntity {
                                   String competitionDate,
                                   String registrationDeadline,
                                   String location,
+                                  Region region,
                                   String applyLink) {
         this.title = title;
         this.organizer = organizer;
@@ -125,6 +126,9 @@ public class Tournament extends BaseTimeEntity {
         this.competitionDate = competitionDate;
         this.registrationDeadline = registrationDeadline;
         this.location = location;
+        if (region != null) {
+            this.region = region;
+        }
         this.applyLink = applyLink;
     }
 

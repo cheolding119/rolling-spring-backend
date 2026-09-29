@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.service;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.tournament.crawler.HeroesOfJiuJitsuCrawler;
 import com.rolling.api.domain.tournament.crawler.KoreaJiuCrawler;
 import com.rolling.api.domain.tournament.crawler.StreetJiuJitsuCrawler;
@@ -167,6 +168,108 @@ class TournamentManagerServiceTest {
         assertThat(existing.getApplyLink()).isEqualTo(model.getApplyLink());
         verify(tournamentRepository).findByApplyLink(model.getApplyLink());
         verify(tournamentRepository).findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate());
+    }
+
+    @Test
+    @DisplayName("수동 등록한 FlowComp 대회는 제목과 날짜가 달라도 대회 번호로 찾아 건너뛴다")
+    void crawlAndSaveAll_skipsManualFlowCompByChampionshipId() {
+        TournamentModel model = validModel(
+                "PROVA20 화성",
+                "2099-10-03",
+                "경기 화성시 향남로 470",
+                "https://www.flowcomp.co.kr/championship/76"
+        );
+        model.setPosterUrl(null);
+        Tournament manual = Tournament.builder()
+                .hostUserId(10L)
+                .source(TournamentSource.MANUAL)
+                .title("PROVA 20 화성 주짓수대회")
+                .competitionDate("2099-10-04")
+                .location("기존 수동 장소")
+                .region(Region.GYEONGGI)
+                .applyLink("https://flowcomp.co.kr/championship/76")
+                .build();
+        ReflectionTestUtils.setField(manual, "id", 208L);
+
+        when(successCrawler.getSource()).thenReturn(TournamentSource.FLOWCOMP);
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(tournamentRepository.findAllByApplyLinkContaining("flowcomp.co.kr/championship/"))
+                .thenReturn(List.of(manual));
+
+        TournamentCrawlResult result = managerService(successCrawler).crawlAndSaveAll();
+
+        assertThat(result.getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCreatedCount()).isZero();
+        assertThat(result.getUpdatedCount()).isZero();
+        assertThat(manual.getTitle()).isEqualTo("PROVA 20 화성 주짓수대회");
+        assertThat(manual.getCompetitionDate()).isEqualTo("2099-10-04");
+        assertThat(manual.getApplyLink()).isEqualTo("https://flowcomp.co.kr/championship/76");
+        verify(tournamentRepository, never()).save(any());
+        verify(s3Uploader, never()).uploadImageFromUrl(anyString());
+    }
+
+    @Test
+    @DisplayName("FlowComp 신규 대회는 이미지 없이 지역을 저장한다")
+    void crawlAndSaveAll_createsFlowCompWithRegionWithoutImage() {
+        TournamentModel model = validModel(
+                "IRIS CHAMPIONSHIP IN 광주",
+                "2099-11-22",
+                "전남광주통합특별시 북구 북문대로 200",
+                "https://www.flowcomp.co.kr/championship/98"
+        );
+        model.setPosterUrl(null);
+        AtomicReference<Tournament> saved = new AtomicReference<>();
+        when(successCrawler.getSource()).thenReturn(TournamentSource.FLOWCOMP);
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(tournamentRepository.findAllByApplyLinkContaining("flowcomp.co.kr/championship/"))
+                .thenReturn(List.of());
+        when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
+        when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
+                .thenReturn(Optional.empty());
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> {
+            Tournament tournament = invocation.getArgument(0);
+            saved.set(tournament);
+            return tournament;
+        });
+
+        TournamentCrawlResult result = managerService(successCrawler).crawlAndSaveAll();
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        assertThat(saved.get().getRegion()).isEqualTo(Region.GWANGJU);
+        assertThat(saved.get().getPosterUrl()).isNull();
+        assertThat(saved.get().getSource()).isEqualTo(TournamentSource.FLOWCOMP);
+        verify(s3Uploader, never()).uploadImageFromUrl(anyString());
+    }
+
+    @Test
+    @DisplayName("제목과 개최일이 같은 수동 대회도 크롤러가 덮어쓰지 않는다")
+    void crawlAndSaveAll_skipsManualByTitleAndDate() {
+        TournamentModel model = validModel(
+                "서울 주짓수 오픈",
+                "2099-10-03",
+                "서울 서초구 체육관",
+                "https://example.com/new-registration"
+        );
+        model.setPosterUrl(null);
+        Tournament manual = Tournament.builder()
+                .hostUserId(11L)
+                .source(TournamentSource.MANUAL)
+                .title(model.getTitle())
+                .competitionDate(model.getCompetitionDate())
+                .location("기존 장소")
+                .applyLink("https://example.com/manual-registration")
+                .build();
+        ReflectionTestUtils.setField(manual, "id", 209L);
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(tournamentRepository.findByApplyLink(model.getApplyLink())).thenReturn(Optional.empty());
+        when(tournamentRepository.findByTitleAndCompetitionDate(model.getTitle(), model.getCompetitionDate()))
+                .thenReturn(Optional.of(manual));
+
+        TournamentCrawlResult result = managerService(successCrawler).crawlAndSaveAll();
+
+        assertThat(result.getSkippedCount()).isEqualTo(1);
+        assertThat(manual.getLocation()).isEqualTo("기존 장소");
+        verify(tournamentRepository, never()).save(any());
     }
 
     @Test

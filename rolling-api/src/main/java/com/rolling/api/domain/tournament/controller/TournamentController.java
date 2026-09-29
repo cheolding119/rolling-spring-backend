@@ -54,7 +54,7 @@ public class TournamentController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<TournamentResponse>>> list(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Parameter(description = "출처 필터 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, MANUAL)")
+            @Parameter(description = "출처 필터 (STREET_JIU_JITSU, KOREA_JIU, HEROES_OF_JIU_JITSU, SPOTLITE, FLOWCOMP, MANUAL)")
             @RequestParam(required = false) TournamentSource source,
             @Parameter(description = "지역 필터 (예: SEOUL, GYEONGGI)")
             @RequestParam(required = false) Region region,

@@ -1,5 +1,6 @@
 package com.rolling.api.domain.tournament.service;
 
+import com.rolling.api.domain.openmat.entity.Region;
 import com.rolling.api.domain.tournament.crawler.TournamentCrawler;
 import com.rolling.api.domain.tournament.dto.TournamentCrawlResult;
 import com.rolling.api.domain.tournament.entity.Tournament;
@@ -9,6 +10,7 @@ import com.rolling.api.domain.tournament.model.TournamentModel;
 import com.rolling.api.domain.tournament.repository.TournamentFavoriteRepository;
 import com.rolling.api.domain.tournament.repository.TournamentRepository;
 import com.rolling.api.domain.tournament.util.TournamentDateUtils;
+import com.rolling.api.domain.tournament.util.TournamentRegionResolver;
 import com.rolling.api.global.exception.BusinessException;
 import com.rolling.api.infra.s3.S3Uploader;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -18,13 +20,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -32,6 +41,9 @@ import java.util.Optional;
 public class TournamentManagerService {
 
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+    private static final String FLOWCOMP_LINK_FRAGMENT = "flowcomp.co.kr/championship/";
+    private static final Set<String> FLOWCOMP_HOSTS = Set.of("flowcomp.co.kr", "www.flowcomp.co.kr");
+    private static final Pattern FLOWCOMP_PATH = Pattern.compile("^/championship/(\\d+)/?$");
 
     private final List<TournamentCrawler> crawlers;
     private final TournamentRepository tournamentRepository;
@@ -86,6 +98,7 @@ public class TournamentManagerService {
 
     private TournamentCrawlResult saveCrawledTournaments(List<TournamentModel> crawled) {
         List<TournamentModel> safeCrawled = crawled == null ? List.of() : crawled;
+        Map<Long, Tournament> existingFlowComp = loadExistingFlowComp(safeCrawled);
 
         int createdCount = 0;
         int updatedCount = 0;
@@ -100,13 +113,16 @@ public class TournamentManagerService {
                 continue;
             }
 
-            UpsertResult result = upsert(normalizedOptional.get());
+            UpsertResult result = upsert(normalizedOptional.get(), existingFlowComp);
             if (result == UpsertResult.CREATED) {
                 createdCount++;
                 incrementTournamentItems(sourceTag(normalizedOptional.get().source()), "created", 1);
-            } else {
+            } else if (result == UpsertResult.UPDATED) {
                 updatedCount++;
                 incrementTournamentItems(sourceTag(normalizedOptional.get().source()), "updated", 1);
+            } else {
+                skippedCount++;
+                incrementTournamentItems(sourceTag(normalizedOptional.get().source()), "skipped", 1);
             }
         }
 
@@ -184,6 +200,7 @@ public class TournamentManagerService {
                 normalizeDate(crawledModel.getCompetitionDate()),
                 normalizeDate(crawledModel.getRegistrationDeadline()),
                 normalize(crawledModel.getLocation()),
+                TournamentRegionResolver.resolve(crawledModel.getLocation()),
                 normalize(crawledModel.getApplyLink())
         );
 
@@ -232,8 +249,14 @@ public class TournamentManagerService {
         return Optional.of(normalizedTournament);
     }
 
-    private UpsertResult upsert(NormalizedTournament normalizedTournament) {
-        Optional<Tournament> existingByApplyLink = tournamentRepository.findByApplyLink(normalizedTournament.applyLink());
+    private UpsertResult upsert(NormalizedTournament normalizedTournament, Map<Long, Tournament> existingFlowComp) {
+        Long flowCompId = flowCompId(normalizedTournament.applyLink());
+        Tournament knownFlowComp = normalizedTournament.source() == TournamentSource.FLOWCOMP && flowCompId != null
+                ? existingFlowComp.get(flowCompId)
+                : null;
+        Optional<Tournament> existingByApplyLink = knownFlowComp != null
+                ? Optional.of(knownFlowComp)
+                : tournamentRepository.findByApplyLink(normalizedTournament.applyLink());
 
         Tournament tournament = existingByApplyLink
                 .orElseGet(() -> tournamentRepository
@@ -247,14 +270,23 @@ public class TournamentManagerService {
                                 .competitionDate(normalizedTournament.competitionDate())
                                 .registrationDeadline(normalizedTournament.registrationDeadline())
                                 .location(normalizedTournament.location())
+                                .region(normalizedTournament.region())
                                 .applyLink(normalizedTournament.applyLink())
                                 .build()));
 
         boolean isNew = tournament.getId() == null;
+        if (!isNew && isProtectedExisting(tournament, normalizedTournament.source())) {
+            return UpsertResult.SKIPPED;
+        }
         tournament.assignSourceIfAbsent(normalizedTournament.source());
         String effectivePosterUrl = normalizedTournament.posterUrl() != null
                 ? normalizedTournament.posterUrl()
                 : tournament.getPosterUrl();
+        String effectiveApplyLink = normalizedTournament.source() == TournamentSource.FLOWCOMP
+                && flowCompId != null
+                && flowCompId.equals(flowCompId(tournament.getApplyLink()))
+                ? tournament.getApplyLink()
+                : normalizedTournament.applyLink();
 
         tournament.updateFromCrawler(
                 normalizedTournament.title(),
@@ -263,14 +295,63 @@ public class TournamentManagerService {
                 normalizedTournament.competitionDate(),
                 normalizedTournament.registrationDeadline(),
                 normalizedTournament.location(),
-                normalizedTournament.applyLink()
+                normalizedTournament.region(),
+                effectiveApplyLink
         );
-        tournamentRepository.save(tournament);
+        Tournament saved = tournamentRepository.save(tournament);
+        if (normalizedTournament.source() == TournamentSource.FLOWCOMP && flowCompId != null) {
+            existingFlowComp.put(flowCompId, saved);
+        }
         if (!isNew) {
             disableInvalidReminders(tournament);
         }
 
         return isNew ? UpsertResult.CREATED : UpsertResult.UPDATED;
+    }
+
+    private Map<Long, Tournament> loadExistingFlowComp(List<TournamentModel> crawled) {
+        if (crawled.stream().noneMatch(model -> model != null && model.getSource() == TournamentSource.FLOWCOMP)) {
+            return Map.of();
+        }
+
+        Map<Long, Tournament> existing = new HashMap<>();
+        for (Tournament tournament : tournamentRepository.findAllByApplyLinkContaining(FLOWCOMP_LINK_FRAGMENT)) {
+            Long id = flowCompId(tournament.getApplyLink());
+            if (id != null) {
+                existing.merge(id, tournament, (first, second) -> isManual(second) ? second : first);
+            }
+        }
+        return existing;
+    }
+
+    private boolean isProtectedExisting(Tournament tournament, TournamentSource source) {
+        return isManual(tournament)
+                || tournament.getSource() != null && tournament.getSource() != source;
+    }
+
+    private boolean isManual(Tournament tournament) {
+        return tournament.getSource() == TournamentSource.MANUAL || tournament.getHostUserId() != null;
+    }
+
+    private Long flowCompId(String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            String path = uri.getPath();
+            if (host == null || path == null || !FLOWCOMP_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+                return null;
+            }
+            Matcher match = FLOWCOMP_PATH.matcher(path);
+            if (!match.matches()) {
+                return null;
+            }
+            return Long.parseLong(match.group(1));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private void disableInvalidReminders(Tournament tournament) {
@@ -319,7 +400,8 @@ public class TournamentManagerService {
 
     private enum UpsertResult {
         CREATED,
-        UPDATED
+        UPDATED,
+        SKIPPED
     }
 
     private record NormalizedTournament(
@@ -330,6 +412,7 @@ public class TournamentManagerService {
             String competitionDate,
             String registrationDeadline,
             String location,
+            Region region,
             String applyLink
     ) {
     }

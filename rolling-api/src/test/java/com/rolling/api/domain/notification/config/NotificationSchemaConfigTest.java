@@ -1,7 +1,11 @@
 package com.rolling.api.domain.notification.config;
 
+import com.rolling.api.domain.notification.model.PushNotificationType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,7 +38,10 @@ class NotificationSchemaConfigTest {
     @Test
     @DisplayName("현재 constraint 정의에 enum 값이 모두 있으면 동기화가 필요 없다고 판단한다")
     void containsAllAllowedTypes_whenDefinitionContainsAllValues_returnsTrue() {
-        String definition = "CHECK (((type)::text = ANY ((ARRAY['OPEN_MAT_UPDATED'::character varying, 'OPEN_MAT_DELETED'::character varying, 'SEMINAR_APPLIED'::character varying, 'SEMINAR_APPLICATION_CANCELED'::character varying, 'SEMINAR_APPLICATION_CANCELED_BY_HOST'::character varying, 'SEMINAR_UPDATED'::character varying, 'SEMINAR_DELETED'::character varying, 'SEMINAR_CANCELED'::character varying, 'INQUIRY_ANSWERED'::character varying, 'COMMUNITY_COMMENT_CREATED'::character varying, 'FRIEND_REQUEST_RECEIVED'::character varying, 'TRAINING_LOG_COMMENT_CREATED'::character varying, 'TRAINING_LOG_COMMENT_REPLY_CREATED'::character varying, 'TOURNAMENT_FAVORITE_REMINDER'::character varying])::text[])))";
+        String allowedTypes = Arrays.stream(PushNotificationType.values())
+                .map(type -> "'" + type.name() + "'::character varying")
+                .collect(Collectors.joining(", "));
+        String definition = "CHECK (((type)::text = ANY ((ARRAY[" + allowedTypes + "])::text[])))";
 
         assertThat(config.containsAllAllowedTypes(definition)).isTrue();
     }
