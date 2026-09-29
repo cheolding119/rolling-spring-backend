@@ -5,5 +5,6 @@ public enum TournamentSource {
     KOREA_JIU,
     HEROES_OF_JIU_JITSU,
     SPOTLITE,
+    FLOWCOMP,
     MANUAL
 }
