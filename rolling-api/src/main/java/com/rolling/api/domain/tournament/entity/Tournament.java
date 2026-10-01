@@ -112,7 +112,8 @@ public class Tournament extends BaseTimeEntity {
         }
     }
 
-    public void updateFromCrawler(String title,
+    public void updateFromCrawler(TournamentSource source,
+                                  String title,
                                   String organizer,
                                   String posterUrl,
                                   String competitionDate,
@@ -120,6 +121,7 @@ public class Tournament extends BaseTimeEntity {
                                   String location,
                                   Region region,
                                   String applyLink) {
+        this.source = source;
         this.title = title;
         this.organizer = organizer;
         this.posterUrl = posterUrl;

@@ -237,8 +237,46 @@ class TournamentManagerServiceTest {
         assertThat(result.getCreatedCount()).isEqualTo(1);
         assertThat(saved.get().getRegion()).isEqualTo(Region.GWANGJU);
         assertThat(saved.get().getPosterUrl()).isNull();
-        assertThat(saved.get().getSource()).isEqualTo(TournamentSource.FLOWCOMP);
+        assertThat(saved.get().getSource()).isEqualTo(TournamentSource.MANUAL);
         verify(s3Uploader, never()).uploadImageFromUrl(anyString());
+    }
+
+    @Test
+    @DisplayName("자동 수집된 FlowComp 대회는 MANUAL 출처로 저장하고 다음 크롤링에서 갱신한다")
+    void crawlAndSaveAll_updatesPreviouslyCrawledFlowCompSavedAsManual() {
+        TournamentModel model = validModel(
+                "업데이트된 FlowComp 대회",
+                "2099-12-01",
+                "서울 송파구 체육관",
+                "https://www.flowcomp.co.kr/championship/102"
+        );
+        model.setSource(TournamentSource.FLOWCOMP);
+        model.setPosterUrl(null);
+
+        Tournament existing = Tournament.builder()
+                .hostUserId(null)
+                .source(TournamentSource.MANUAL)
+                .title("이전 FlowComp 제목")
+                .competitionDate("2099-11-30")
+                .location("이전 장소")
+                .applyLink("https://flowcomp.co.kr/championship/102")
+                .build();
+        ReflectionTestUtils.setField(existing, "id", 212L);
+
+        when(successCrawler.getSource()).thenReturn(TournamentSource.FLOWCOMP);
+        when(successCrawler.crawlAll()).thenReturn(List.of(model));
+        when(tournamentRepository.findAllByApplyLinkContaining("flowcomp.co.kr/championship/"))
+                .thenReturn(List.of(existing));
+        when(tournamentRepository.save(any(Tournament.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TournamentCrawlResult result = managerService(successCrawler).crawlAndSaveAll();
+
+        assertThat(result.getUpdatedCount()).isEqualTo(1);
+        assertThat(existing.getSource()).isEqualTo(TournamentSource.MANUAL);
+        assertThat(existing.getTitle()).isEqualTo("업데이트된 FlowComp 대회");
+        assertThat(existing.getCompetitionDate()).isEqualTo("2099-12-01");
+        assertThat(existing.getApplyLink()).isEqualTo("https://flowcomp.co.kr/championship/102");
+        verify(tournamentRepository).save(existing);
     }
 
     @Test
