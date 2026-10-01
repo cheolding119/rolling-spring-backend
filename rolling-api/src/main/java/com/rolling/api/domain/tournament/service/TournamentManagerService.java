@@ -263,7 +263,7 @@ public class TournamentManagerService {
                         .findByTitleAndCompetitionDate(normalizedTournament.title(), normalizedTournament.competitionDate())
                         .orElseGet(() -> Tournament.builder()
                                 .hostUserId(null)
-                                .source(normalizedTournament.source())
+                                .source(persistedSource(normalizedTournament.source()))
                                 .title(normalizedTournament.title())
                                 .organizer(normalizedTournament.organizer())
                                 .posterUrl(normalizedTournament.posterUrl())
@@ -275,10 +275,9 @@ public class TournamentManagerService {
                                 .build()));
 
         boolean isNew = tournament.getId() == null;
-        if (!isNew && isProtectedExisting(tournament, normalizedTournament.source())) {
+        if (!isNew && isProtectedExisting(tournament, normalizedTournament.source(), flowCompId)) {
             return UpsertResult.SKIPPED;
         }
-        tournament.assignSourceIfAbsent(normalizedTournament.source());
         String effectivePosterUrl = normalizedTournament.posterUrl() != null
                 ? normalizedTournament.posterUrl()
                 : tournament.getPosterUrl();
@@ -289,6 +288,7 @@ public class TournamentManagerService {
                 : normalizedTournament.applyLink();
 
         tournament.updateFromCrawler(
+                persistedSource(normalizedTournament.source()),
                 normalizedTournament.title(),
                 normalizedTournament.organizer(),
                 effectivePosterUrl,
@@ -318,19 +318,40 @@ public class TournamentManagerService {
         for (Tournament tournament : tournamentRepository.findAllByApplyLinkContaining(FLOWCOMP_LINK_FRAGMENT)) {
             Long id = flowCompId(tournament.getApplyLink());
             if (id != null) {
-                existing.merge(id, tournament, (first, second) -> isManual(second) ? second : first);
+                existing.merge(id, tournament, (first, second) ->
+                        isUserCreatedManual(second) && !isUserCreatedManual(first) ? second : first);
             }
         }
         return existing;
     }
 
-    private boolean isProtectedExisting(Tournament tournament, TournamentSource source) {
-        return isManual(tournament)
+    private boolean isProtectedExisting(Tournament tournament, TournamentSource source, Long flowCompId) {
+        if (tournament.getHostUserId() != null) {
+            return true;
+        }
+
+        boolean sameFlowCompEvent = source == TournamentSource.FLOWCOMP
+                && flowCompId != null
+                && flowCompId.equals(flowCompId(tournament.getApplyLink()));
+        if (sameFlowCompEvent
+                && (tournament.getSource() == null
+                || tournament.getSource() == TournamentSource.MANUAL
+                || tournament.getSource() == TournamentSource.FLOWCOMP)) {
+            return false;
+        }
+
+        return tournament.getSource() == TournamentSource.MANUAL
                 || tournament.getSource() != null && tournament.getSource() != source;
     }
 
-    private boolean isManual(Tournament tournament) {
-        return tournament.getSource() == TournamentSource.MANUAL || tournament.getHostUserId() != null;
+    private boolean isUserCreatedManual(Tournament tournament) {
+        return tournament.getHostUserId() != null
+                || tournament.getSource() == TournamentSource.MANUAL
+                && flowCompId(tournament.getApplyLink()) == null;
+    }
+
+    private TournamentSource persistedSource(TournamentSource crawlerSource) {
+        return crawlerSource == TournamentSource.FLOWCOMP ? TournamentSource.MANUAL : crawlerSource;
     }
 
     private Long flowCompId(String url) {
