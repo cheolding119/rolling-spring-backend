@@ -6,6 +6,7 @@ import com.rolling.api.domain.auth.dto.TokenRefreshRequest;
 import com.rolling.api.domain.auth.dto.TokenRefreshResponse;
 import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
 import com.rolling.api.domain.auth.entity.RefreshToken;
+import com.rolling.api.domain.achievement.repository.TournamentAchievementRepository;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.AccountStatus;
@@ -57,6 +58,7 @@ public class AuthService {
     private final AppleTokenVerifier appleTokenVerifier;
     private final UserRepository userRepository;
     private final UserDeviceRepository userDeviceRepository;
+    private final TournamentAchievementRepository tournamentAchievementRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenHashProvider refreshTokenHashProvider;
@@ -252,6 +254,7 @@ public class AuthService {
             for (User user : targets) {
                 refreshTokenRepository.deleteByUserId(user.getId());
                 userDeviceRepository.deleteAllByUser_Id(user.getId());
+                tournamentAchievementRepository.deleteAllByUserId(user.getId());
                 user.withdraw();
                 log.info("Withdraw executed - userId: {}", user.getId());
             }

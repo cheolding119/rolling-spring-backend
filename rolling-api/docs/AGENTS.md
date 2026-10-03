@@ -110,6 +110,8 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - 오픈매트: [domain_and_spec/openmat.md](domain_and_spec/openmat.md)
 - 세미나: [domain_and_spec/seminar.md](domain_and_spec/seminar.md)
 - 세미나 제품 계획: [domain_and_spec/seminar-product-plan.md](domain_and_spec/seminar-product-plan.md)
+- 대회 성적 도메인/API: [domain_and_spec/tournament-achievement.md](domain_and_spec/tournament-achievement.md)
+- 대회 성적 제품 계획: [product_plans/tournament-achievement-product-plan.md](product_plans/tournament-achievement-product-plan.md)
 - 훈련 기록: [domain_and_spec/training-log.md](domain_and_spec/training-log.md)
 - 훈련 기록 인사이트: [domain_and_spec/training-log-insight.md](domain_and_spec/training-log-insight.md)
 - 훈련 기록 소셜: [domain_and_spec/training-log-social.md](domain_and_spec/training-log-social.md)
@@ -125,6 +127,8 @@ cd C:\rolling\rolling-spring-backend\rolling-api
 - [openmat.md](domain_and_spec/openmat.md): 오픈매트 도메인 모델 + API 스펙
 - [seminar.md](domain_and_spec/seminar.md): 세미나 도메인 모델 + API 스펙
 - [seminar-product-plan.md](domain_and_spec/seminar-product-plan.md): 세미나 제품 범위와 출시 계획
+- [tournament-achievement.md](domain_and_spec/tournament-achievement.md): 대회 성적 도메인 및 API 계약
+- [tournament-achievement-product-plan.md](product_plans/tournament-achievement-product-plan.md): 대회 성적 및 메달 기록 제품 기획
 - [training-log.md](domain_and_spec/training-log.md): 훈련 기록 도메인 모델 + API 스펙
 - [training-log-insight.md](domain_and_spec/training-log-insight.md): 훈련 기록 출석 잔디와 주간/월간 인사이트 도메인/API 스펙
 - [training-log-social.md](domain_and_spec/training-log-social.md): 훈련 기록 친구 관계, 친구 열람, 좋아요, 댓글, 대댓글, 댓글 알림 스펙

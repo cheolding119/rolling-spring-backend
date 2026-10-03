@@ -1,6 +1,7 @@
 package com.rolling.api.domain.auth.service;
 
 import com.rolling.api.domain.auth.dto.WithdrawStatusResponse;
+import com.rolling.api.domain.achievement.repository.TournamentAchievementRepository;
 import com.rolling.api.domain.auth.repository.RefreshTokenRepository;
 import com.rolling.api.domain.user.entity.BeltColor;
 import com.rolling.api.domain.user.entity.SocialProvider;
@@ -58,6 +59,9 @@ class AuthServiceWithdrawTest {
     private UserDeviceRepository userDeviceRepository;
 
     @Mock
+    private TournamentAchievementRepository tournamentAchievementRepository;
+
+    @Mock
     private JwtTokenProvider jwtTokenProvider;
 
     @Mock
@@ -110,6 +114,7 @@ class AuthServiceWithdrawTest {
         assertThat(user.getIsWithdrawn()).isFalse();
         verify(refreshTokenRepository, never()).deleteByUserId(10L);
         verify(userDeviceRepository, never()).deleteAllByUser_Id(10L);
+        verify(tournamentAchievementRepository, never()).deleteAllByUserId(10L);
     }
 
     @Test
@@ -171,6 +176,7 @@ class AuthServiceWithdrawTest {
 
         verify(refreshTokenRepository).deleteByUserId(30L);
         verify(userDeviceRepository).deleteAllByUser_Id(30L);
+        verify(tournamentAchievementRepository).deleteAllByUserId(30L);
         assertThat(user.getIsWithdrawn()).isTrue();
         assertThat(user.getWithdrawalPending()).isFalse();
         assertThat(user.getEmail()).isNull();
